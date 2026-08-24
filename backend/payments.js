@@ -95,7 +95,9 @@
     return true;
   }
 
-  async function criarCobrancaAbacate(pag, plano, dono) {
+  async function criarCobrancaAbacate(pag, plano) {
+    /* customer é opcional no PIX e EXIGE taxId quando informado —
+       como não coletamos CPF do dono, enviamos só o essencial */
     const resp = await fetch(URL_API + '/transparents/create', {
       method: 'POST',
       headers: {
@@ -109,21 +111,17 @@
           expiresIn: EXPIRA_EM_SEG,
           description: 'Corte Certo — Plano ' + plano.name + ' (30 dias)',
           externalId: 'cc_pay_' + pag.id,
-          customer: {
-            name: dono.name || 'Dono',
-            email: dono.email || undefined,
-            cellphone: dono.phone ? '(' + dono.phone.slice(0, 2) + ') ' +
-              dono.phone.slice(2, 7) + '-' + dono.phone.slice(7) : undefined
-          },
           metadata: { payment_db_id: String(pag.id), barbershop_id: String(pag.barbershop_id), plan_id: String(pag.plan_id) }
         }
       })
     });
     let corpo = null;
     try { corpo = await resp.json(); } catch (e) { /* resposta não-JSON */ }
-    if (!resp.ok || !corpo || !corpo.data) {
-      console.error('[payments] AbacatePay', resp.status, corpo && corpo.error);
-      throw { status: 502, error: 'Falha ao gerar o PIX na AbacatePay. Tente novamente.' };
+    if (!resp.ok || !corpo || corpo.success !== true || !corpo.data) {
+      const motivo = (corpo && (corpo.error && (corpo.error.message || corpo.error))) ||
+        ('HTTP ' + resp.status);
+      console.error('[payments] AbacatePay recusou a cobrança:', motivo);
+      throw { status: 502, error: 'Falha ao gerar o PIX na AbacatePay (' + motivo + '). Tente novamente.' };
     }
     return corpo.data;
   }
@@ -135,7 +133,7 @@
    * cobrança pendente ainda válida da mesma loja+plano.
    */
   async function criarCobrancaPlano(planId) {
-    const { shop, user } = exigirDonoLocal();
+    const { shop } = exigirDonoLocal();
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
@@ -163,7 +161,7 @@
     };
 
     if (pag.provider === 'abacatepay') {
-      const d = await criarCobrancaAbacate(pag, plano, user);
+      const d = await criarCobrancaAbacate(pag, plano);
       pag.abacate_id = d.id;
       pag.br_code = d.brCode || '';
       pag.qr_base64 = d.brCodeBase64 || '';
