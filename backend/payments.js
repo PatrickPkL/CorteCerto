@@ -337,7 +337,7 @@
     statusCobranca,
     listarMinhasCobrancas,
     confirmarCobrancaDemo,
-    simularPagamento,
+    simularCobranca: simularPagamento,
     processarEventoWebhook,
     acessoLiberado
   });
