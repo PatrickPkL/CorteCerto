@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/admin-login.css">
+</head>
+<body data-page="login">
+<div class="stripe"></div>
+<a href="../public/catalogo.html" class="btn-back">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  Voltar ao catálogo
+</a>
+<div class="login-shell">
+
+  <div class="login-visual">
+    <h1>Sua barbearia, no ritmo certo.</h1>
+    <p>Agende, acompanhe e organize seus clientes em um só lugar — feito para o dia a dia de quem corta, apara e cuida.</p>
+  </div>
+
+  <div class="login-form-side">
+    <div class="login-card">
+      <div class="brand" style="border:none; margin-bottom:24px;">Corte<span>Certo</span></div>
+
+      <div class="role-selector">
+        <button type="button" class="role-btn active" data-role="cliente">Cliente</button>
+        <button type="button" class="role-btn" data-role="dono">Salão / Barbearia</button>
+      </div>
+
+      <div class="demo-hint">
+        <strong>Demo:</strong> informe seu telefone com DDD e receba um código de verificação por SMS.
+        Em modo de demonstração o código aparece direto na tela.
+      </div>
+
+      <!-- CLIENTE -->
+      <div id="painel-cliente">
+        <div class="login-tabs">
+          <div class="login-tab active" id="tab-cli-entrar">Entrar</div>
+          <div class="login-tab" id="tab-cli-criar">Criar conta</div>
+        </div>
+
+        <form id="form-cli-login">
+          <div class="field">
+            <label for="cli-tel">Telefone (com DDD)</label>
+            <input type="tel" id="cli-tel" placeholder="(71) 99999-0000" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+        </form>
+
+        <form id="form-cli-cadastro" style="display:none;">
+          <div class="field">
+            <label for="cli-nome">Nome completo</label>
+            <input type="text" id="cli-nome" placeholder="Seu nome" required>
+          </div>
+          <div class="field">
+            <label for="cli-email">E-mail</label>
+            <input type="email" id="cli-email" placeholder="voce@email.com">
+          </div>
+          <div class="field">
+            <label for="cli-tel-cad">Telefone (com DDD)</label>
+            <input type="tel" id="cli-tel-cad" placeholder="(71) 99999-0000" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta</button>
+        </form>
+      </div>
+
+      <!-- SALÃO / BARBEARIA -->
+      <div id="painel-dono" style="display:none;">
+        <div class="login-tabs">
+          <div class="login-tab active" id="tab-dono-entrar">Entrar</div>
+          <div class="login-tab" id="tab-dono-criar">Criar conta</div>
+        </div>
+
+        <form id="form-dono-login">
+          <div class="field">
+            <label for="dono-tel">Telefone ou e-mail</label>
+            <input type="text" id="dono-tel" placeholder="(71) 99999-0000 · voce@email.com" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+        </form>
+
+        <form id="form-dono-cadastro" style="display:none;">
+          <div class="field">
+            <label for="cad-nome-resp">Seu nome</label>
+            <input type="text" id="cad-nome-resp" placeholder="Nome do responsável" required>
+          </div>
+          <div class="field">
+            <label for="cad-salao-nome">Nome do salão</label>
+            <input type="text" id="cad-salao-nome" placeholder="Ex: Barbearia São Jorge" required>
+          </div>
+          <div class="field">
+            <label for="cad-email">E-mail</label>
+            <input type="email" id="cad-email" placeholder="contato@seusalao.com.br">
+          </div>
+          <div class="field">
+            <label for="cad-tel">Telefone (com DDD)</label>
+            <input type="tel" id="cad-tel" placeholder="(71) 99999-0000" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta do salão</button>
+        </form>
+      </div>
+
+      <!-- CÓDIGO DE VERIFICAÇÃO (compartilhado entre os papéis) -->
+      <div id="etapa-codigo" style="display:none;">
+        <div class="demo-hint" id="banner-codigo" hidden></div>
+        <h3 class="section-title" style="margin-bottom:12px;">Código de verificação</h3>
+        <p id="codigo-info" style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;"></p>
+        <form id="form-verificar-codigo">
+          <div class="field">
+            <label for="input-codigo">Código de 6 dígitos</label>
+            <input type="text" id="input-codigo" maxlength="6" inputmode="numeric"
+                   placeholder="000000" required autocomplete="one-time-code"
+                   style="text-align:center; font-size:20px; letter-spacing:8px;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Verificar e entrar</button>
+          <p style="text-align:center; margin-top:14px; font-size:13.5px;">
+            <a href="#" id="btn-reenviar" style="color:var(--brass);">Reenviar código</a> ·
+            <a href="#" id="btn-voltar-login" style="color:var(--brass);">Voltar</a>
+          </p>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="../shared/js/db.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="../shared/js/shared.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

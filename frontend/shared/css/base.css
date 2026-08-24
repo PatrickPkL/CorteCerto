@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --ink: #1C1F26;
+  --ink-soft: #2A2E38;
+  --paper: #EDE7DA;
+  --paper-soft: #F5F1E7;
+  --heading: #1C1F26;
+  --text: #22252B;
+  --text-muted: #6B6558;
+  --field-bg: #FFFFFF;
+  --tag-bg: rgba(28,31,38,0.06);
+  --warn-text: #8a611f;
+  --brass: #B8863B;
+  --brass-soft: #D9B87A;
+  --stripe-red: #8C2F2F;
+  --line: #DCD4C2;
+  --success: #4C7A5E;
+  --danger: #A1433C;
+  --radius: 6px;
+  --sidebar-w: 236px;
+  --shadow-sm: 0 1px 3px rgba(28,31,38,0.06);
+  --shadow-md: 0 4px 12px rgba(28,31,38,0.08);
+  --shadow-lg: 0 8px 24px rgba(28,31,38,0.12);
+}
+
+/* Tema escuro suavizado: cinzas escuros no lugar do preto absoluto,
+   com textos de alto contraste para leitura confortável */
+:root[data-theme="dark"] {
+  --ink: #17191F;
+  --ink-soft: #1F222A;
+  --paper: #1B1E24;
+  --paper-soft: #242830;
+  --heading: #F4F0E6;
+  --text: #E6E2D8;
+  --text-muted: #B0A996;
+  --field-bg: #2C313C;
+  --tag-bg: rgba(237,231,218,0.09);
+  --warn-text: #D9B87A;
+  --line: #3A3F4C;
+  --success: #74AE89;
+  --danger: #CE7067;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.35);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+
+body {
+  margin: 0;
+  font-family: 'Work Sans', sans-serif;
+  background: var(--paper);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+h1, h2, h3 {
+  font-family: 'Fraunces', serif;
+  color: var(--heading);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+a { color: inherit; text-decoration: none; }
+
+.stripe {
+  height: 4px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--stripe-red) 0px, var(--stripe-red) 8px,
+    var(--paper-soft) 8px, var(--paper-soft) 16px,
+    var(--brass) 16px, var(--brass) 24px
+  );
+}
+
+/* ---------- Botão de tema ---------- */
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.theme-toggle:hover {
+  background: rgba(184,134,59,0.12);
+  border-color: var(--brass-soft);
+  transform: rotate(-12deg);
+}
+.theme-toggle svg { width: 17px; height: 17px; }
+/* no claro mostra a lua (clique vai p/ escuro); no escuro mostra o sol */
+[data-theme="light"] .theme-toggle .icon-lua { display: block; }
+[data-theme="light"] .theme-toggle .icon-sol { display: none; }
+[data-theme="dark"] .theme-toggle .icon-sol { display: block; }
+[data-theme="dark"] .theme-toggle .icon-lua { display: none; }
+
+/* toggle dentro da sidebar escura */
+.sidebar .theme-toggle,
+.login-topbar .theme-toggle {
+  color: rgba(237,231,218,0.85);
+  border-color: rgba(255,255,255,0.18);
+}
+.sidebar .theme-toggle:hover,
+.login-topbar .theme-toggle:hover {
+  background: rgba(184,134,59,0.2);
+  border-color: var(--brass-soft);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

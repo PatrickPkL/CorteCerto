@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encontre uma barbearia · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/public.css">
+</head>
+<body data-page="catalogo">
+<div class="stripe"></div>
+
+<header class="public-header">
+  <div class="brand">Corte<span>Certo</span></div>
+  <nav class="public-nav">
+    <a href="catalogo.html">Catálogo</a>
+    <span id="nav-auth" class="nav-auth-slot"></span>
+    <a href="../admin/login.html">Sou dono de salão</a>
+  </nav>
+</header>
+
+<main class="public-main">
+  <div class="public-hero">
+    <span class="eyebrow">Catálogo</span>
+    <h1>Encontre a sua barbearia</h1>
+    <p>Veja as barbearias e salões cadastrados, escolha o serviço e agende direto pelo site.</p>
+
+    <div class="public-search">
+      <div class="search-box" style="position:relative;">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="busca-salao" placeholder="Buscar por salão, serviço ou profissional..." autocomplete="off">
+        <div id="sugestoes" hidden></div>
+      </div>
+      <select id="filtro-cidade">
+        <option value="">Todas as cidades</option>
+      </select>
+      <select id="filtro-servico">
+        <option value="">Todos os serviços</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="salon-grid" id="grid-saloes"></div>
+
+  <div class="empty-state" id="estado-vazio" style="display:none;">
+    <h3>Nenhuma barbearia encontrada</h3>
+    <p>Tente mudar a cidade, o serviço ou o termo de busca.</p>
+  </div>
+</main>
+<script src="../shared/js/db.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="../shared/js/shared.js"></script>
+<script src="js/catalogo.js"></script>
+</body>
+</html>

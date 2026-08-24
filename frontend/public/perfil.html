@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meu Perfil · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/public.css">
+</head>
+<body data-page="perfil">
+<div class="stripe"></div>
+
+<header class="public-header">
+  <div class="brand">Corte<span>Certo</span></div>
+  <nav class="public-nav">
+    <a href="catalogo.html">Catálogo</a>
+    <span id="nav-auth" class="nav-auth-slot"></span>
+  </nav>
+</header>
+
+<main class="public-main">
+  <a href="catalogo.html" class="btn-back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Voltar ao catálogo
+  </a>
+
+  <div class="profile-header">
+    <div class="profile-avatar" id="pf-avatar">–</div>
+    <div class="profile-info">
+      <h1 id="pf-nome">Carregando…</h1>
+      <p class="profile-meta" id="pf-meta"></p>
+      <p class="profile-since" id="pf-desde"></p>
+    </div>
+
+  </div>
+
+  <div class="profile-stats">
+    <div class="card">
+      <span class="stat-label">Agendamentos</span>
+      <div class="stat-value" id="st-total">0</div>
+    </div>
+    <div class="card">
+      <span class="stat-label">Gasto total</span>
+      <div class="stat-value mono" id="st-gasto">R$ 0</div>
+    </div>
+    <div class="card">
+      <span class="stat-label">Avaliações feitas</span>
+      <div class="stat-value" id="st-avaliacoes">0</div>
+    </div>
+  </div>
+
+  <div class="profile-tabs">
+    <button class="profile-tab active" data-tab="proximos">Próximos agendamentos</button>
+    <button class="profile-tab" data-tab="historico">Histórico</button>
+    <button class="profile-tab" data-tab="favoritos">Favoritos</button>
+    <button class="profile-tab" data-tab="config">Configurações</button>
+  </div>
+
+  <!-- Próximos agendamentos -->
+  <div class="profile-tab-content active" id="tab-proximos">
+    <div class="card">
+      <h3 class="section-title">Próximos agendamentos</h3>
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Horário</th><th>Salão</th><th>Serviço</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="tb-proximos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Histórico -->
+  <div class="profile-tab-content" id="tab-historico">
+    <div class="card">
+      <h3 class="section-title">Histórico de serviços</h3>
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Salão</th><th>Serviço</th><th>Profissional</th><th>Valor</th><th></th></tr>
+        </thead>
+        <tbody id="tb-historico"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Favoritos -->
+  <div class="profile-tab-content" id="tab-favoritos">
+    <div class="salon-grid" id="lista-favoritos"></div>
+    <div class="empty-state" id="favoritos-vazio" style="display:none;">
+      <h3>Nenhum favorito ainda</h3>
+      <p>Explore o catálogo e guarde suas barbearias preferidas.</p>
+      <a href="catalogo.html" class="btn btn-brass" style="margin-top:12px;">Explorar catálogo</a>
+    </div>
+  </div>
+
+  <!-- Configurações -->
+  <div class="profile-tab-content" id="tab-config">
+    <div class="card-row cols-2">
+      <div class="card">
+        <h3 class="section-title">Dados pessoais</h3>
+        <form id="form-perfil-dados">
+          <div class="field">
+            <label for="pf-input-nome">Nome completo</label>
+            <input type="text" id="pf-input-nome" name="nome">
+          </div>
+          <div class="field">
+            <label for="pf-telefone">Telefone</label>
+            <input type="tel" id="pf-telefone" name="telefone">
+          </div>
+          <div class="field">
+            <label for="pf-email">E-mail</label>
+            <input type="email" id="pf-email" name="email">
+          </div>
+          <button type="submit" class="btn btn-brass">Salvar alterações</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Preferências</h3>
+        <form id="form-perfil-preferencias">
+          <div class="field">
+            <label for="pf-notif-email">Notificações por e-mail</label>
+            <select id="pf-notif-email" name="notif_email">
+              <option value="sim" selected>Sim</option>
+              <option value="não">Não</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pf-notif-sms">Notificações por SMS</label>
+            <select id="pf-notif-sms" name="notif_sms">
+              <option value="sim">Sim</option>
+              <option value="não" selected>Não</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pf-lembrete">Lembrete antes do agendamento</label>
+            <select id="pf-lembrete" name="lembrete">
+              <option value="15">15 minutos antes</option>
+              <option value="30" selected>30 minutos antes</option>
+              <option value="60">1 hora antes</option>
+              <option value="1440">1 dia antes</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-brass">Salvar preferências</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <h3 class="section-title" style="border-bottom:none; margin-bottom:4px;">Sessão</h3>
+          <p style="color:var(--text-muted); font-size:14px;">Encerre sua sessão neste dispositivo.</p>
+        </div>
+        <button class="btn btn-outline" id="btn-sair-perfil" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+          Sair
+        </button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px; border-color: var(--danger);">
+      <h3 class="section-title" style="border-bottom-color: var(--danger);">Zona de risco</h3>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">Ações abaixo não podem ser desfeitas.</p>
+      <button class="btn btn-danger" id="btn-excluir-conta-cliente">Excluir minha conta</button>
+    </div>
+  </div>
+
+  <!-- Modal de avaliação -->
+  <div id="modal-avaliacao" style="display:none;">
+    <div class="card" style="width:400px;">
+      <h3 class="section-title">Avaliar atendimento</h3>
+      <form id="form-avaliacao">
+        <div class="field">
+          <label>Nota</label>
+          <div class="star-rating" id="star-rating">
+            <span class="star" data-value="1">★</span>
+            <span class="star" data-value="2">★</span>
+            <span class="star" data-value="3">★</span>
+            <span class="star" data-value="4">★</span>
+            <span class="star" data-value="5">★</span>
+          </div>
+          <input type="hidden" id="av-nota" name="nota" value="0">
+        </div>
+        <div class="field">
+          <label for="av-comentario">Comentário (opcional)</label>
+          <textarea id="av-comentario" name="comentario" rows="3" placeholder="Conte como foi sua experiência..."></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" class="btn btn-outline" id="btn-fechar-modal-avaliacao">Cancelar</button>
+          <button type="submit" class="btn btn-brass">Enviar avaliação</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+</main>
+<script src="../shared/js/db.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="../shared/js/shared.js"></script>
+<script src="js/perfil.js"></script>
+</body>
+</html>

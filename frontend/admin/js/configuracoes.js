@@ -1,0 +1,253 @@
+/* ============================================================
+   Corte Certo – admin/js/configuracoes.js
+   Dados da loja (RF-016/017), logo/capa e galeria com reencode
+   (RF-062..065), grade de horários com almoço (DT-09) e
+   exclusão de conta em cascata (RF-010).
+   ============================================================ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  const usuario = exigirLogin('dono');
+  if (!usuario) return;
+  const loja = Auth.salaoDoUsuario(usuario);
+  if (!loja) {
+    showToast('Nenhum salão vinculado a esta conta.', 'error');
+    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    return;
+  }
+
+  /* ---------- dados do salão ---------- */
+  function preencherDados() {
+    let l;
+    try { l = API.minhaLoja(); } catch (e) { showToast(msgErro(e), 'error'); return; }
+    setVal('cfg-nome', l.name);
+    setVal('cfg-descricao', l.description || '');
+    setVal('cfg-telefone', l.phone || '');
+    setVal('cfg-whatsapp', l.whatsapp || '');
+    setVal('cfg-endereco', l.address || '');
+    setVal('cfg-cidade', l.city || '');
+    setVal('cfg-uf', l.uf || '');
+    setVal('cfg-instagram', l.instagram || '');
+
+    const preview = document.getElementById('foto-perfil-preview');
+    if (preview && l.logo_url) {
+      preview.innerHTML = '<img src="' + esc(l.logo_url) + '" alt="Logo do salão">';
+    }
+  }
+
+  function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+
+  document.getElementById('form-config-salao')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    try {
+      const l = API.atualizarLoja({
+        name: document.getElementById('cfg-nome').value.trim(),
+        description: document.getElementById('cfg-descricao').value.trim(),
+        phone: document.getElementById('cfg-telefone').value.trim(),
+        whatsapp: document.getElementById('cfg-whatsapp').value.trim(),
+        address: document.getElementById('cfg-endereco').value.trim(),
+        city: document.getElementById('cfg-cidade').value.trim(),
+        uf: document.getElementById('cfg-uf').value.trim().toUpperCase().slice(0, 2),
+        instagram: document.getElementById('cfg-instagram').value.trim()
+      });
+      Auth.sincronizarLoja(l); // cabeçalho das outras páginas não fica velho
+      const sbNome = document.getElementById('sb-nome');
+      if (sbNome) sbNome.textContent = document.getElementById('cfg-nome').value.trim();
+      showToast('Dados do salão atualizados!');
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  /* ---------- logo (upload com reencode — RF-063/RNF-11) ---------- */
+  document.getElementById('foto-perfil')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await API.processarImagem(file);
+      API.definirLogo(dataUrl);
+      const preview = document.getElementById('foto-perfil-preview');
+      if (preview) preview.innerHTML = '<img src="' + esc(dataUrl) + '" alt="Logo do salão">';
+      showToast('Logo atualizada!');
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+    e.target.value = '';
+  });
+
+  /* ---------- horários de funcionamento (DT-09) ---------- */
+  const DIAS_LABEL = { 0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado' };
+
+  function renderHorarios() {
+    let linhas = [];
+    try { linhas = API.horariosDaLoja(loja.id, true); } catch (e) { /* noop */ }
+
+    document.querySelectorAll('.schedule-row').forEach(row => {
+      const dow = Number(row.dataset.dia);
+      const h = linhas.find(w => w.day_of_week === dow);
+      if (!h) return;
+      row.querySelector('[data-toggle]').checked = !!h.is_open;
+      row.querySelector('[data-open]').value = h.start_time || '09:00';
+      row.querySelector('[data-close]').value = h.end_time || '18:00';
+      row.querySelector('[data-lunch-ini]').value = h.lunch_start || '';
+      row.querySelector('[data-lunch-fim]').value = h.lunch_end || '';
+      atualizarStatusRow(row, !!h.is_open);
+
+      const label = row.querySelector('.schedule-dia-label');
+      if (label) label.textContent = DIAS_LABEL[dow] || '';
+    });
+  }
+
+  function atualizarStatusRow(row, aberto) {
+    row.classList.toggle('schedule-folga', !aberto);
+    const st = row.querySelector('.schedule-status');
+    if (st) {
+      st.className = 'badge schedule-status ' + (aberto ? 'badge-confirmado' : 'badge-pendente');
+      st.textContent = aberto ? 'Aberto' : 'Fechado';
+    }
+  }
+
+  document.querySelectorAll('.schedule-row [data-toggle]').forEach(tgl => {
+    tgl.addEventListener('change', () => {
+      atualizarStatusRow(tgl.closest('.schedule-row'), tgl.checked);
+    });
+  });
+
+  document.getElementById('btn-aplicar-todos')?.addEventListener('click', () => {
+    const first = document.querySelector('.schedule-row');
+    if (!first) return;
+    const vals = {
+      open: first.querySelector('[data-open]').value,
+      close: first.querySelector('[data-close]').value,
+      li: first.querySelector('[data-lunch-ini]').value,
+      lf: first.querySelector('[data-lunch-fim]').value
+    };
+    document.querySelectorAll('.schedule-row').forEach(r => {
+      r.querySelector('[data-open]').value = vals.open;
+      r.querySelector('[data-close]').value = vals.close;
+      r.querySelector('[data-lunch-ini]').value = vals.li;
+      r.querySelector('[data-lunch-fim]').value = vals.lf;
+    });
+    showToast('Horários copiados para todos os dias — clique em Salvar.');
+  });
+
+  document.getElementById('form-config-horario')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const dias = [];
+    let erroAlmoco = null;
+    document.querySelectorAll('.schedule-row').forEach(row => {
+      const aberto = row.querySelector('[data-toggle]').checked;
+      const li = row.querySelector('[data-lunch-ini]').value;
+      const lf = row.querySelector('[data-lunch-fim]').value;
+      if (aberto && li && lf && li >= lf && !erroAlmoco) {
+        erroAlmoco = DIAS_LABEL[row.dataset.dia];
+      }
+      dias.push({
+        day_of_week: Number(row.dataset.dia),
+        is_open: aberto,
+        start_time: row.querySelector('[data-open]').value,
+        end_time: row.querySelector('[data-close]').value,
+        lunch_start: li || null,
+        lunch_end: lf || null
+      });
+    });
+    if (erroAlmoco) {
+      showToast('Início do almoço deve ser antes do fim (' + erroAlmoco + ').', 'error');
+      return;
+    }
+    try {
+      API.salvarHorariosLoja(dias);
+      showToast('Horários salvos! Já valem no agendamento público.');
+      renderHorarios();
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  /* ---------- galeria ---------- */
+  const galleryGrid = document.getElementById('gallery-grid');
+  const inputGaleria = document.getElementById('input-foto-catalogo');
+
+  function renderGaleria() {
+    if (!galleryGrid) return;
+    let fotos = [];
+    try { fotos = API.galeriaDaLoja(loja.id); } catch (e) { /* noop */ }
+    const addBtn = document.getElementById('btn-add-foto');
+
+    galleryGrid.querySelectorAll('.gallery-item:not(.gallery-add)').forEach(i => i.remove());
+
+    fotos.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      item.innerHTML =
+        '<div class="gallery-img"><img src="' + esc(f.url) + '" alt="Foto do salão"></div>' +
+        '<div class="gallery-actions">' +
+          '<button type="button" class="gallery-btn-capa" title="Definir como capa">★</button>' +
+          '<button type="button" class="gallery-remove" title="Remover">&times;</button>' +
+        '</div>';
+      item.querySelector('.gallery-remove').addEventListener('click', () => {
+        if (!confirm('Remover esta foto?')) return;
+        try {
+          API.removerGaleria(f.id);
+          item.remove();
+          showToast('Foto removida.', 'error');
+        } catch (err2) {
+          showToast(msgErro(err2), 'error');
+        }
+      });
+      item.querySelector('.gallery-btn-capa').addEventListener('click', () => {
+        try {
+          API.definirCapa(f.url);
+          showToast('Foto definida como capa!');
+        } catch (err2) {
+          showToast(msgErro(err2), 'error');
+        }
+      });
+      if (addBtn) galleryGrid.insertBefore(item, addBtn);
+      else galleryGrid.appendChild(item);
+    });
+  }
+
+  document.getElementById('btn-add-foto')?.addEventListener('click', () => inputGaleria?.click());
+  inputGaleria?.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const urls = [];
+    for (const file of files) {
+      try { urls.push(await API.processarImagem(file)); }
+      catch (err2) { showToast(file.name + ': ' + msgErro(err2), 'error'); }
+    }
+    if (urls.length) {
+      try {
+        API.adicionarGaleria(urls);
+        renderGaleria();
+        showToast(urls.length + ' foto(s) adicionada(s)!');
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      }
+    }
+    inputGaleria.value = '';
+  });
+
+  /* ---------- zona de risco (RF-010) ---------- */
+  document.getElementById('btn-excluir-conta')?.addEventListener('click', () => {
+    const nome = prompt(
+      'Isto excluirá PERMANENTEMENTE a conta "' + loja.name + '" e todos os dados\n' +
+      '(serviços, profissionais, agendamentos, clientes). Digite o nome do salão para confirmar:');
+    if (!nome || nome.trim().toLowerCase() !== String(loja.name).trim().toLowerCase()) {
+      if (nome !== null) showToast('Nome não confere. Exclusão cancelada.', 'error');
+      return;
+    }
+    try {
+      API.excluirMinhaConta();
+      Auth.limparSessao(); // remove token/user/barbershop do navegador
+      showToast('Conta excluída permanentemente.', 'error');
+      setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  preencherDados();
+  renderHorarios();
+  renderGaleria();
+});

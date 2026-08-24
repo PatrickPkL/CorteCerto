@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profissionais · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-page="profissionais">
+<div class="stripe"></div>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+<button class="hamburger" id="hamburger" aria-label="Menu">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+</button>
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <div class="brand">Corte<span>Certo</span></div>
+
+    <div class="sidebar-tools">
+      <button class="bell-btn" id="btn-notificacoes" type="button" aria-label="Notificações">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span class="bell-badge" id="bell-badge" hidden></span>
+      </button>
+    </div>
+    <div class="notif-panel" id="painel-notificacoes"></div>
+
+    <span class="nav-group-label">Painel</span>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="index.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Início
+      </a></li>
+      <li class="nav-item"><a href="agendamentos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        Agendamentos
+      </a></li>
+    </ul>
+
+    <span class="nav-group-label">Cadastros</span>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="clientes.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/></svg>
+        Clientes
+      </a></li>
+      <li class="nav-item"><a href="servicos.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6M14 4l-9 9-2 5 5-2 9-9-3-3zM17 7l3 3"/></svg>
+        Serviços
+      </a></li>
+      <li class="nav-item active"><a href="profissionais.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="18" cy="7" r="2.2"/><path d="M15.5 14c2.6.3 4.5 2.2 4.5 5"/></svg>
+        Profissionais
+      </a></li>
+    </ul>
+
+    <span class="nav-group-label">Sistema</span>
+    <ul class="nav-list">
+      <li class="nav-item"><a href="assinatura.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        Assinatura
+      </a></li>
+      <li class="nav-item"><a href="suporte.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
+        Suporte
+      </a></li>
+      <li class="nav-item"><a href="configuracoes.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
+        Configurações
+      </a></li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar" id="sb-avatar">–</div>
+        <div>
+          <div style="color:#fff;font-size:13.5px;" id="sb-nome">—</div>
+          <div style="font-size:12px;" id="sb-plano">—</div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sair" id="btn-sair" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        Sair
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <a href="index.html" class="btn-back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Início
+    </a>
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">Cadastros</span>
+        <h1>Profissionais</h1>
+        <p>Gerencie a equipe e os horários de trabalho de cada um.</p>
+      </div>
+      <a href="#" class="btn btn-brass" id="btn-novo-profissional">+ Novo profissional</a>
+    </div>
+
+    <div class="card-row cols-3" id="grid-profissionais"></div>
+
+    <div id="modal-profissional" style="display:none;">
+      <div class="card" style="width:480px; max-height:90vh; overflow-y:auto;">
+        <h3 class="section-title">Novo profissional</h3>
+        <form id="form-profissional">
+          <div class="form-grid">
+            <div class="field">
+              <label for="pf-nome">Nome</label>
+              <input type="text" id="pf-nome" name="nome" required>
+            </div>
+            <div class="field">
+              <label for="pf-telefone">Telefone</label>
+              <input type="tel" id="pf-telefone" name="telefone">
+            </div>
+          </div>
+          <div class="field">
+            <label for="pf-email">E-mail</label>
+            <input type="email" id="pf-email" name="email" placeholder="usado para convidar o ajudante (login)">
+            <p style="color:var(--text-muted); font-size:12.5px; margin-top:6px;">
+              Com o e-mail ou o telefone, o profissional poderá entrar no sistema com acesso restrito
+              (apenas Agendamentos e Clientes).
+            </p>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="pf-cor">Cor do perfil</label>
+              <input type="color" id="pf-cor" value="#3b82f6" style="height:40px; padding:4px;">
+            </div>
+            <div class="field">
+              <label for="pf-bio">Especialidade / bio</label>
+              <input type="text" id="pf-bio" placeholder="Ex: Barbeiro, Colorista">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="pf-inicio">Início do expediente</label>
+              <input type="time" id="pf-inicio" value="09:00">
+            </div>
+            <div class="field">
+              <label for="pf-fim">Fim do expediente</label>
+              <input type="time" id="pf-fim" value="18:00">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="pf-almoco-ini">Almoço — início</label>
+              <input type="time" id="pf-almoco-ini" value="12:00">
+            </div>
+            <div class="field">
+              <label for="pf-almoco-fim">Almoço — fim</label>
+              <input type="time" id="pf-almoco-fim" value="13:00">
+            </div>
+          </div>
+          <div class="field">
+            <label>Serviços que executa</label>
+            <div id="pf-servicos"></div>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-outline" id="btn-fechar-modal-profissional">Cancelar</button>
+            <button type="submit" class="btn btn-brass">Salvar profissional</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="modal-editar-profissional" style="display:none;">
+      <div class="card" style="width:480px; max-height:90vh; overflow-y:auto;">
+        <h3 class="section-title">Editar profissional</h3>
+        <form id="form-editar-profissional">
+          <input type="hidden" id="ep-id">
+          <div class="form-grid">
+            <div class="field">
+              <label for="ep-nome">Nome</label>
+              <input type="text" id="ep-nome" name="nome" required>
+            </div>
+            <div class="field">
+              <label for="ep-telefone">Telefone</label>
+              <input type="tel" id="ep-telefone" name="telefone">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="ep-cor">Cor do perfil</label>
+              <input type="color" id="ep-cor" value="#3b82f6" style="height:40px; padding:4px;">
+            </div>
+            <div class="field">
+              <label for="ep-bio">Especialidade / bio</label>
+              <input type="text" id="ep-bio">
+            </div>
+          </div>
+          <p style="font-size:12.5px; color:var(--text-muted);">Horários de trabalho são gerenciados na aba
+            <a href="configuracoes.html#horarios">Configurações → Horários</a>.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="ep-inicio">Início do expediente</label>
+              <input type="time" id="ep-inicio" value="09:00">
+            </div>
+            <div class="field">
+              <label for="ep-fim">Fim do expediente</label>
+              <input type="time" id="ep-fim" value="18:00">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="ep-almoco-ini">Almoço — início</label>
+              <input type="time" id="ep-almoco-ini" value="12:00">
+            </div>
+            <div class="field">
+              <label for="ep-almoco-fim">Almoço — fim</label>
+              <input type="time" id="ep-almoco-fim" value="13:00">
+            </div>
+          </div>
+          <div class="field">
+            <label>Serviços que executa</label>
+            <div id="ep-servicos"></div>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-outline" id="btn-fechar-modal-editar-profissional">Cancelar</button>
+            <button type="submit" class="btn btn-brass">Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../shared/js/db.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="../shared/js/shared.js"></script>
+<script src="js/profissionais.js"></script>
+</body>
+</html>
