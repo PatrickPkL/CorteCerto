@@ -57,6 +57,7 @@
       br_code: pag.br_code || '',
       qr_base64: pag.qr_base64 || '',
       abacate_id: pag.abacate_id || null,
+      dev_mode: pag.dev_mode === true,
       created_at: pag.created_at,
       expires_at: pag.expires_at,
       paid_at: pag.paid_at || null
@@ -166,6 +167,7 @@
       pag.br_code = d.brCode || '';
       pag.qr_base64 = d.brCodeBase64 || '';
       pag.expires_at = d.expiresAt || pag.expires_at;
+      pag.dev_mode = d.devMode === true; /* sandbox → permite simular pagamento */
     } else {
       /* modo simulado — código PIX inválido apenas ilustrativo */
       pag.br_code = '00020126BR.GOV.BCB.PIX01CORTECERTO-DEMO520400005303986' +
@@ -202,20 +204,16 @@
     return pagamentoPublico(pag);
   }
 
-  /** GET da cobrança na AbacatePay — tolerante a endpoint ausente. */
+  /** GET do status na AbacatePay (endpoint oficial de consulta). */
   async function consultarAbacate(chargeId) {
-    for (const rota of ['/transparents/', '/pix/qrcode/']) {
-      try {
-        const resp = await fetch(URL_API + rota + encodeURIComponent(chargeId), {
-          headers: { 'Authorization': 'Bearer ' + chaveApi() }
-        });
-        if (!resp.ok) continue;
-        const corpo = await resp.json();
-        const st = corpo && corpo.data && corpo.data.status;
-        if (st) return st;
-      } catch (e) { /* tenta próxima rota */ }
-    }
-    return null;
+    try {
+      const resp = await fetch(
+        URL_API + '/transparents/check?id=' + encodeURIComponent(chargeId),
+        { headers: { 'Authorization': 'Bearer ' + chaveApi() } });
+      if (!resp.ok) return null;
+      const corpo = await resp.json();
+      return (corpo && corpo.data && corpo.data.status) || null;
+    } catch (e) { return null; }
   }
 
   /**
@@ -229,6 +227,59 @@
     if (pag.provider !== 'demo') throw { status: 409, error: 'Esta cobrança é real — use o app do banco.' };
     if (pag.status !== 'pending') throw { status: 409, error: 'Cobrança já processada.' };
     aplicarPagamento(pag);
+    return pagamentoPublico(pag);
+  }
+
+  /** Dispara a simulação de pagamento na AbacatePay (só dev mode).
+      Exige Content-Type json com corpo vazio — sem isso a API
+      responde 400 "Pix QR Code not found". Requer CHECKOUT:READ. */
+  async function simularNaAbacate(chargeId) {
+    try {
+      const resp = await fetch(
+        URL_API + '/transparents/simulate-payment?id=' + encodeURIComponent(chargeId),
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + chaveApi(),
+            'Content-Type': 'application/json'
+          },
+          body: ''
+        });
+      if (!resp.ok) return null;
+      const corpo = await resp.json();
+      return corpo && corpo.data ? corpo.data : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Confirma uma cobrança pendente para testes:
+   * • provider demo → ativa localmente;
+   * • provider abacatepay → pede à própria AbacatePay para simular
+   *   o pagamento (endpoint oficial de Dev mode; com chave de
+   *   produção a API recusa e devolvemos o erro).
+   */
+  async function simularPagamento(paymentId) {
+    const { shop } = exigirDonoLocal();
+    const pag = DB._d().payments.find(p => p.id == paymentId && p.barbershop_id === shop.id);
+    if (!pag) throw { status: 404, error: 'Cobrança não encontrada.' };
+    if (pag.provider === 'demo') return confirmarCobrancaDemo(paymentId);
+    if (!chaveApi()) throw { status: 409, error: 'Sem chave da AbacatePay configurada.' };
+    if (pag.provider !== 'abacatepay' || !pag.abacate_id) {
+      throw { status: 409, error: 'Cobrança inválida para simulação.' };
+    }
+    if (pag.status !== 'pending') throw { status: 409, error: 'Cobrança já processada.' };
+
+    const resultado = await simularNaAbacate(pag.abacate_id);
+    let situacao = (resultado && resultado.status) || null;
+    if (situacao !== 'PAID') situacao = await consultarAbacate(pag.abacate_id);
+    if (situacao === 'PAID') {
+      aplicarPagamento(pag);
+    } else {
+      throw {
+        status: 502,
+        error: 'A AbacatePay recusou a simulação — confirme que a chave é de Dev mode.'
+      };
+    }
     return pagamentoPublico(pag);
   }
 
@@ -286,6 +337,7 @@
     statusCobranca,
     listarMinhasCobrancas,
     confirmarCobrancaDemo,
+    simularPagamento,
     processarEventoWebhook,
     acessoLiberado
   });

@@ -155,7 +155,11 @@ document.addEventListener('DOMContentLoaded', () => {
       semqr.hidden = false;
     }
     document.getElementById('pg-codigo').value = c.br_code || '';
-    document.getElementById('pg-simular').hidden = c.provider !== 'demo';
+    const btnSim = document.getElementById('pg-simular');
+    const devAbacate = c.provider === 'abacatepay' && c.abacate_id;
+    btnSim.hidden = !(c.provider === 'demo' || devAbacate);
+    btnSim.textContent = devAbacate ? 'Simular pagamento (Dev mode)'
+                                    : 'Simular pagamento (modo teste)';
     atualizarStatus(c);
     iniciarRelogio(c.expires_at);
 
@@ -206,10 +210,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pg-simular')?.addEventListener('click', () => {
     if (!cobrancaId) return;
     try {
-      const c = API.confirmarCobrancaDemo(cobrancaId);
+      const c = API.simularCobranca(cobrancaId);
       atualizarStatus(c);
-      showToast('Pagamento simulado confirmado! Plano ' + c.plan_name + ' ativo.', 'success');
-      setTimeout(fecharPagamento, 900);
+      if (c.status === 'paid') {
+        showToast('Pagamento confirmado! Plano ' + c.plan_name + ' ativo.', 'success');
+        setTimeout(fecharPagamento, 900);
+      } else {
+        showToast('Simulação enviada — confirmando…', 'info');
+      }
     } catch (e) {
       showToast(msgErro(e), 'error');
     }

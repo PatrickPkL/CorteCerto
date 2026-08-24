@@ -191,6 +191,7 @@ input:focus, select:focus, textarea:focus {
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast-success { background: var(--ink); color: #fff; }
 .toast-error { background: var(--danger); color: #fff; }
+.toast-info { background: var(--brass); color: #fff; }
 
 .btn-back {
   position: fixed;
