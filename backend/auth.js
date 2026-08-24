@@ -300,7 +300,9 @@ window.Auth = (function () {
       if (p.name) usuario.name = p.name;
       if (p.email) usuario.email = p.email;
       DB.salvar();
-      if (usuario.role === 'dono') barbearia = salaoDoUsuario(usuario);
+      if (usuario.role === 'dono' || usuario.role === 'barbeiro') {
+        barbearia = salaoDoUsuario(usuario);
+      }
     }
 
     criarSessao(usuario.id);

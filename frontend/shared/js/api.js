@@ -123,7 +123,7 @@
     },
 
     salaoDoUsuario(user) {
-      if (!user || user.role !== 'dono') return null;
+      if (!user || (user.role !== 'dono' && user.role !== 'barbeiro')) return null;
       try { return JSON.parse(localStorage.getItem(KEY_LOJA)) || null; }
       catch (e) { return null; }
     },
