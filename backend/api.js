@@ -49,6 +49,24 @@ window.API = (function () {
     return { user, shop };
   }
 
+  /**
+   * Assinatura em dia? Trial vigente ou período pago corrente.
+   * Implementação vive em payments.js; sem backend de pagamentos
+   * (modo local puro no navegador) tudo permanece liberado.
+   */
+  function assinaturaLiberada(shopId) {
+    return typeof window.API.acessoLiberado === 'function'
+      ? window.API.acessoLiberado(shopId)
+      : true;
+  }
+
+  function exigirAssinaturaAtiva(shopId) {
+    if (!assinaturaLiberada(shopId)) {
+      err(403, 'Assinatura expirada — renove o plano na aba Assinatura para continuar.');
+    }
+  }
+
+
   function podeVerAgendamento(user, ag) {
     if (!user) return false;
     if (ag.user_id === user.id) return true;
@@ -205,6 +223,7 @@ window.API = (function () {
 
   function criarServico(dados) {
     const { shop } = exigirDono();
+    exigirAssinaturaAtiva(shop.id);
     validarServico(dados, false);
     const svc = {
       id: DB.proximoId(),
@@ -318,6 +337,7 @@ window.API = (function () {
 
   function criarProfissional(dados) {
     const { shop } = exigirDono();
+    exigirAssinaturaAtiva(shop.id);
     const db = DB._d();
 
     const nome = String(dados.name || '').trim();
@@ -790,6 +810,12 @@ window.API = (function () {
     const shop = db.barbershops.find(b => b.id == shopId);
     if (!shop) err(404, 'Salão não encontrado.');
 
+    /* assinatura em dia é exigida só do painel — o agendamento
+       público do catálogo não pune o cliente final (RF-039) */
+    if ((payload.origin || 'online') !== 'online') {
+      exigirAssinaturaAtiva(shop.id);
+    }
+
     const date = String(payload.date || '');
     const hora = String(payload.start_time || payload.hora || '');
     const clientName = String(payload.client_name || '').trim();
@@ -1150,6 +1176,7 @@ window.API = (function () {
 
   function criarCliente(dados) {
     const { shop } = exigirDono();
+    exigirAssinaturaAtiva(shop.id);
     const nome = String(dados.name || '').trim();
     if (!nome) err(400, 'Nome é obrigatório.');
     const tel = String(dados.phone || '').replace(/\D/g, '');

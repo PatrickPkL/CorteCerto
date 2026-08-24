@@ -1,6 +1,7 @@
 node_modules/
 npm-debug.log*
 ignore/
+.env
 database/db.json
 .DS_Store
 Thumbs.db

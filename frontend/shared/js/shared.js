@@ -391,6 +391,29 @@ function montarNotificacoes() {
 
 /* ---------------- SHELL DO PAINEL ADMIN (sidebar comum) ---------------- */
 
+/* Aviso persistente de assinatura expirada (dono) — criação bloqueada,
+   consulta liberada; some sozinho quando o acesso volta a valer */
+function aplicarAvisoAssinatura(u, loja) {
+  const existente = document.getElementById('aviso-assinatura');
+  if (u.role !== 'dono' || !loja) { existente?.remove(); return; }
+  let liberado = true;
+  try { liberado = API.acessoLiberado(loja.id); } catch (e) { liberado = true; }
+  if (liberado) { existente?.remove(); return; }
+  if (existente || !document.querySelector('.main')) return;
+
+  const av = document.createElement('div');
+  av.id = 'aviso-assinatura';
+  av.className = 'card';
+  av.style.cssText = 'border-color:var(--warn-text);margin-bottom:18px;display:flex;gap:12px;' +
+    'align-items:center;flex-wrap:wrap;';
+  av.innerHTML =
+    '<strong style="color:var(--warn-text);">Assinatura expirada.</strong>' +
+    '<span style="color:var(--text-muted);font-size:14px;">' +
+    'Consultas continuam liberadas, mas criar agendamentos, clientes, serviços e profissionais está bloqueado.</span>' +
+    '<a href="assinatura.html" class="btn btn-brass" style="margin-left:auto;">Renovar plano</a>';
+  document.querySelector('.main').prepend(av);
+}
+
 function montarShellAdmin() {
   const u = Auth.usuarioAtual();
   if (!u || (u.role !== 'dono' && u.role !== 'barbeiro')) return;
@@ -413,6 +436,7 @@ function montarShellAdmin() {
           (sub.on_trial ? ' · trial' : '');
       } catch (e) { planoEl.textContent = ''; }
     }
+    aplicarAvisoAssinatura(u, loja);
   }
 
   const btnSair = document.getElementById('btn-sair');

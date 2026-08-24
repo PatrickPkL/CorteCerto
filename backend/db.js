@@ -9,7 +9,7 @@ window.DB = (function () {
   'use strict';
 
   const DB_KEY = 'cc_db';
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
 
   /* ---------------- helpers de data (hora local, mata DT-11) ---------------- */
 
@@ -76,12 +76,26 @@ window.DB = (function () {
     }
   }
 
+  function migrar(p) {
+    /* v3 → v4: cobranças dos planos (AbacatePay) */
+    if (p.v === 3) {
+      p.v = 4;
+      p.payments = Array.isArray(p.payments) ? p.payments : [];
+      try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
+      catch (e) { console.error('[DB] Falha ao persistir migração v4.', e); }
+    }
+    return p;
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(DB_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.v === DB_VERSION && parsed.meta) return parsed;
+        if (parsed && parsed.meta) {
+          if (parsed.v === DB_VERSION) return parsed;
+          if (parsed.v === DB_VERSION - 1) return migrar(parsed);
+        }
       }
     } catch (e) { console.warn('[DB] Estado corrompido — recriando dados demo.', e); }
     const fresh = seed();
@@ -427,6 +441,9 @@ window.DB = (function () {
     /* ---- galeria ---- */
     const galleryImages = [];
 
+    /* ---- cobranças dos planos (AbacatePay) ---- */
+    const payments = [];
+
     /* ---- notificações demo ---- */
     const notifications = [
       {
@@ -466,6 +483,7 @@ window.DB = (function () {
       reviews,
       plans: planos,
       subscriptions,
+      payments,
       gallery_images: galleryImages,
       notifications,
       favorites,

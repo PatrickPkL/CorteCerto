@@ -24,7 +24,9 @@ function carregar() {
   if (carregado) return;
   carregado = true;
   try {
-    memoria.set(CHAVE_PRINCIPAL, JSON.parse(fs.readFileSync(ARQUIVO, 'utf8')));
+    /* mantém o texto cru: localStorage devolve STRINGS e quem
+       interpreta é o db.js (JSON.parse) — igual ao navegador */
+    memoria.set(CHAVE_PRINCIPAL, fs.readFileSync(ARQUIVO, 'utf8'));
   } catch (e) {
     /* primeiro boot: arquivo ainda não existe — db.js cria o seed */
   }

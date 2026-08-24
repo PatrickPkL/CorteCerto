@@ -12,7 +12,22 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { URL } = require('url');
+
+/* Carrega o .env da raiz (KEY=VALUE por linha) antes do boot —
+   sem sobrescrever variáveis já definidas no ambiente */
+(function carregarDotEnv() {
+  try {
+    const conteudo = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    conteudo.split(/\r?\n/).forEach(linha => {
+      const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(linha);
+      if (m && !(m[1] in process.env)) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    });
+  } catch (e) { /* projeto sem .env — ok */ }
+})();
 
 const { API, Auth } = require('./backend/boot');
 
@@ -97,6 +112,50 @@ function handleRpc(req, res) {
   });
 }
 
+/* ---------------- webhook AbacatePay ---------------- */
+
+/* Assinatura HMAC-SHA256 (base64) no header x-webhook-signature */
+function assinaturaValida(corpo, recebida) {
+  try {
+    const pub = String(process.env.ABACATEPAY_PUBLIC_KEY || '').trim();
+    if (!pub || !recebida) return false;
+    const esperada = crypto.createHmac('sha256', pub)
+      .update(Buffer.from(corpo, 'utf8')).digest('base64');
+    const a = Buffer.from(esperada);
+    const b = Buffer.from(String(recebida));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (e) { return false; }
+}
+
+function handleWebhookAbacate(req, res, url) {
+  let corpo = '';
+  req.on('data', c => {
+    corpo += c;
+    if (corpo.length > 2e6) req.destroy();
+  });
+  req.on('end', () => {
+    const secretEnv = String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
+    if (secretEnv) {
+      const secretUrl = url.searchParams.get('webhookSecret');
+      if (secretUrl !== secretEnv && !assinaturaValida(corpo, req.headers['x-webhook-signature'])) {
+        return json(res, 401, { ok: false, error: 'Unauthorized' });
+      }
+    }
+    let ev;
+    try { ev = JSON.parse(corpo || '{}'); }
+    catch (e) { return json(res, 400, { ok: false, error: 'JSON inválido.' }); }
+    try {
+      const r = API.processarEventoWebhook(ev);
+      console.log('[webhook] ' + (ev.event || '?') + ' → ' + JSON.stringify(r));
+      return json(res, 200, { ok: true, data: r });
+    } catch (e) {
+      console.error('[webhook]', e);
+      /* 500 faz a AbacatePay retentar — o processamento é idempotente */
+      return json(res, 500, { ok: false, error: 'Falha ao processar evento.' });
+    }
+  });
+}
+
 /* ---------------- estáticos ---------------- */
 
 function servirEstatico(req, res, url) {
@@ -139,6 +198,9 @@ function servirEstatico(req, res, url) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (req.method === 'POST' && url.pathname === '/api/rpc') return handleRpc(req, res);
+  if (req.method === 'POST' && url.pathname === '/webhooks/abacatepay') {
+    return handleWebhookAbacate(req, res, url);
+  }
   if (req.method === 'GET' || req.method === 'HEAD') return servirEstatico(req, res, url);
   res.writeHead(405);
   res.end('Método não permitido');
@@ -151,5 +213,9 @@ server.listen(PORTA, () => {
   console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
   console.log('  Banco de dados   : database/db.json');
   console.log('  Códigos SMS demo aparecem no terminal e na tela de login.');
+  console.log(process.env.ABACATEPAY_API_KEY
+    ? '  Pagamentos PIX   : AbacatePay (' +
+      (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
+    : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
   console.log('');
 });

@@ -116,7 +116,7 @@
       <div class="card">
         <span class="stat-label">Próxima cobrança</span>
         <div class="stat-value mono" id="st-cobranca" style="font-size:22px;">–</div>
-        <div class="stat-delta">renovação automática</div>
+        <div class="stat-delta" id="st-cobranca-nota">renovação automática</div>
       </div>
       <div class="card">
         <span class="stat-label">Status</span>
@@ -144,6 +144,35 @@
           Ao cancelar, o acesso aos recursos pagos é encerrado ao fim do período atual.
           Você pode reassinar quando quiser.</p>
         <button class="btn btn-danger" id="btn-cancelar-assinatura">Cancelar assinatura</button>
+      </div>
+    </div>
+
+    <div id="modal-pagamento" style="display:none;">
+      <div class="card" style="width:400px;">
+        <h3 class="section-title">Pagar com PIX</h3>
+        <div style="text-align:center;">
+          <p style="margin:4px 0 0;" class="eyebrow" id="pg-plano">—</p>
+          <div class="stat-value mono" id="pg-valor" style="font-size:26px;">—</div>
+
+          <img id="pg-qrcode" alt="QR Code PIX" hidden
+               style="width:210px;height:210px;margin:10px auto 6px;display:block;background:#fff;padding:8px;border-radius:10px;">
+          <p id="pg-semqr" hidden style="color:var(--text-muted); font-size:13px; margin:8px 0 2px;">
+            QR indisponível neste modo — use o código copia-e-cola abaixo.</p>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input type="text" id="pg-codigo" readonly
+                   style="flex:1; font-size:11px; font-family:monospace;">
+            <button type="button" class="btn btn-outline" id="pg-copiar">Copiar</button>
+          </div>
+
+          <p id="pg-status" style="margin:12px 0 0; font-size:14px; color:var(--text-muted);">
+            Aguardando pagamento…</p>
+          <button type="button" class="btn btn-brass" id="pg-simular" hidden style="margin-top:12px;">
+            Simular pagamento (modo teste)</button>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+          <button type="button" class="btn btn-outline" id="btn-fechar-pagamento">Fechar</button>
+        </div>
       </div>
     </div>
   </main>
