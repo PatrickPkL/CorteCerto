@@ -35,8 +35,11 @@ function carregar() {
 function persistir() {
   const valor = memoria.get(CHAVE_PRINCIPAL);
   if (valor === undefined) return;
+  /* pelo contrato de localStorage o valor já É uma string JSON;
+     serializar de novo gerava arquivo com encoding duplo e o
+     banco recriava o seed a cada reinício */
   fs.mkdirSync(path.dirname(ARQUIVO), { recursive: true });
-  fs.writeFileSync(ARQUIVO, JSON.stringify(valor, null, 2));
+  fs.writeFileSync(ARQUIVO, typeof valor === 'string' ? valor : JSON.stringify(valor, null, 2));
 }
 
 module.exports = {

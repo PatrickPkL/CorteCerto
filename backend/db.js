@@ -91,7 +91,11 @@ window.DB = (function () {
     try {
       const raw = localStorage.getItem(DB_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw);
+        let parsed = JSON.parse(raw);
+        /* recupera arquivo com encoding duplo (bug antigo do store) */
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
+        }
         if (parsed && parsed.meta) {
           if (parsed.v === DB_VERSION) return parsed;
           if (parsed.v === DB_VERSION - 1) return migrar(parsed);
