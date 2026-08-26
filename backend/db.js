@@ -9,7 +9,7 @@ window.DB = (function () {
   'use strict';
 
   const DB_KEY = 'cc_db';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
 
   /* ---------------- helpers de data (hora local, mata DT-11) ---------------- */
 
@@ -87,6 +87,12 @@ window.DB = (function () {
     if (p.v === 3) {
       p.v = 4;
       p.payments = Array.isArray(p.payments) ? p.payments : [];
+    }
+    /* v4 → v5: magic tokens */
+    if (p.v === 4) {
+      p.v = 5;
+      p.magic_tokens = Array.isArray(p.magic_tokens) ? p.magic_tokens : [];
+      p.superadmin_sessions = Array.isArray(p.superadmin_sessions) ? p.superadmin_sessions : [];
     }
     try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
     catch (e) { console.error('[DB] Falha ao persistir migração.', e); }
@@ -477,6 +483,8 @@ window.DB = (function () {
     const sms_codes = [];
     const sessions = [];
     const tickets = [];
+    const magic_tokens = [];
+    const superadmin_sessions = [];
 
     return {
       v: DB_VERSION,
@@ -500,6 +508,8 @@ window.DB = (function () {
       gallery_images: galleryImages,
       notifications,
       favorites,
+      magic_tokens,
+      superadmin_sessions,
       tickets
     };
   }

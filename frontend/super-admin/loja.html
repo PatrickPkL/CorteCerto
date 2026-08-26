@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe Loja · Super Admin · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #f0f0f0;
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* header */
+  .sa-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 32px;
+    background: #161616;
+    border-bottom: 1px solid #222;
+  }
+  .sa-detail-header button {
+    background: none;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #888;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .85rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    transition: color .2s, border-color .2s;
+  }
+  .sa-detail-header button:hover {
+    color: #f0f0f0;
+    border-color: #b8863b;
+  }
+  .sa-detail-header h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+
+  /* main */
+  .sa-detail-main {
+    padding: 32px;
+    max-width: 900px;
+  }
+
+  /* sections */
+  .sa-section {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .sa-section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #222;
+    font-size: .9rem;
+    font-weight: 600;
+    color: #b8863b;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .sa-section-body {
+    padding: 16px 20px;
+  }
+
+  /* info rows */
+  .sa-info-row {
+    display: flex;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .sa-info-row:last-child { border-bottom: none; }
+  .sa-info-label {
+    width: 140px;
+    flex-shrink: 0;
+    color: #888;
+    font-size: .85rem;
+  }
+  .sa-info-value {
+    color: #f0f0f0;
+    font-size: .9rem;
+  }
+
+  /* list */
+  .sa-lista {
+    list-style: none;
+    padding: 0;
+  }
+  .sa-lista li {
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: .9rem;
+    color: #f0f0f0;
+  }
+  .sa-lista li:last-child { border-bottom: none; }
+
+  /* stats mini grid */
+  .sa-agend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .sa-stat-mini {
+    text-align: center;
+    padding: 16px 8px;
+    background: #0c0c0c;
+    border-radius: 8px;
+  }
+  .sa-stat-mini-num {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #b8863b;
+    margin-bottom: 4px;
+  }
+  .sa-stat-mini-lbl {
+    display: block;
+    font-size: .75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* plano section */
+  .sa-plano-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .sa-plano-row select {
+    padding: 10px 14px;
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: .9rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    outline: none;
+    cursor: pointer;
+  }
+  .sa-plano-row select:focus { border-color: #b8863b; }
+  .sa-plano-info {
+    color: #888;
+    font-size: .85rem;
+    margin-bottom: 12px;
+  }
+
+  /* buttons */
+  .sa-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: .9rem;
+    font-weight: 600;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .sa-btn:hover { opacity: .88; }
+  .sa-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .sa-btn-primary {
+    background: #b8863b;
+    color: #0c0c0c;
+  }
+  .sa-btn-danger {
+    background: #e74c3c;
+    color: #fff;
+  }
+
+  /* delete section */
+  .sa-delete-section {
+    border-color: rgba(231,76,60,.3);
+  }
+  .sa-delete-section .sa-section-header {
+    color: #e74c3c;
+  }
+  .sa-delete-note {
+    color: #888;
+    font-size: .85rem;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 600px) {
+    .sa-detail-main { padding: 16px; }
+    .sa-detail-header { padding: 16px; }
+    .sa-info-row { flex-direction: column; gap: 4px; }
+    .sa-info-label { width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="sa-detail-header">
+  <button id="btn-voltar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Voltar
+  </button>
+  <h1 id="loja-nome">Carregando...</h1>
+</header>
+
+<main class="sa-detail-main">
+
+  <!-- Informações -->
+  <div class="sa-section">
+    <div class="sa-section-header">Informações</div>
+    <div class="sa-section-body" id="section-info">
+      <div style="color:#888; padding:16px 0;">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- Serviços -->
+  <div class="sa-section">
+    <div class="sa-section-header">Serviços</div>
+    <div class="sa-section-body" id="section-servicos">
+      <div style="color:#888; padding:16px 0;">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- Profissionais -->
+  <div class="sa-section">
+    <div class="sa-section-header">Profissionais</div>
+    <div class="sa-section-body" id="section-profissionais">
+      <div style="color:#888; padding:16px 0;">Carregando...</div>
+    </div>
+  </div>
+
+  <!-- Agendamentos -->
+  <div class="sa-section">
+    <div class="sa-section-header">Agendamentos</div>
+    <div class="sa-section-body">
+      <div class="sa-agend-grid" id="section-agendamentos">
+        <div style="color:#888; padding:16px 0;">Carregando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plano -->
+  <div class="sa-section">
+    <div class="sa-section-header">Gerenciar Plano</div>
+    <div class="sa-section-body">
+      <div class="sa-plano-info" id="plano-status">Plano atual: —</div>
+      <div class="sa-plano-row">
+        <select id="select-plano">
+          <option value="free">Free</option>
+          <option value="basic">Basic</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+        <button class="sa-btn sa-btn-primary" id="btn-salvar-plano">Salvar Plano</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Excluir -->
+  <div class="sa-section sa-delete-section">
+    <div class="sa-section-header">Zona de Perigo</div>
+    <div class="sa-section-body">
+      <p class="sa-delete-note">Excluir esta loja removerá todos os dados associados. Esta ação é irreversível.</p>
+      <button class="sa-btn sa-btn-danger" id="btn-excluir">Excluir Loja</button>
+    </div>
+  </div>
+
+</main>
+
+<script src="js/super-auth.js"></script>
+<script src="js/loja-detalhe.js"></script>
+
+</body>
+</html>

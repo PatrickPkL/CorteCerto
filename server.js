@@ -135,6 +135,99 @@ function handleRpc(req, res) {
   });
 }
 
+/* ---------------- super-admin routes ---------------- */
+
+function handleSuperAdmin(req, res, pathname, url) {
+  const sub = pathname.replace('/api/super-admin/', '');
+  const parts = sub.split('/').filter(Boolean);
+  const rota = parts[0] || '';
+  const idParam = parts[1] || null;
+
+  const authHeader = req.headers['authorization'] || req.headers['x-super-admin-token'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  function readBody() {
+    return new Promise((resolve, reject) => {
+      let body = '';
+      req.on('data', c => { body += c; if (body.length > 2e6) req.destroy(); });
+      req.on('end', () => {
+        try { resolve(body ? JSON.parse(body) : {}); }
+        catch (e) { reject(new Error('JSON inválido.')); }
+      });
+    });
+  }
+
+  function needAuth() {
+    if (!token) { json(res, 401, { ok: false, error: 'Token ausente.' }); return false; }
+    try { API.superAdminAuth(token); }
+    catch (e) { json(res, 401, { ok: false, error: (e && e.error) || 'Não autorizado.' }); return false; }
+    return true;
+  }
+
+  /* POST /api/super-admin/login — sem auth */
+  if (rota === 'login' && req.method === 'POST') {
+    return readBody().then(dados => {
+      const r = API.superAdminLogin(dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* rotas autenticadas abaixo */
+  if (!needAuth()) return;
+
+  /* POST /api/super-admin/logout */
+  if (rota === 'logout' && req.method === 'POST') {
+    try { const r = API.superAdminLogout(token); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/dashboard */
+  if (rota === 'dashboard' && req.method === 'GET') {
+    try { const r = API.saDashboard(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/lojas */
+  if (rota === 'lojas' && req.method === 'GET' && !idParam) {
+    try { const r = API.saListarLojas(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/usuarios */
+  if (rota === 'usuarios' && req.method === 'GET') {
+    try { const r = API.saListarUsuarios(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/loja/:id */
+  if (rota === 'loja' && idParam && parts[2] === undefined && req.method === 'GET') {
+    try { const r = API.saDetalheLoja(idParam); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/loja/:id/plan */
+  if (rota === 'loja' && idParam && parts[2] === 'plan' && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saAtualizarPlano(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* DELETE /api/super-admin/loja/:id */
+  if (rota === 'loja' && idParam && parts[2] === undefined && req.method === 'DELETE') {
+    try { const r = API.saExcluirLoja(idParam); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  json(res, 404, { ok: false, error: 'Rota super-admin não encontrada.' });
+}
+
 /* ---------------- webhook AbacatePay ---------------- */
 
 /* Assinatura HMAC-SHA256 (base64) no header x-webhook-signature */
@@ -225,12 +318,25 @@ function servirEstatico(req, res, url) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
-  if (req.method === 'GET' && url.pathname === '/health') {
+  const pathname = url.pathname;
+  if (req.method === 'GET' && pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, version: '2.1.0', uptime: process.uptime(), timestamp: new Date().toISOString() }));
   }
-  if (req.method === 'POST' && url.pathname === '/api/rpc') return handleRpc(req, res);
-  if (req.method === 'POST' && url.pathname === '/webhooks/abacatepay') {
+  /* magic-link */
+  if (req.method === 'GET' && url.pathname === '/magic-link') {
+    const tk = url.searchParams.get('token');
+    if (!tk) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Token ausente.'); }
+    const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Certo...</p><script>\nvar params = new URLSearchParams(location.search);\nvar tk = params.get(\'token\');\nif (tk) { localStorage.setItem(\'cc_magic_token\', tk); }\nlocation.href = \'../admin/\';\n</script></body></html>';
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' });
+    return res.end(html);
+  }
+  /* super-admin routes */
+  if (pathname.indexOf('/api/super-admin/') === 0) {
+    return void handleSuperAdmin(req, res, pathname, url);
+  }
+  if (req.method === 'POST' && pathname === '/api/rpc') return handleRpc(req, res);
+  if (req.method === 'POST' && pathname === '/webhooks/abacatepay') {
     return handleWebhookAbacate(req, res, url);
   }
   if (req.method === 'GET' || req.method === 'HEAD') return servirEstatico(req, res, url);

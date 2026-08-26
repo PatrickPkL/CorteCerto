@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0c0c0c;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .sa-login-card {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .sa-login-brand {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #f0f0f0;
+    margin-bottom: 8px;
+  }
+  .sa-login-brand span {
+    color: #b8863b;
+  }
+  .sa-login-subtitle {
+    text-align: center;
+    color: #888;
+    font-size: .85rem;
+    margin-bottom: 28px;
+  }
+  .sa-form-group {
+    margin-bottom: 18px;
+  }
+  .sa-form-group label {
+    display: block;
+    color: #888;
+    font-size: .8rem;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .sa-form-group input {
+    width: 100%;
+    padding: 12px 14px;
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: .95rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .sa-form-group input:focus {
+    border-color: #b8863b;
+  }
+  .sa-btn-entrar {
+    width: 100%;
+    padding: 12px;
+    background: #b8863b;
+    border: none;
+    border-radius: 8px;
+    color: #0c0c0c;
+    font-size: .95rem;
+    font-weight: 600;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: opacity .2s;
+  }
+  .sa-btn-entrar:hover {
+    opacity: .88;
+  }
+  .sa-btn-entrar:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+  .sa-error-msg {
+    color: #e74c3c;
+    font-size: .82rem;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="sa-login-card">
+  <div class="sa-login-brand">Corte<span>Certo</span></div>
+  <p class="sa-login-subtitle">Painel do Super Admin</p>
+
+  <form id="sa-login-form">
+    <div class="sa-form-group">
+      <label for="sa-email">E-mail</label>
+      <input type="email" id="sa-email" placeholder="admin@cortecerto.com" required>
+    </div>
+    <div class="sa-form-group">
+      <label for="sa-senha">Senha</label>
+      <input type="password" id="sa-senha" placeholder="Sua senha" required>
+    </div>
+    <button type="submit" class="sa-btn-entrar" id="sa-btn-entrar">Entrar</button>
+    <div class="sa-error-msg" id="sa-error-msg"></div>
+  </form>
+</div>
+
+<script>
+(function () {
+  if (localStorage.getItem('cc_superadmin_token')) {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  var form = document.getElementById('sa-login-form');
+  var btn = document.getElementById('sa-btn-entrar');
+  var erroEl = document.getElementById('sa-error-msg');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('sa-email').value.trim();
+    var senha = document.getElementById('sa-senha').value;
+
+    if (!email || !senha) {
+      erroEl.textContent = 'Preencha todos os campos.';
+      erroEl.style.display = 'block';
+      return;
+    }
+
+    erroEl.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
+
+    fetch('/api/super-admin/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: email, senha: senha })
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.error) {
+          erroEl.textContent = data.error;
+          erroEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Entrar';
+          return;
+        }
+        if (data.token) {
+          localStorage.setItem('cc_superadmin_token', data.token);
+          window.location.href = 'index.html';
+        } else {
+          erroEl.textContent = 'Resposta inválida do servidor.';
+          erroEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Entrar';
+        }
+      })
+      .catch(function () {
+        erroEl.textContent = 'Erro de conexão. Tente novamente.';
+        erroEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      });
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -135,4 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderStats();
+
+  try { API.gerarLembretesAmanha(); } catch(e) { /* best-effort */ }
 });

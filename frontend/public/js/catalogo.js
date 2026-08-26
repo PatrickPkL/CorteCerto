@@ -127,4 +127,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   popularFiltros();
   render();
+
+  /* geolocation: lojas perto de mim */
+  var btnGeo = document.getElementById('btn-proximas');
+  if (btnGeo) {
+    btnGeo.addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        showToast('Geolocalização não suportada.', 'error');
+        return;
+      }
+      btnGeo.disabled = true;
+      btnGeo.textContent = 'Buscando...';
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        try {
+          var res = API.lojasProximas({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            raio: 30
+          });
+          grid.innerHTML = res.items.map(cardLoja).join('');
+          if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
+          showToast(res.items.length + ' barbearia(s) encontrada(s) perto de você!');
+        } catch (e) {
+          showToast(msgErro(e), 'error');
+        }
+        btnGeo.disabled = false;
+        btnGeo.textContent = 'Lojas perto de mim';
+      }, function(err) {
+        showToast('Não foi possível obter sua localização.', 'error');
+        btnGeo.disabled = false;
+        btnGeo.textContent = 'Lojas perto de mim';
+      }, { timeout: 10000 });
+    });
+  }
 });

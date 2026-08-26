@@ -51,6 +51,22 @@
     </div>
   </div>
 
+  <button onclick="compartilhar()" class="btn btn-outline" style="margin-top:8px;">📤 Compartilhar</button>
+  <script>
+  function compartilhar() {
+    var url = window.location.href;
+    var nome = document.querySelector('.salon-name, h1, .salao-nome');
+    var texto = 'Confira ' + (nome ? nome.textContent : 'esta barbearia') + ' no Corte Certo: ';
+    if (navigator.share) {
+      navigator.share({ title: 'Corte Certo', text: texto, url: url });
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(texto + url).then(function() { alert('Link copiado!'); });
+    } else {
+      window.open('https://wa.me/?text=' + encodeURIComponent(texto + url), '_blank');
+    }
+  }
+  </script>
+
   <h3 class="section-title">Escolha o profissional</h3>
 
   <div class="prof-list-public" id="lista-profissionais-publica"></div>

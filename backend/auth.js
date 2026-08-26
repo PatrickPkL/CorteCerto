@@ -10,6 +10,9 @@
 window.Auth = (function () {
   'use strict';
 
+  var SMS = require('./sms');
+  var Mailer = require('./mailer');
+
   const TOKEN_TTL_DIAS = 30;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
   const MAX_TENTATIVAS = 5;               // RNF-10
@@ -238,6 +241,50 @@ window.Auth = (function () {
 
     console.info('[Auth][DEMO] Código para ' + ident + ': ' + code);
 
+    /* envio de SMS (real ou demo) */
+    var phoneDigits = ident.replace(/\D/g, '');
+    if (!porEmail && phoneDigits.length >= 10) {
+      SMS.enviarSMS(phoneDigits, 'Seu código Corte Certo: ' + code)
+        .catch(function(e) { console.error('[sms] falha:', e); });
+    }
+
+    /* link mágico por e-mail (se usuário tem email) */
+    var emailDestino = porEmail ? ident : (dados.email || '');
+    if (!emailDestino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino)) {
+      /* tenta buscar email do usuário existente */
+      if (existente && existente.email) emailDestino = existente.email;
+    }
+    if (emailDestino && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino)) {
+      var crypto = require('crypto');
+      var token = crypto.randomBytes(32).toString('hex');
+      var agora = new Date();
+      var expira = new Date(agora.getTime() + 15 * 60 * 1000);
+      db.magic_tokens = (db.magic_tokens || []).filter(function(t) {
+        return t.user_id !== (existente ? existente.id : -1) || !t.used;
+      });
+      var ativos = (db.magic_tokens || []).filter(function(t) {
+        return t.user_id === (existente ? existente.id : -1) && !t.used;
+      });
+      if (ativos.length >= 3) {
+        db.magic_tokens = db.magic_tokens.filter(function(t) {
+          return t.user_id !== (existente ? existente.id : -1) || t.used;
+        });
+      }
+      db.magic_tokens.push({
+        id: DB.proximoId(),
+        token: token,
+        user_id: existente ? existente.id : 0,
+        email: emailDestino,
+        expires_at: expira.toISOString(),
+        used: 0,
+        created_at: agora.toISOString()
+      });
+      DB.salvar();
+      var nomeUser = existente ? existente.name : (dados.name || 'Usuário');
+      Mailer.enviarLinkMagico(emailDestino, token, nomeUser)
+        .catch(function(e) { console.error('[mailer] falha:', e); });
+    }
+
     return {
       ok: true,
       expires_in_seconds: 600,
@@ -302,6 +349,14 @@ window.Auth = (function () {
       };
       db.users.push(usuario);
       if (usuario.role === 'dono') barbearia = provisionarSalao(usuario, p.salon_name);
+      /* email de onboarding para novo dono */
+      if (usuario.role === 'dono' && usuario.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usuario.email)) {
+        Mailer.enviarBoasVindas({
+          email: usuario.email, nome: usuario.name,
+          nomeSalao: p.salon_name || (barbearia && barbearia.name) || 'Seu salão',
+          trialDias: 10
+        }).catch(function(e) { console.error('[onboarding] falha:', e); });
+      }
       DB.salvar();
     } else {
       usuario.verified = 1;

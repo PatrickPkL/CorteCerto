@@ -89,10 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
   /* entrada */
   document.getElementById('form-cli-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    pedirCodigo({
+    var payload = {
       phone: document.getElementById('cli-tel').value,
       modo: 'login'
-    });
+    };
+    var emailCli = document.getElementById('cli-email-login');
+    if (emailCli && emailCli.value.trim()) payload.email = emailCli.value.trim();
+    pedirCodigo(payload);
   });
 
   document.getElementById('form-cli-cadastro')?.addEventListener('submit', (e) => {
@@ -157,4 +160,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (b.classList.contains('active')) mostrarPapel(b.dataset.role);
     });
   });
+
+  /* magic link: se URL tem ?token=, verificar automaticamente */
+  (function() {
+    var params = new URLSearchParams(window.location.search);
+    var magicToken = params.get('token') || localStorage.getItem('cc_magic_token');
+    if (magicToken) {
+      localStorage.removeItem('cc_magic_token');
+      try {
+        var r = Auth.verificarMagicLink(magicToken);
+        showToast('Login realizado via link mágico!');
+        setTimeout(function() { window.location.href = destinoPosLogin(r.user); }, 500);
+      } catch (e) {
+        showToast(msgErro(e), 'error');
+      }
+    }
+  })();
 });

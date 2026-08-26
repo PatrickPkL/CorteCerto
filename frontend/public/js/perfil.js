@@ -5,6 +5,15 @@
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
+  /* captura magic link token da URL */
+  var params = new URLSearchParams(window.location.search);
+  var magicToken = params.get('token');
+  if (magicToken) {
+    localStorage.removeItem('cc_magic_token');
+    window.location.href = '/admin/?token=' + magicToken;
+    return;
+  }
+
   const usuario = exigirLogin('cliente');
   if (!usuario) return;
 

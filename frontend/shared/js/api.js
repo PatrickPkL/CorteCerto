@@ -88,6 +88,12 @@
     });
   };
 
+  /* ---------------- RPC explícitos (além do Proxy) ---------------- */
+
+  API.verificarMagicLink = function (token) { return rpc('verificarMagicLink', [token]); };
+  API.gerarLembretesAmanha = function () { return rpc('gerarLembretesAmanha', []); };
+  API.lojasProximas = function (dados) { return rpc('lojasProximas', [dados]); };
+
   /* ---------------- Auth (espelho do backend) ---------------- */
 
   function limpar() {

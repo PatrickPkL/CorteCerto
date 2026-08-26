@@ -9,6 +9,8 @@
 window.API = (function () {
   'use strict';
 
+  var Mailer = require('./mailer');
+
   /* ================= helpers ================= */
 
   function err(status, error) { throw { status, error }; }
@@ -178,24 +180,253 @@ window.API = (function () {
   }
 
   /* RF-015 — nearby Haversine */
-  function lojasProximas(lat, lng, raioKm) {
-    const R = 6371;
+  function lojasProximas(lat, lng, raioKm, filtros) {
+    var R = 6371;
     function haversine(a, b) {
-      const toRad = d => d * Math.PI / 180;
-      const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
-      const h = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+      var toRad = function(d) { return d * Math.PI / 180; };
+      var dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+      var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
       return 2 * R * Math.asin(Math.sqrt(h));
     }
-    const origem = { lat: Number(lat), lng: Number(lng) };
+    var origem = { lat: Number(lat), lng: Number(lng) };
     if (isNaN(origem.lat) || isNaN(origem.lng)) err(400, 'Informe latitude e longitude.');
-    const raio = Number(raioKm) || 20;
-    return DB._d().barbershops
-      .filter(l => l.lat != null && l.lng != null)
-      .map(l => ({ loja: lojaPublica(l), dist: haversine(origem, l) }))
-      .filter(x => x.dist <= raio)
-      .sort((a, b) => a.dist - b.dist)
-      .map(x => Object.assign(x.loja, { distance_km: Math.round(x.dist * 10) / 10 }));
+    var raio = Number(raioKm) || 20;
+    filtros = filtros || {};
+    var resultado = DB._d().barbershops
+      .filter(function(l) { return l.lat != null && l.lng != null; })
+      .map(function(l) { return { loja: lojaPublica(l), dist: haversine(origem, l) }; })
+      .filter(function(x) { return x.dist <= raio; });
+    if (filtros.servico) {
+      var sn = filtros.servico.toLowerCase();
+      resultado = resultado.filter(function(x) {
+        var svcs = DB._d().services.filter(function(s) { return s.barbershop_id === x.loja.id && s.active; });
+        return svcs.some(function(s) { return s.name.toLowerCase().indexOf(sn) !== -1; });
+      });
+    }
+    if (filtros.cidade) {
+      var cn = filtros.cidade.toLowerCase();
+      resultado = resultado.filter(function(x) { return (x.loja.city || '').toLowerCase() === cn; });
+    }
+    if (filtros.precoMax != null) {
+      var pm = Number(filtros.precoMax);
+      if (isFinite(pm)) {
+        resultado = resultado.filter(function(x) {
+          var svcs = DB._d().services.filter(function(s) { return s.barbershop_id === x.loja.id && s.active; });
+          return svcs.length === 0 || svcs.every(function(s) { return Number(s.price) <= pm; });
+        });
+      }
+    }
+    resultado.sort(function(a, b) { return a.dist - b.dist; });
+    return resultado.map(function(x) {
+      return Object.assign(x.loja, { distance_km: Math.round(x.dist * 10) / 10 });
+    });
+  }
+
+  function verificarMagicLink(token) {
+    var tk = String(token || '').trim();
+    if (!tk) err(400, 'Token obrigatório.');
+    var all = db.magic_tokens || [];
+    var registro = null;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].token === tk && !all[i].used) { registro = all[i]; break; }
+    }
+    if (!registro) err(404, 'Link inválido ou já utilizado.');
+    if (new Date(registro.expires_at) < new Date()) err(410, 'Link expirado. Solicite um novo.');
+    registro.used = 1;
+    DB.salvar();
+    var usuario = (db.users || []).find(function(u) { return u.id === registro.user_id; });
+    if (!usuario) err(404, 'Usuário não encontrado.');
+    var sessao = require('./auth').criarSessao(usuario.id);
+    return { token: sessao.token, user: { id: usuario.id, name: usuario.name, role: usuario.role } };
+  }
+
+  function gerarLembretesAmanha() {
+    var amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    var alvo = amanha.toISOString().slice(0, 10);
+    var ags = (db.appointments || []).filter(function(a) {
+      return a.date === alvo && (a.status === 'confirmado' || a.status === 'agendado');
+    });
+    ags.forEach(function(ag) {
+      var loja = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
+      var cli = (db.users || []).find(function(u) { return u.id === ag.user_id; });
+      if (!loja) return;
+      var dados = {
+        salaoNome: loja.name,
+        servicos: ag.services || [],
+        hora: ag.time,
+        endereco: loja.address || '',
+        appUrl: process.env.APP_URL || 'http://localhost:3000'
+      };
+      if (cli && cli.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cli.email)) {
+        Mailer.enviarLembrete(cli.email, Object.assign({ nome: cli.name, isCliente: true }, dados))
+          .catch(function() {});
+      }
+      var prof = (db.professionals || []).find(function(p) { return p.id === ag.professional_id; });
+      if (prof && prof.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
+        Mailer.enviarLembrete(prof.email, Object.assign({
+          nome: prof.name, isCliente: false
+        }, dados)).catch(function() {});
+      }
+    });
+    return { enviados: ags.length };
+  }
+
+  /* ================= SUPER-ADMIN (v2.4) ================= */
+
+  var bcrypt;
+  try { bcrypt = require('bcryptjs'); } catch(e) { bcrypt = null; }
+
+  function ensureSuperAdmin() {
+    var hash = process.env.SUPER_ADMIN_HASH;
+    if (!hash) err(500, 'SUPER_ADMIN_HASH não configurado.');
+    var email = (process.env.SUPER_ADMIN_EMAIL || 'admin@cortecerto.com').toLowerCase();
+    var ips = (process.env.SUPER_ADMIN_IPS || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    return { email: email, hash: hash, ips: ips };
+  }
+
+  function superAdminLogin(dados) {
+    var cfg = ensureSuperAdmin();
+    var email = String(dados.email || '').toLowerCase().trim();
+    var senha = String(dados.senha || '').trim();
+    if (email !== cfg.email) err(401, 'Credenciais inválidas.');
+    if (!bcrypt) err(500, 'Módulo bcrypt não disponível.');
+    var ok;
+    try { ok = bcrypt.compareSync(senha, cfg.hash); } catch(e) { ok = false; }
+    if (!ok) err(401, 'Credenciais inválidas.');
+    var token = UUID();
+    db.superadmin_sessions = (db.superadmin_sessions || []).filter(function(s) {
+      return s.email !== email;
+    });
+    db.superadmin_sessions.push({
+      token: token, email: email,
+      created_at: agoraISO(),
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    });
+    DB.salvar();
+    return { token: token, email: email };
+  }
+
+  function superAdminAuth(token) {
+    var tk = String(token || '').trim();
+    if (!tk) err(401, 'Token obrigatório.');
+    var sessoes = db.superadmin_sessions || [];
+    var sessao = null;
+    for (var i = 0; i < sessoes.length; i++) {
+      if (sessoes[i].token === tk) { sessao = sessoes[i]; break; }
+    }
+    if (!sessao) err(401, 'Sessão inválida.');
+    if (new Date(sessao.expires_at) < new Date()) err(401, 'Sessão expirada.');
+    return sessao;
+  }
+
+  function superAdminLogout(token) {
+    var tk = String(token || '').trim();
+    db.superadmin_sessions = (db.superadmin_sessions || []).filter(function(s) { return s.token !== tk; });
+    DB.salvar();
+    return { ok: true };
+  }
+
+  function saListarLojas() {
+    var lojas = (db.barbershops || []).map(function(b) {
+      var owner = (db.users || []).find(function(u) { return u.id === b.owner_id; });
+      var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+      var profCount = (db.professionals || []).filter(function(p) { return p.barbershop_id === b.id; }).length;
+      var agCount = (db.appointments || []).filter(function(a) { return a.barbershop_id === b.id && a.status !== 'cancelado'; }).length;
+      return {
+        id: b.id, name: b.name, city: b.city, uf: b.uf,
+        owner_name: owner ? owner.name : '?',
+        owner_email: owner ? owner.email : '',
+        plano: sub ? sub.status : 'nenhum',
+        trial_ends_at: sub && sub.trial_ends_at ? sub.trial_ends_at : null,
+        profissionais: profCount,
+        agendamentos: agCount,
+        created_at: b.created_at
+      };
+    });
+    return lojas;
+  }
+
+  function saListarUsuarios() {
+    return (db.users || []).map(function(u) {
+      var agCount = (db.appointments || []).filter(function(a) { return a.user_id === u.id; }).length;
+      var sessoes = (db.sessions || []).filter(function(s) { return s.user_id === u.id; }).length;
+      return {
+        id: u.id, name: u.name, email: u.email, phone: u.phone,
+        role: u.role, agendamentos: agCount, sessoes: sessoes,
+        created_at: u.created_at
+      };
+    });
+  }
+
+  function saDetalheLoja(shopId) {
+    var b = (db.barbershops || []).find(function(x) { return x.id == shopId; });
+    if (!b) err(404, 'Loja não encontrada.');
+    var owner = (db.users || []).find(function(u) { return u.id === b.owner_id; });
+    var svcs = (db.services || []).filter(function(s) { return s.barbershop_id === b.id; });
+    var profs = (db.professionals || []).filter(function(p) { return p.barbershop_id === b.id; });
+    var ags = (db.appointments || []).filter(function(a) { return a.barbershop_id === b.id; });
+    var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+    var totalPago = (db.payments || []).filter(function(p) { return p.barbershop_id === b.id; })
+      .reduce(function(sum, p) { return sum + (Number(p.amount) || 0); }, 0);
+    return {
+      loja: b, owner: owner, planos: sub,
+      servicos: svcs, profissionais: profs,
+      totalAgendamentos: ags.length,
+      agendamentosPorStatus: {
+        confirmado: ags.filter(function(a) { return a.status === 'confirmado'; }).length,
+        concluido: ags.filter(function(a) { return a.status === 'concluido'; }).length,
+        cancelado: ags.filter(function(a) { return a.status === 'cancelado'; }).length
+      },
+      totalPago: totalPago
+    };
+  }
+
+  function saAtualizarPlano(shopId, dados) {
+    var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id == shopId; });
+    if (!sub) err(404, 'Assinatura não encontrada.');
+    if (dados.status) sub.status = dados.status;
+    if (dados.current_period_end) sub.current_period_end = dados.current_period_end;
+    sub.updated_at = agoraISO();
+    DB.salvar();
+    return sub;
+  }
+
+  function saExcluirLoja(shopId) {
+    var b = (db.barbershops || []).find(function(x) { return x.id == shopId; });
+    if (!b) err(404, 'Loja não encontrada.');
+    db.services = (db.services || []).filter(function(s) { return s.barbershop_id !== b.id; });
+    db.professionals = (db.professionals || []).filter(function(p) { return p.barbershop_id !== b.id; });
+    db.clients = (db.clients || []).filter(function(c) { return c.barbershop_id !== b.id; });
+    db.appointments = (db.appointments || []).filter(function(a) { return a.barbershop_id !== b.id; });
+    db.notifications = (db.notifications || []).filter(function(n) { return n.barbershop_id !== b.id; });
+    db.subscriptions = (db.subscriptions || []).filter(function(s) { return s.barbershop_id !== b.id; });
+    db.payments = (db.payments || []).filter(function(p) { return p.barbershop_id !== b.id; });
+    db.reviews = (db.reviews || []).filter(function(r) { return r.barbershop_id !== b.id; });
+    db.gallery_images = (db.gallery_images || []).filter(function(g) { return g.barbershop_id !== b.id; });
+    db.working_hours = (db.working_hours || []).filter(function(w) { return w.barbershop_id !== b.id; });
+    db.schedule_exceptions = (db.schedule_exceptions || []).filter(function(e) { return e.barbershop_id !== b.id; });
+    db.appointment_services = (db.appointment_services || []).filter(function(a) {
+      var ag = (db.appointments || []).find(function(x) { return x.id === a.appointment_id; });
+      return !ag || ag.barbershop_id !== b.id;
+    });
+    db.tickets = (db.tickets || []).filter(function(t) { return t.salaoId !== b.id; });
+    db.barbershops = db.barbershops.filter(function(x) { return x.id !== b.id; });
+    DB.salvar();
+    return { ok: true };
+  }
+
+  function saDashboard() {
+    return {
+      totalLojas: (db.barbershops || []).length,
+      totalUsuarios: (db.users || []).length,
+      totalAgendamentos: (db.appointments || []).length,
+      totalReceita: (db.payments || []).reduce(function(s, p) { return s + (Number(p.amount) || 0); }, 0),
+      lojasTrial: (db.subscriptions || []).filter(function(s) { return s.status === 'trial'; }).length,
+      lojasAtivas: (db.subscriptions || []).filter(function(s) { return s.status === 'ativa'; }).length,
+      agendamentosHoje: (db.appointments || []).filter(function(a) { return a.date === agoraISO().slice(0, 10); }).length
+    };
   }
 
   /* ================= SERVIÇOS (RF-018..021) ================= */
@@ -924,6 +1155,32 @@ window.API = (function () {
     }, user ? user.id : null).id;
 
     DB.salvar();
+
+    /* notificar dono da loja por e-mail */
+    try {
+      var lojaRef = (db.barbershops || []).find(function(b) { return b.id === agendamento.barbershop_id; });
+      if (lojaRef && lojaRef.owner_email) {
+        var cliRef = (db.users || []).find(function(u) { return u.id === agendamento.user_id; });
+        Mailer.enviarNovoAgendamento(lojaRef.owner_email, {
+          clienteNome: (cliRef && cliRef.name) || 'Cliente',
+          salaoNome: lojaRef.name,
+          servicos: agendamento.services || [],
+          data: agendamento.date,
+          hora: agendamento.time
+        }).catch(function() {});
+      }
+      /* confirmar para o cliente por e-mail */
+      var cliRef2 = (db.users || []).find(function(u) { return u.id === agendamento.user_id; });
+      if (cliRef2 && cliRef2.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliRef2.email)) {
+        Mailer.enviarConfirmacaoAgendamento(cliRef2.email, {
+          salaoNome: lojaRef ? lojaRef.name : 'Seu salão',
+          servicos: agendamento.services || [],
+          data: agendamento.date,
+          hora: agendamento.time,
+          clienteNome: cliRef2.name
+        }).catch(function() {});
+      }
+    } catch (notifErr) { /* notificação é best-effort */ }
 
     /* notificações (UC-17 / RF-066) */
     const nomesSvc = svcs.map(s => s.name).join(' + ') || 'atendimento';
@@ -2044,6 +2301,14 @@ window.API = (function () {
     alternarFavorito, meusFavoritos,
 
     // suporte
-    criarTicket, ticketsDoSalao
+    criarTicket, ticketsDoSalao,
+
+    // magic link / lembretes
+    verificarMagicLink, gerarLembretesAmanha,
+
+    // super-admin
+    superAdminLogin, superAdminLogout,
+    saListarLojas, saListarUsuarios, saDetalheLoja,
+    saAtualizarPlano, saExcluirLoja, saDashboard
   };
 })();
