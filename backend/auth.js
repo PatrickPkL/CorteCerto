@@ -13,7 +13,7 @@ window.Auth = (function () {
   var SMS = require('./sms');
   var Mailer = require('./mailer');
 
-  const TOKEN_TTL_DIAS = 30;
+  const TOKEN_TTL_DIAS = 7;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
   const MAX_TENTATIVAS = 5;               // RNF-10
   const COOLDOWN_MS = 30 * 1000;          // RNF-10
@@ -336,6 +336,9 @@ window.Auth = (function () {
     const p = reg.payload || {};
 
     if (!usuario) {
+      if (p.modo === 'registro' && !p.aceite_privacidade) {
+        throw { status: 400, error: 'Aceite da Política de Privacidade e Termos de Uso é obrigatório.' };
+      }
       // criação no verify (RF-004) — apenas por telefone
       usuario = {
         id: DB.proximoId(),
@@ -344,6 +347,7 @@ window.Auth = (function () {
         email: p.email || '',
         phone: ident,
         verified: 1,
+        consentimentos: [{ tipo: 'privacidade', data: new Date().toISOString(), versao: '1.0' }],
         created_at: DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos()),
         prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
       };
@@ -444,6 +448,12 @@ window.Auth = (function () {
 
   /* ---------------- API pública ---------------- */
 
+  function logoutTodos(userId) {
+    var d = DB._d();
+    d.sessions = (d.sessions || []).filter(function(s) { return s.user_id !== userId; });
+    DB.salvar();
+  }
+
   return {
     normalizarTelefone,
     normalizarIdentidade,
@@ -454,6 +464,7 @@ window.Auth = (function () {
     publicUser,
     salaoDoUsuario,
     logout,
+    logoutTodos,
     limparSessao,
     criarSessao
   };

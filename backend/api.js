@@ -19,6 +19,34 @@ window.API = (function () {
   function agoraISO() { return new Date().toISOString(); }
   function agoraLocal() { return DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos()); }
 
+  /* ================= LGPD — Auditoria ================= */
+
+  function _auditLog(userId, acao, extra) {
+    var d = DB._d();
+    d.audit_log = d.audit_log || [];
+    d.audit_log.push({
+      id: DB.proximoId(),
+      user_id: userId,
+      acao: acao,
+      extra: extra || null,
+      timestamp: new Date().toISOString()
+    });
+    /* manter apenas últimos 1000 registros */
+    if (d.audit_log.length > 1000) {
+      d.audit_log = d.audit_log.slice(-1000);
+    }
+    DB.salvar();
+  }
+
+  function meusLogsDeAcesso() {
+    var user = sessao();
+    var d = DB._d();
+    var desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    return (d.audit_log || []).filter(function(l) {
+      return l.user_id === user.id && l.timestamp >= desde;
+    }).sort(function(a, b) { return b.timestamp > a.timestamp ? 1 : -1; });
+  }
+
   function clampInt(v, min, max, def) {
     const n = parseInt(v, 10);
     if (isNaN(n)) return def;
@@ -2106,32 +2134,45 @@ window.API = (function () {
     return excluirMinhaConta();
   }
 
-  /** RF-010 — exclusão de conta com cascata completa. */
+  /** RF-010 — exclusão de conta com cascata completa (LGPD). */
   function excluirMinhaConta() {
-    const user = sessao();
-    const db = DB._d();
+    var user = sessao();
+    var d = DB._d();
+    _auditLog(user.id, 'excluir_conta');
 
     if (user.role === 'dono') {
-      deletarLojaCascade(Auth.salaoDoUsuario(user));
+      var loja = Auth.salaoDoUsuario(user);
+      if (loja) deletarLojaCascade(loja);
     }
 
-    /* cancela agendamentos futuros do usuário como cliente */
-    db.appointments.forEach(a => {
-      if (a.user_id === user.id && a.starts_at >= agoraLocal() &&
-          (a.status === 'pendente' || a.status === 'confirmado')) {
+    /* cancelar agendamentos futuros do cliente */
+    (d.appointments || []).forEach(function(a) {
+      if ((a.user_id === user.id || (d.clients || []).some(function(c) { return c.id === a.client_id && c.user_id === user.id; }))
+          && a.date >= DB.hojeISO() && a.status !== 'cancelado') {
         a.status = 'cancelado';
-        a.cancellation_reason = 'Conta do cliente excluída';
+        a.cancelled_by = 'sistema';
+        a.cancel_reason = 'Exclusão de conta (LGPD)';
       }
     });
 
-    db.sessions = db.sessions.filter(s => s.user_id !== user.id);
-    db.notifications = db.notifications.filter(n => n.user_id !== user.id);
-    db.favorites = db.favorites.filter(f => f.user_id !== user.id);
-    db.users = db.users.filter(u => u.id !== user.id);
+    /* remover sessões, notificações, favoritos, magic tokens */
+    d.sessions = (d.sessions || []).filter(function(s) { return s.user_id !== user.id; });
+    d.notifications = (d.notifications || []).filter(function(n) { return n.user_id !== user.id; });
+    d.favorites = (d.favorites || []).filter(function(f) { return f.user_id !== user.id; });
+    d.magic_tokens = (d.magic_tokens || []).filter(function(t) { return t.user_id !== user.id; });
+
+    /* anonimizar dados pessoais (mantém id, role, created_at) */
+    user.name = '[REMOVIDO]';
+    user.email = null;
+    user.phone = null;
+    user.prefs = null;
+    user.consentimentos = null;
+    user._removed_at = new Date().toISOString();
+    user._removal_log = 'Conta excluída em ' + new Date().toISOString() + ' (LGPD)';
 
     DB.salvar();
     Auth.logout();
-    return { ok: true };
+    return { ok: true, message: 'Conta excluída. Dados pessoais anonimizados conforme LGPD.' };
   }
 
   /* ================= FAVORITOS (UC-15 · DECISÃO v2: implementar) ================= */
@@ -2205,6 +2246,131 @@ window.API = (function () {
     return DB._d().reviews.filter(r => r.user_id === user.id);
   }
 
+  /* ================= LGPD — Exportação de Dados ================= */
+
+  function exportarMeusDados() {
+    var user = sessao();
+    var d = DB._d();
+    var result = {
+      dados_pessoais: {
+        id: user.id,
+        nome: user.name,
+        email: user.email,
+        telefone: user.phone,
+        role: user.role,
+        created_at: user.created_at,
+        consentimentos: user.consentimentos || []
+      },
+      agendamentos: (d.appointments || []).filter(function(a) {
+        return a.user_id === user.id || (d.clients || []).some(function(c) {
+          return c.id === a.client_id && c.user_id === user.id;
+        });
+      }),
+      avaliacoes: (d.reviews || []).filter(function(r) {
+        return r.user_id === user.id;
+      }),
+      favoritos: (d.favorites || []).filter(function(f) {
+        return f.user_id === user.id;
+      })
+    };
+    if (user.role === 'dono') {
+      var loja = Auth.salaoDoUsuario(user);
+      if (loja) {
+        result.loja = {
+          id: loja.id,
+          nome: loja.name,
+          endereco: loja.address,
+          cidade: loja.city,
+          uf: loja.uf
+        };
+        result.servicos = (d.services || []).filter(function(s) { return s.barbershop_id === loja.id; });
+        result.profissionais = (d.professionals || []).filter(function(p) { return p.barbershop_id === loja.id; });
+      }
+    }
+    /* audit log */
+    _auditLog(user.id, 'exportar_dados');
+    return result;
+  }
+
+  function revogarConsentimento(tipo) {
+    var user = sessao();
+    var d = DB._d();
+    if (!tipo) err(400, 'Tipo de consentimento obrigatório.');
+    user.consentimentos = (user.consentimentos || []).map(function(c) {
+      if (c.tipo === tipo && !c.revogado) {
+        return { tipo: c.tipo, data: c.data, versao: c.versao, revogado: true, revogado_em: new Date().toISOString() };
+      }
+      return c;
+    });
+    _auditLog(user.id, 'revogar_consentimento', { tipo: tipo });
+    DB.salvar();
+    return { ok: true, consentimentos: user.consentimentos };
+  }
+
+  function solicitarExclusao(dados) {
+    var email = String(dados.email || '').toLowerCase().trim();
+    var motivo = String(dados.motivo || '').trim();
+    if (!email) err(400, 'E-mail obrigatório.');
+    var d = DB._d();
+    d.tickets = d.tickets || [];
+    d.tickets.push({
+      id: DB.proximoId(),
+      tipo: 'exclusao_lgpd',
+      email: email,
+      motivo: motivo,
+      status: 'aberto',
+      created_at: new Date().toISOString()
+    });
+    DB.salvar();
+    return { ok: true, message: 'Solicitação registrada. Responderemos em até 15 dias úteis.' };
+  }
+
+  function enviarSolicitacaoLGPD(dados) {
+    var nome = String(dados.nome || '').trim();
+    var email = String(dados.email || '').trim();
+    var tipo = String(dados.tipo || '').trim();
+    var descricao = String(dados.descricao || '').trim();
+    if (!nome || !email || !tipo || !descricao) err(400, 'Todos os campos obrigatórios devem ser preenchidos.');
+    var protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+    var d = DB._d();
+    d.tickets = d.tickets || [];
+    d.tickets.push({
+      id: DB.proximoId(),
+      tipo: 'lgpd_' + tipo,
+      protocolo: protocolo,
+      nome: nome,
+      email: email,
+      descricao: descricao,
+      status: 'aberto',
+      created_at: new Date().toISOString()
+    });
+    DB.salvar();
+    /* enviar email para DPO */
+    var dpoEmail = (typeof process !== 'undefined' && process.env && process.env.DPO_EMAIL) || 'dpo@cortecerto.com';
+    var Mailer;
+    try { Mailer = require('./mailer'); } catch(e) {}
+    if (Mailer && Mailer.enviarEmail) {
+      Mailer.enviarEmail({
+        to: dpoEmail,
+        subject: '[LGPD] Solicitação ' + protocolo + ' — ' + tipo,
+        html: '<h2>Solicitação LGPD</h2>' +
+              '<p><strong>Protocolo:</strong> ' + protocolo + '</p>' +
+              '<p><strong>Nome:</strong> ' + nome + '</p>' +
+              '<p><strong>E-mail:</strong> ' + email + '</p>' +
+              '<p><strong>Tipo:</strong> ' + tipo + '</p>' +
+              '<p><strong>Descrição:</strong></p><p>' + descricao + '</p>'
+      }).catch(function() {});
+    }
+    return { ok: true, protocolo: protocolo, message: 'Solicitação registrada. Responderemos em até 15 dias úteis.' };
+  }
+
+  function logoutTodosDispositivos() {
+    var user = sessao();
+    _auditLog(user.id, 'logout_todos_dispositivos');
+    Auth.logoutTodos(user.id);
+    return { ok: true };
+  }
+
   /* ================= API pública ================= */
 
   return {
@@ -2261,6 +2427,10 @@ window.API = (function () {
 
     // me
     mePerfil, atualizarMe, atualizarPreferencias, excluirMinhaConta,
+
+    // LGPD
+    exportarMeusDados, revogarConsentimento, solicitarExclusao,
+    enviarSolicitacaoLGPD, meusLogsDeAcesso, logoutTodosDispositivos,
 
     // favoritos
     alternarFavorito, meusFavoritos,

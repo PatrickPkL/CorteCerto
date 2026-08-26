@@ -9,7 +9,43 @@ window.DB = (function () {
   'use strict';
 
   const DB_KEY = 'cc_db';
-  const DB_VERSION = 5;
+  const DB_VERSION = 6;
+
+  var _crypto;
+  try { _crypto = require('crypto'); } catch(e) { _crypto = null; }
+
+  var _ENCRYPT_KEY = (typeof process !== 'undefined' && process.env && process.env.DB_ENCRYPT_KEY) || '';
+
+  function _deriveKey() {
+    if (!_crypto || !_ENCRYPT_KEY) return null;
+    return _crypto.createHash('sha256').update(_ENCRYPT_KEY).digest();
+  }
+
+  function criptografar(texto) {
+    var key = _deriveKey();
+    if (!key || !texto) return texto;
+    try {
+      var iv = _crypto.randomBytes(12);
+      var cipher = _crypto.createCipheriv('aes-256-gcm', key, iv);
+      var encrypted = Buffer.concat([cipher.update(String(texto), 'utf8'), cipher.final()]);
+      var tag = cipher.getAuthTag();
+      return 'enc:v1:' + iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex');
+    } catch(e) { return texto; }
+  }
+
+  function descriptografar(texto) {
+    var key = _deriveKey();
+    if (!key || !texto || typeof texto !== 'string' || !texto.startsWith('enc:v1:')) return texto;
+    try {
+      var parts = texto.split(':');
+      var iv = Buffer.from(parts[2], 'hex');
+      var tag = Buffer.from(parts[3], 'hex');
+      var encrypted = Buffer.from(parts[4], 'hex');
+      var decipher = _crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(tag);
+      return decipher.update(encrypted) + decipher.final('utf8');
+    } catch(e) { return texto; }
+  }
 
   /* ---------------- helpers de data (hora local, mata DT-11) ---------------- */
 
@@ -93,6 +129,17 @@ window.DB = (function () {
       p.v = 5;
       p.magic_tokens = Array.isArray(p.magic_tokens) ? p.magic_tokens : [];
       p.superadmin_sessions = Array.isArray(p.superadmin_sessions) ? p.superadmin_sessions : [];
+    }
+    /* v5 → v6: criptografia de dados sensíveis (phone/email) */
+    if (p.v === 5) {
+      p.v = 6;
+      var _key = _deriveKey();
+      if (_key) {
+        (p.users || []).forEach(function(u) {
+          if (u.phone && !u.phone.startsWith('enc:')) u.phone = criptografar(u.phone);
+          if (u.email && !u.email.startsWith('enc:')) u.email = criptografar(u.email);
+        });
+      }
     }
     try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
     catch (e) { console.error('[DB] Falha ao persistir migração.', e); }

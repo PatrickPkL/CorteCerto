@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seus Direitos (LGPD) · Corte Certo</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<style>
+  body { margin:0; background:#0c0c0c; color:#f0f0f0; font-family:system-ui,-apple-system,sans-serif; line-height:1.7; }
+  .lgpd-header { background:#161616; border-bottom:1px solid #222; padding:20px 24px; text-align:center; }
+  .lgpd-header a { color:#f5c518; text-decoration:none; font-size:18px; font-weight:700; }
+  .lgpd-container { max-width:720px; margin:0 auto; padding:32px 20px 60px; }
+  .lgpd-container h1 { font-size:24px; margin:0 0 8px; }
+  .lgpd-container h2 { font-size:18px; color:#f5c518; margin:32px 0 12px; border-bottom:1px solid #222; padding-bottom:8px; }
+  .lgpd-container p { font-size:15px; color:#ccc; }
+  .lgpd-card { background:#161616; border:1px solid #222; border-radius:12px; padding:24px; margin:20px 0; }
+  .lgpd-card label { display:block; font-size:14px; color:#ccc; margin-bottom:6px; margin-top:16px; }
+  .lgpd-card input, .lgpd-card textarea, .lgpd-card select { width:100%; padding:10px 12px; border:1px solid #333; border-radius:8px; background:#0c0c0c; color:#f0f0f0; font-size:15px; box-sizing:border-box; }
+  .lgpd-card textarea { min-height:120px; resize:vertical; font-family:inherit; }
+  .lgpd-card select { cursor:pointer; }
+  .lgpd-card button { margin-top:20px; width:100%; padding:12px; border:none; border-radius:8px; background:#f5c518; color:#0c0c0c; font-size:16px; font-weight:600; cursor:pointer; }
+  .lgpd-card button:hover { background:#e0b416; }
+  .lgpd-card button:disabled { opacity:0.5; cursor:not-allowed; }
+  .lgpd-success { display:none; background:#1a3a1a; border:1px solid #2ecc71; border-radius:12px; padding:24px; margin:20px 0; text-align:center; }
+  .lgpd-success h3 { color:#2ecc71; margin:0 0 8px; }
+  .lgpd-info { font-size:14px; color:#888; margin-top:16px; }
+  .lgpd-info a { color:#f5c518; }
+</style>
+</head>
+<body>
+<div class="lgpd-header"><a href="telainicial.html">Corte Certo</a></div>
+<div class="lgpd-container">
+  <h1>Seus Direitos (LGPD)</h1>
+  <p>Utilize o formulário abaixo para exercer qualquer dos seus direitos previstos na Lei Geral de Proteção de Dados (Lei 13.709/2018). Responderemos em até 15 dias úteis.</p>
+
+  <div class="lgpd-card" id="lgpd-form">
+    <label for="lgpd-nome">Seu nome completo *</label>
+    <input type="text" id="lgpd-nome" placeholder="Nome como no cadastro" required>
+
+    <label for="lgpd-email">Seu e-mail *</label>
+    <input type="email" id="lgpd-email" placeholder="E-mail da conta" required>
+
+    <label for="lgpd-telefone">Telefone (opcional)</label>
+    <input type="tel" id="lgpd-telefone" placeholder="(XX) XXXXX-XXXX">
+
+    <label for="lgpd-tipo">Tipo de solicitação *</label>
+    <select id="lgpd-tipo" required>
+      <option value="">Selecione...</option>
+      <option value="acesso">Acesso aos meus dados</option>
+      <option value="correcao">Correção de dados</option>
+      <option value="exclusao">Exclusão de dados</option>
+      <option value="portabilidade">Portabilidade de dados</option>
+      <option value="revogacao">Revogação de consentimento</option>
+      <option value="outro">Outra solicitação</option>
+    </select>
+
+    <label for="lgpd-descricao">Descrição da solicitação *</label>
+    <textarea id="lgpd-descricao" placeholder="Descreva detalhadamente sua solicitação..." required></textarea>
+
+    <button id="lgpd-enviar" onclick="enviarSolicitacao()">Enviar solicitação</button>
+  </div>
+
+  <div class="lgpd-success" id="lgpd-sucesso">
+    <h3>Solicitação enviada com sucesso!</h3>
+    <p>Seu protocolo será enviado por e-mail. Responderemos em até 15 dias úteis.</p>
+    <p id="lgpd-protocolo" style="font-family:monospace;color:#f5c518;margin-top:12px;"></p>
+  </div>
+
+  <p class="lgpd-info">
+    Para mais informações, consulte nossa <a href="privacidade.html">Política de Privacidade</a> e nossos <a href="termos.html">Termos de Uso</a>.
+    <br><br>
+    <strong>DPO:</strong> <a href="mailto:dpo@cortecerto.com">dpo@cortecerto.com</a>
+  </p>
+</div>
+<script>
+function enviarSolicitacao() {
+  var nome = document.getElementById('lgpd-nome').value.trim();
+  var email = document.getElementById('lgpd-email').value.trim();
+  var telefone = document.getElementById('lgpd-telefone').value.trim();
+  var tipo = document.getElementById('lgpd-tipo').value;
+  var descricao = document.getElementById('lgpd-descricao').value.trim();
+  var btn = document.getElementById('lgpd-enviar');
+
+  if (!nome || !email || !tipo || !descricao) {
+    alert('Preencha todos os campos obrigatórios.');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('E-mail inválido.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  var protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+
+  /* Em produção, isso enviaria um e-mail para dpo@cortecerto.com via backend.
+     Por agora, registra no console e mostra sucesso. */
+  console.log('[LGPD] Solicitação recebida:', { protocolo: protocolo, nome: nome, email: email, telefone: telefone, tipo: tipo, descricao: descricao });
+
+  document.getElementById('lgpd-form').style.display = 'none';
+  document.getElementById('lgpd-sucesso').style.display = 'block';
+  document.getElementById('lgpd-protocolo').textContent = 'Protocolo: ' + protocolo;
+}
+</script>
+</body>
+</html>

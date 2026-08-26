@@ -439,5 +439,29 @@ document.addEventListener('DOMContentLoaded', () => {
   btnCancelarExcluirCli?.addEventListener('click', () => fecharModal(modalExcluirCli));
   modalExcluirCli?.addEventListener('click', e => { if (e.target === modalExcluirCli) fecharModal(modalExcluirCli); });
 
+  /* LGPD — Exportar dados */
+  var btnExportar = document.getElementById('btn-exportar-dados');
+  if (btnExportar) {
+    btnExportar.onclick = function() {
+      var r = API.exportarMeusDados();
+      var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'cortecerto-meus-dados-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+
+  /* LGPD — Sair de todos dispositivos */
+  var btnSairTodos = document.getElementById('btn-sair-todos');
+  if (btnSairTodos) {
+    btnSairTodos.onclick = function() {
+      if (!confirm('Sair de todos os dispositivos? Você precisará fazer login novamente.')) return;
+      API.logoutTodosDispositivos();
+      Auth.logout();
+    };
+  }
+
   renderFavoritos();
 });

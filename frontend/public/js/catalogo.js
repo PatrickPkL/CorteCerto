@@ -136,9 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Geolocalização não suportada.', 'error');
         return;
       }
-      btnGeo.disabled = true;
-      btnGeo.textContent = 'Buscando...';
-      navigator.geolocation.getCurrentPosition(function(pos) {
+      function buscarLojas() {
+        btnGeo.disabled = true;
+        btnGeo.textContent = 'Buscando...';
+        navigator.geolocation.getCurrentPosition(function(pos) {
         try {
           var res = API.lojasProximas({
             lat: pos.coords.latitude,
@@ -158,6 +159,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btnGeo.disabled = false;
         btnGeo.textContent = 'Lojas perto de mim';
       }, { timeout: 10000 });
+      }
+      if (localStorage.getItem('cc_geo_consent')) {
+        buscarLojas();
+      } else {
+        if (confirm('O Corte Certo deseja acessar sua localização para encontrar barbearias perto de você. Você pode revogar este acesso a qualquer momento nas configurações do navegador. Continuar?')) {
+          localStorage.setItem('cc_geo_consent', '1');
+          buscarLojas();
+        } else {
+          showToast('Acesso à localização negado. Use a busca por CEP.', 'error');
+        }
+      }
     });
   }
 });

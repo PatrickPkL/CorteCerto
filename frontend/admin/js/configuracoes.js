@@ -228,6 +228,20 @@ document.addEventListener('DOMContentLoaded', () => {
     inputGaleria.value = '';
   });
 
+  /* LGPD — Exportar dados da loja */
+  var btnExportarLoja = document.getElementById('btn-exportar-dados-loja');
+  if (btnExportarLoja) {
+    btnExportarLoja.onclick = function() {
+      var r = API.exportarMeusDados();
+      var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'cortecerto-dados-loja-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+
   /* ---------- zona de risco (RF-010) — exclusão com código ---------- */
   const modalExcluir = document.getElementById('modal-excluir-conta');
   const step1 = document.getElementById('excluir-step-1');
