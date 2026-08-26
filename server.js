@@ -107,6 +107,9 @@ function handleRpc(req, res) {
 
     global.__CC_REQUEST_TOKEN = req.headers['x-cc-token'] || null;
     global.__CC_HTTP = true;
+    const ip = req.socket.remoteAddress || '0.0.0.0';
+    const ts = new Date().toISOString();
+    const argsStr = JSON.stringify(Array.isArray(args) ? args : []).slice(0, 200);
     try {
       const dados = fn.apply(null, Array.isArray(args) ? args : []);
       /* função assíncrona: resolve a resposta fora daqui — sem isso,
@@ -116,14 +119,14 @@ function handleRpc(req, res) {
           valor => json(res, 200, { ok: true, data: valor === undefined ? null : valor }),
           e => {
             const st = (e && e.status) || 500;
-            if (st >= 500) console.error('[rpc]', metodo, e);
+            if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
             json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
           });
       }
       return json(res, 200, { ok: true, data: dados === undefined ? null : dados });
     } catch (e) {
       const status = (e && e.status) || 500;
-      if (status >= 500) console.error('[rpc]', metodo, e);
+      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
       return json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
     } finally {
       delete global.__CC_REQUEST_TOKEN;
@@ -222,6 +225,10 @@ function servirEstatico(req, res, url) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (req.method === 'GET' && url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, version: '2.1.0', uptime: process.uptime(), timestamp: new Date().toISOString() }));
+  }
   if (req.method === 'POST' && url.pathname === '/api/rpc') return handleRpc(req, res);
   if (req.method === 'POST' && url.pathname === '/webhooks/abacatepay') {
     return handleWebhookAbacate(req, res, url);
