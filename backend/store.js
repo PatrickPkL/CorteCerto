@@ -61,6 +61,6 @@ module.exports = {
   clear() {
     carregar();
     memoria.clear();
-    persistir();
+    try { fs.unlinkSync(ARQUIVO); } catch (e) { /* arquivo pode não existir */ }
   }
 };
