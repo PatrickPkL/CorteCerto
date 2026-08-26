@@ -398,6 +398,14 @@ window.Auth = (function () {
     };
     db.barbershops.push(loja);
 
+    /* geocodificação automática se já tiver endereço */
+    if (loja.address && loja.city) {
+      var Geocode = require('./geocode');
+      Geocode.geocodificar(loja.address, loja.city, loja.uf).then(function(coords) {
+        if (coords) { loja.lat = coords.lat; loja.lng = coords.lng; DB.salvar(); }
+      }).catch(function() {});
+    }
+
     /* horários padrão da LOJA: seg–sáb 09–18 sem almoço, dom fechado */
     for (let dow = 1; dow <= 6; dow++) {
       db.working_hours.push({

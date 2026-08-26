@@ -10,6 +10,7 @@ window.API = (function () {
   'use strict';
 
   var Mailer = require('./mailer');
+  var Geocode = require('./geocode');
 
   /* ================= helpers ================= */
 
@@ -142,14 +143,29 @@ window.API = (function () {
   function atualizarLoja(patch) {
     const { shop } = exigirDono();
     const campos = ['name', 'description', 'phone', 'email', 'whatsapp',
-      'instagram', 'address', 'city', 'uf', 'logo_url', 'cover_url', 'tags'];
+      'instagram', 'address', 'city', 'uf', 'logo_url', 'cover_url', 'tags',
+      'lat', 'lng'];
+    var mudouEndereco = (patch.address !== undefined && patch.address !== shop.address) ||
+      (patch.city !== undefined && patch.city !== shop.city) ||
+      (patch.uf !== undefined && patch.uf !== shop.uf);
     campos.forEach(c => {
       if (patch[c] !== undefined) shop[c] = patch[c];
     });
     if (!shop.name.trim()) err(400, 'Nome do salão é obrigatório.');
     shop.updated_at = agoraISO();
     DB.salvar();
-    localStorage.setItem('barbershop', JSON.stringify(shop)); // mantém chave compat
+    localStorage.setItem('barbershop', JSON.stringify(shop));
+    /* geocodificação automática quando endereço/cidade mudam */
+    if (mudouEndereco && shop.address && shop.city) {
+      Geocode.geocodificar(shop.address, shop.city, shop.uf)
+        .then(function(coords) {
+          if (coords) {
+            shop.lat = coords.lat;
+            shop.lng = coords.lng;
+            DB.salvar();
+          }
+        }).catch(function() {});
+    }
     return shop;
   }
 
@@ -180,7 +196,7 @@ window.API = (function () {
   }
 
   /* RF-015 — nearby Haversine */
-  function lojasProximas(lat, lng, raioKm, filtros) {
+  function lojasProximas(dados) {
     var R = 6371;
     function haversine(a, b) {
       var toRad = function(d) { return d * Math.PI / 180; };
@@ -189,10 +205,11 @@ window.API = (function () {
         Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
       return 2 * R * Math.asin(Math.sqrt(h));
     }
+    var lat = dados.lat, lng = dados.lng;
     var origem = { lat: Number(lat), lng: Number(lng) };
     if (isNaN(origem.lat) || isNaN(origem.lng)) err(400, 'Informe latitude e longitude.');
-    var raio = Number(raioKm) || 20;
-    filtros = filtros || {};
+    var raio = Number(dados.raio) || 20;
+    var filtros = { servico: dados.servico, cidade: dados.cidade, precoMax: dados.precoMax };
     var resultado = DB._d().barbershops
       .filter(function(l) { return l.lat != null && l.lng != null; })
       .map(function(l) { return { loja: lojaPublica(l), dist: haversine(origem, l) }; })
@@ -218,9 +235,9 @@ window.API = (function () {
       }
     }
     resultado.sort(function(a, b) { return a.dist - b.dist; });
-    return resultado.map(function(x) {
+    return { items: resultado.map(function(x) {
       return Object.assign(x.loja, { distance_km: Math.round(x.dist * 10) / 10 });
-    });
+    }) };
   }
 
   function verificarMagicLink(token) {
