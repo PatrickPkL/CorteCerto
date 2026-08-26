@@ -228,24 +228,55 @@ document.addEventListener('DOMContentLoaded', () => {
     inputGaleria.value = '';
   });
 
-  /* ---------- zona de risco (RF-010) ---------- */
+  /* ---------- zona de risco (RF-010) — exclusão com código ---------- */
+  const modalExcluir = document.getElementById('modal-excluir-conta');
+  const step1 = document.getElementById('excluir-step-1');
+  const step2 = document.getElementById('excluir-step-2');
+  const inputCodigo = document.getElementById('input-codigo-excluir');
+  const btnGerar = document.getElementById('btn-gerar-codigo-excluir');
+  const btnConfirmar = document.getElementById('btn-confirmar-excluir');
+  const btnCancelarExcluir = document.getElementById('btn-cancelar-excluir');
+
   document.getElementById('btn-excluir-conta')?.addEventListener('click', () => {
-    const nome = prompt(
-      'Isto excluirá PERMANENTEMENTE a conta "' + loja.name + '" e todos os dados\n' +
-      '(serviços, profissionais, agendamentos, clientes). Digite o nome do salão para confirmar:');
-    if (!nome || nome.trim().toLowerCase() !== String(loja.name).trim().toLowerCase()) {
-      if (nome !== null) showToast('Nome não confere. Exclusão cancelada.', 'error');
-      return;
-    }
+    if (!modalExcluir) return;
+    step1.style.display = 'block';
+    step2.style.display = 'none';
+    if (inputCodigo) inputCodigo.value = '';
+    if (btnConfirmar) btnConfirmar.disabled = true;
+    abrirModal(modalExcluir);
+  });
+
+  btnGerar?.addEventListener('click', () => {
     try {
-      API.excluirMinhaConta();
-      Auth.limparSessao(); // remove token/user/barbershop do navegador
+      API.gerarCodigoExclusao();
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+      showToast('Código gerado. Verifique e digite abaixo.');
+      if (inputCodigo) inputCodigo.focus();
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  inputCodigo?.addEventListener('input', () => {
+    if (btnConfirmar) btnConfirmar.disabled = inputCodigo.value.length !== 4;
+  });
+
+  btnConfirmar?.addEventListener('click', () => {
+    const code = (inputCodigo?.value || '').trim();
+    if (code.length !== 4) return;
+    try {
+      API.confirmarExclusao(code);
+      Auth.limparSessao();
       showToast('Conta excluída permanentemente.', 'error');
       setTimeout(() => { window.location.href = 'login.html'; }, 1200);
     } catch (err2) {
       showToast(msgErro(err2), 'error');
     }
   });
+
+  btnCancelarExcluir?.addEventListener('click', () => fecharModal(modalExcluir));
+  modalExcluir?.addEventListener('click', e => { if (e.target === modalExcluir) fecharModal(modalExcluir); });
 
   preencherDados();
   renderHorarios();

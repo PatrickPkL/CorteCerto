@@ -1863,6 +1863,28 @@ window.API = (function () {
   }
 
   /** RF-010 — exclusão de conta com cascata completa. */
+  function gerarCodigoExclusao() {
+    const user = sessao();
+    const db = DB._d();
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    db._delete_codes = (db._delete_codes || []).filter(c => c.user_id !== user.id);
+    db._delete_codes.push({ user_id: user.id, code: code, expires_at: Date.now() + 300000 });
+    DB.salvar();
+    return { ok: true, hint: 'Código enviado (use nos próximos 5 minutos).' };
+  }
+
+  function confirmarExclusao(code) {
+    const user = sessao();
+    const db = DB._d();
+    const codes = (db._delete_codes || []).filter(c => c.user_id === user.id);
+    const match = codes.find(c => c.code === code && Date.now() < c.expires_at);
+    if (!match) err(400, 'Código inválido ou expirado. Solicite um novo.');
+    db._delete_codes = db._delete_codes.filter(c => c.user_id !== user.id);
+    DB.salvar();
+    return excluirMinhaConta();
+  }
+
+  /** RF-010 — exclusão de conta com cascata completa. */
   function excluirMinhaConta() {
     const user = sessao();
     const db = DB._d();

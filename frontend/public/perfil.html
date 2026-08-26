@@ -217,6 +217,30 @@
     </div>
   </div>
 
+  <!-- Modal exclusão com código -->
+  <div id="modal-excluir-cliente" style="display:none;">
+    <div class="card" style="width:400px;">
+      <h3 class="section-title" style="border-bottom-color:var(--danger);">Confirmar exclusão</h3>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">
+        Clique em "Gerar código" para receber um código de 4 dígitos. A exclusão será irreversível.
+      </p>
+      <div id="excluir-cli-step-1">
+        <button class="btn btn-danger" id="btn-gerar-codigo-excluir-cli" type="button">Gerar código</button>
+      </div>
+      <div id="excluir-cli-step-2" style="display:none;">
+        <div class="field">
+          <label for="input-codigo-excluir-cli">Digite o código de 4 dígitos</label>
+          <input type="text" id="input-codigo-excluir-cli" maxlength="4" pattern="\d{4}" placeholder="0000"
+            style="font-size:24px; text-align:center; letter-spacing:8px; width:160px;">
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+          <button type="button" class="btn btn-outline" id="btn-cancelar-excluir-cli">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="btn-confirmar-excluir-cli" disabled>Excluir permanentemente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 <script src="../shared/js/db.js"></script>
 <script src="../shared/js/api.js"></script>

@@ -380,17 +380,55 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { window.location.href = 'catalogo.html'; }, 600);
   });
 
+  /* ---------- exclusão de conta com código (P3-3) ---------- */
+  const modalExcluirCli = document.getElementById('modal-excluir-cliente');
+  const stepCli1 = document.getElementById('excluir-cli-step-1');
+  const stepCli2 = document.getElementById('excluir-cli-step-2');
+  const inputCodigoCli = document.getElementById('input-codigo-excluir-cli');
+  const btnGerarCli = document.getElementById('btn-gerar-codigo-excluir-cli');
+  const btnConfirmarCli = document.getElementById('btn-confirmar-excluir-cli');
+  const btnCancelarExcluirCli = document.getElementById('btn-cancelar-excluir-cli');
+
   document.getElementById('btn-excluir-conta-cliente')?.addEventListener('click', () => {
-    if (!confirm('Tem certeza que deseja excluir sua conta? Agendamentos futuros serão cancelados. Esta ação não pode ser desfeita.')) return;
+    if (!modalExcluirCli) return;
+    stepCli1.style.display = 'block';
+    stepCli2.style.display = 'none';
+    if (inputCodigoCli) inputCodigoCli.value = '';
+    if (btnConfirmarCli) btnConfirmarCli.disabled = true;
+    abrirModal(modalExcluirCli);
+  });
+
+  btnGerarCli?.addEventListener('click', () => {
     try {
-      API.excluirMinhaConta();
-      Auth.limparSessao(); // remove token/user/barbershop do navegador
+      API.gerarCodigoExclusao();
+      stepCli1.style.display = 'none';
+      stepCli2.style.display = 'block';
+      showToast('Código gerado. Verifique e digite abaixo.');
+      if (inputCodigoCli) inputCodigoCli.focus();
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  inputCodigoCli?.addEventListener('input', () => {
+    if (btnConfirmarCli) btnConfirmarCli.disabled = inputCodigoCli.value.length !== 4;
+  });
+
+  btnConfirmarCli?.addEventListener('click', () => {
+    const code = (inputCodigoCli?.value || '').trim();
+    if (code.length !== 4) return;
+    try {
+      API.confirmarExclusao(code);
+      Auth.limparSessao();
       showToast('Conta excluída.', 'error');
       setTimeout(() => { window.location.href = 'catalogo.html'; }, 1200);
     } catch (err2) {
       showToast(msgErro(err2), 'error');
     }
   });
+
+  btnCancelarExcluirCli?.addEventListener('click', () => fecharModal(modalExcluirCli));
+  modalExcluirCli?.addEventListener('click', e => { if (e.target === modalExcluirCli) fecharModal(modalExcluirCli); });
 
   renderFavoritos();
 });
