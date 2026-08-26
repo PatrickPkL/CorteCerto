@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         acoes += '<button class="btn btn-danger btn-acao" data-acao="cancelar" data-id="' + a.id + '">Cancelar</button>';
       }
       if (a.status === 'cancelado' || a.status === 'nao_compareceu') {
+        acoes += '<button class="btn btn-outline btn-acao" data-acao="reagendar" data-id="' + a.id + '">Reagendar</button>';
         acoes += '<button class="btn btn-danger btn-acao" data-acao="excluir" data-id="' + a.id + '">Excluir</button>';
       }
 
@@ -126,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { acao, id } = btn.dataset;
 
     if (acao === 'editar') { abrirEdicao(id); return; }
+    if (acao === 'reagendar') { abrirEdicao(id); return; }
 
     try {
       if (acao === 'confirmar') {
@@ -133,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Agendamento confirmado!');
       }
       if (acao === 'concluir') {
+        if (!confirm('Confirmar conclusão deste atendimento?')) return;
         API.atualizarAgendamento(id, { status: 'concluido' });
         showToast('Atendimento concluído.');
       }
@@ -153,8 +156,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* ---------- criação manual de agendamento removida (RF revogada):
-     horários chegam apenas pelo agendamento público do cliente ---------- */
+  /* ---------- criação manual pelo staff ("Agendar Cliente") ----------
+     O atendente escolhe um cliente JÁ CADASTRADO na loja + serviço,
+     profissional, data e hora. O backend revalida sessão, posse da
+     loja e conflito de horário. */
+  const modalNovo = document.getElementById('modal-novo-agendamento');
+  let clientesNovo = [];
+
+  function carregarOpcoesNovo() {
+    const selCli = document.getElementById('na-cliente');
+    const selSvc = document.getElementById('na-servico');
+    const selPro = document.getElementById('na-profissional');
+    if (!selCli || !selSvc || !selPro) return;
+
+    try { clientesNovo = API.listarClientes({}).items || []; }
+    catch (e) { clientesNovo = []; }
+    selCli.innerHTML = clientesNovo.length
+      ? clientesNovo.map(c =>
+          '<option value="' + c.id + '">' +
+          esc(c.name) + (c.phone ? ' · ' + esc(c.phone) : '') + '</option>').join('')
+      : '<option value="">Nenhum cliente cadastrado</option>';
+
+    let svcs = [];
+    try { svcs = API.servicosDaLoja(loja.id, false); } catch (e) { /* noop */ }
+    selSvc.innerHTML = svcs.map(s =>
+      '<option value="' + s.id + '">' + esc(s.name) + ' · ' +
+      DB.fmtBRL(s.price) + '</option>').join('');
+
+    selPro.innerHTML = '<option value="">Primeiro disponível</option>' +
+      profs.filter(p => p.is_active)
+        .map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+
+    const hoje = DB.hojeISO();
+    document.getElementById('na-data').min = hoje;
+    document.getElementById('na-data').value = hoje;
+    document.getElementById('na-hora').value = '';
+    document.getElementById('na-notas').value = '';
+  }
+
+  document.getElementById('btn-novo-agendamento')?.addEventListener('click', () => {
+    if (!modalNovo) return;
+    carregarOpcoesNovo();
+    abrirModal(modalNovo);
+  });
+  document.getElementById('btn-fechar-modal-novo-ag')?.addEventListener('click', () =>
+    fecharModal(modalNovo));
+  modalNovo?.addEventListener('click', (e) => {
+    if (e.target === modalNovo) fecharModal(modalNovo);
+  });
+
+  document.getElementById('form-novo-agendamento')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const selCli = document.getElementById('na-cliente');
+    const selSvc = document.getElementById('na-servico');
+    const selPro = document.getElementById('na-profissional');
+    const data = document.getElementById('na-data').value;
+    const hora = document.getElementById('na-hora').value;
+    if (!selCli.value) { showToast('Cadastre o cliente antes de agendar.', 'error'); return; }
+    if (!selSvc.value || !data || !hora) { showToast('Preencha serviço, data e horário.', 'error'); return; }
+
+    const cli = clientesNovo.find(c => String(c.id) === String(selCli.value));
+    if (!cli) { showToast('Cliente não encontrado.', 'error'); return; }
+
+    const payload = {
+      barbershop_id: loja.id,
+      origin: 'admin',
+      date: data,
+      start_time: hora,
+      service_ids: [Number(selSvc.value)],
+      client_name: cli.name,
+      client_phone: cli.phone || '',
+      notes: document.getElementById('na-notas').value
+    };
+    if (selPro.value) payload.professional_id = Number(selPro.value);
+
+    try {
+      API.criarAgendamento(payload);
+      fecharModal(modalNovo);
+      showToast('Agendamento criado!');
+      render();
+    } catch (err2) {
+      showToast(msgErro(err2), 'error'); /* 409 traz horários livres na msg */
+    }
+  });
 
   /* ---------- editar agendamento (PATCH c/ DT-07) ---------- */
   const modalEdicao = document.getElementById('modal-editar-agendamento');
