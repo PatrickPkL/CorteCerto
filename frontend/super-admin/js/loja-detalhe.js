@@ -196,34 +196,54 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- excluir loja ---------- */
+  function confirmarExclusao(callback) {
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    modal.innerHTML = '<div style="background:#161616;border:1px solid #222;border-radius:12px;padding:32px;max-width:360px;width:90%;text-align:center;">' +
+      '<h3 style="color:#f0f0f0;margin:0 0 12px;">Confirmar exclusão</h3>' +
+      '<p style="color:#888;font-size:14px;margin:0 0 16px;">Digite <strong style="color:#e74c3c;">EXCLUIR</strong> para confirmar:</p>' +
+      '<input type="text" id="sa-delete-code" style="width:100%;padding:10px;border:1px solid #333;border-radius:6px;background:#0c0c0c;color:#f0f0f0;font-size:16px;text-align:center;margin-bottom:16px;" placeholder="EXCLUIR">' +
+      '<div style="display:flex;gap:8px;">' +
+        '<button id="sa-delete-cancel" style="flex:1;padding:10px;border:1px solid #333;border-radius:6px;background:transparent;color:#888;cursor:pointer;">Cancelar</button>' +
+        '<button id="sa-delete-confirm" style="flex:1;padding:10px;border:none;border-radius:6px;background:#e74c3c;color:#fff;cursor:pointer;">Excluir</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('sa-delete-cancel').onclick = function() { modal.remove(); };
+    document.getElementById('sa-delete-confirm').onclick = function() {
+      var code = document.getElementById('sa-delete-code').value;
+      if (code === 'EXCLUIR') { modal.remove(); callback(); }
+      else { document.getElementById('sa-delete-code').style.borderColor = '#e74c3c'; }
+    };
+  }
+
   if (btnExcluir) {
     btnExcluir.addEventListener('click', function () {
-      var confirmado = confirm('Tem certeza que deseja excluir esta loja? Esta ação não pode ser desfeita.');
-      if (!confirmado) return;
+      confirmarExclusao(function() {
+        btnExcluir.disabled = true;
+        btnExcluir.textContent = 'Excluindo...';
 
-      btnExcluir.disabled = true;
-      btnExcluir.textContent = 'Excluindo...';
-
-      fetch('/api/super-admin/loja/' + lojaId, {
-        method: 'DELETE',
-        headers: saAuth.headers()
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (data.error) {
-            showToast(data.error, 'error');
+        fetch('/api/super-admin/loja/' + lojaId, {
+          method: 'DELETE',
+          headers: saAuth.headers()
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.error) {
+              showToast(data.error, 'error');
+              btnExcluir.disabled = false;
+              btnExcluir.textContent = 'Excluir Loja';
+            } else {
+              showToast('Loja excluída com sucesso!');
+              setTimeout(function () { window.location.href = 'index.html'; }, 1000);
+            }
+          })
+          .catch(function () {
+            showToast('Erro ao excluir loja.', 'error');
             btnExcluir.disabled = false;
             btnExcluir.textContent = 'Excluir Loja';
-          } else {
-            showToast('Loja excluída com sucesso!');
-            setTimeout(function () { window.location.href = 'index.html'; }, 1000);
-          }
-        })
-        .catch(function () {
-          showToast('Erro ao excluir loja.', 'error');
-          btnExcluir.disabled = false;
-          btnExcluir.textContent = 'Excluir Loja';
-        });
+          });
+      });
     });
   }
 

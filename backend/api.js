@@ -10,9 +10,9 @@ window.API = (function () {
   'use strict';
 
   var Mailer = require('./mailer');
-  var Geocode = require('./geocode');
-
   /* ================= helpers ================= */
+
+  function _db() { return DB._d(); }
 
   function err(status, error) { throw { status, error }; }
 
@@ -145,9 +145,6 @@ window.API = (function () {
     const campos = ['name', 'description', 'phone', 'email', 'whatsapp',
       'instagram', 'address', 'city', 'uf', 'logo_url', 'cover_url', 'tags',
       'lat', 'lng'];
-    var mudouEndereco = (patch.address !== undefined && patch.address !== shop.address) ||
-      (patch.city !== undefined && patch.city !== shop.city) ||
-      (patch.uf !== undefined && patch.uf !== shop.uf);
     campos.forEach(c => {
       if (patch[c] !== undefined) shop[c] = patch[c];
     });
@@ -155,17 +152,6 @@ window.API = (function () {
     shop.updated_at = agoraISO();
     DB.salvar();
     localStorage.setItem('barbershop', JSON.stringify(shop));
-    /* geocodificação automática quando endereço/cidade mudam */
-    if (mudouEndereco && shop.address && shop.city) {
-      Geocode.geocodificar(shop.address, shop.city, shop.uf)
-        .then(function(coords) {
-          if (coords) {
-            shop.lat = coords.lat;
-            shop.lng = coords.lng;
-            DB.salvar();
-          }
-        }).catch(function() {});
-    }
     return shop;
   }
 
@@ -243,7 +229,7 @@ window.API = (function () {
   function verificarMagicLink(token) {
     var tk = String(token || '').trim();
     if (!tk) err(400, 'Token obrigatório.');
-    var all = db.magic_tokens || [];
+    var all = _db().magic_tokens || [];
     var registro = null;
     for (var i = 0; i < all.length; i++) {
       if (all[i].token === tk && !all[i].used) { registro = all[i]; break; }
@@ -252,7 +238,7 @@ window.API = (function () {
     if (new Date(registro.expires_at) < new Date()) err(410, 'Link expirado. Solicite um novo.');
     registro.used = 1;
     DB.salvar();
-    var usuario = (db.users || []).find(function(u) { return u.id === registro.user_id; });
+    var usuario = (_db().users || []).find(function(u) { return u.id === registro.user_id; });
     if (!usuario) err(404, 'Usuário não encontrado.');
     var sessao = require('./auth').criarSessao(usuario.id);
     return { token: sessao.token, user: { id: usuario.id, name: usuario.name, role: usuario.role } };
@@ -262,16 +248,19 @@ window.API = (function () {
     var amanha = new Date();
     amanha.setDate(amanha.getDate() + 1);
     var alvo = amanha.toISOString().slice(0, 10);
-    var ags = (db.appointments || []).filter(function(a) {
+    var ags = (_db().appointments || []).filter(function(a) {
       return a.date === alvo && (a.status === 'confirmado' || a.status === 'agendado');
     });
     ags.forEach(function(ag) {
-      var loja = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
-      var cli = (db.users || []).find(function(u) { return u.id === ag.user_id; });
+      var loja = (_db().barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
+      var cli = (_db().users || []).find(function(u) { return u.id === ag.user_id; });
       if (!loja) return;
       var dados = {
         salaoNome: loja.name,
-        servicos: ag.services || [],
+        servicos: (function() {
+          var itens = (_db().appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
+          return itens.length ? itens.map(function(i) { return i.name_snapshot || ''; }).join(' + ') : '';
+        })(),
         hora: ag.time,
         endereco: loja.address || '',
         appUrl: process.env.APP_URL || 'http://localhost:3000'
@@ -280,7 +269,7 @@ window.API = (function () {
         Mailer.enviarLembrete(cli.email, Object.assign({ nome: cli.name, isCliente: true }, dados))
           .catch(function() {});
       }
-      var prof = (db.professionals || []).find(function(p) { return p.id === ag.professional_id; });
+      var prof = (_db().professionals || []).find(function(p) { return p.id === ag.professional_id; });
       if (prof && prof.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
         Mailer.enviarLembrete(prof.email, Object.assign({
           nome: prof.name, isCliente: false
@@ -312,11 +301,12 @@ window.API = (function () {
     var ok;
     try { ok = bcrypt.compareSync(senha, cfg.hash); } catch(e) { ok = false; }
     if (!ok) err(401, 'Credenciais inválidas.');
-    var token = UUID();
-    db.superadmin_sessions = (db.superadmin_sessions || []).filter(function(s) {
+    var crypto = require('crypto');
+    var token = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+    _db().superadmin_sessions = (_db().superadmin_sessions || []).filter(function(s) {
       return s.email !== email;
     });
-    db.superadmin_sessions.push({
+    _db().superadmin_sessions.push({
       token: token, email: email,
       created_at: agoraISO(),
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
@@ -328,7 +318,7 @@ window.API = (function () {
   function superAdminAuth(token) {
     var tk = String(token || '').trim();
     if (!tk) err(401, 'Token obrigatório.');
-    var sessoes = db.superadmin_sessions || [];
+    var sessoes = _db().superadmin_sessions || [];
     var sessao = null;
     for (var i = 0; i < sessoes.length; i++) {
       if (sessoes[i].token === tk) { sessao = sessoes[i]; break; }
@@ -340,17 +330,17 @@ window.API = (function () {
 
   function superAdminLogout(token) {
     var tk = String(token || '').trim();
-    db.superadmin_sessions = (db.superadmin_sessions || []).filter(function(s) { return s.token !== tk; });
+    _db().superadmin_sessions = (_db().superadmin_sessions || []).filter(function(s) { return s.token !== tk; });
     DB.salvar();
     return { ok: true };
   }
 
   function saListarLojas() {
-    var lojas = (db.barbershops || []).map(function(b) {
-      var owner = (db.users || []).find(function(u) { return u.id === b.owner_id; });
-      var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
-      var profCount = (db.professionals || []).filter(function(p) { return p.barbershop_id === b.id; }).length;
-      var agCount = (db.appointments || []).filter(function(a) { return a.barbershop_id === b.id && a.status !== 'cancelado'; }).length;
+    var lojas = (_db().barbershops || []).map(function(b) {
+      var owner = (_db().users || []).find(function(u) { return u.id === b.owner_user_id; });
+      var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+      var profCount = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; }).length;
+      var agCount = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id && a.status !== 'cancelado'; }).length;
       return {
         id: b.id, name: b.name, city: b.city, uf: b.uf,
         owner_name: owner ? owner.name : '?',
@@ -366,9 +356,9 @@ window.API = (function () {
   }
 
   function saListarUsuarios() {
-    return (db.users || []).map(function(u) {
-      var agCount = (db.appointments || []).filter(function(a) { return a.user_id === u.id; }).length;
-      var sessoes = (db.sessions || []).filter(function(s) { return s.user_id === u.id; }).length;
+    return (_db().users || []).map(function(u) {
+      var agCount = (_db().appointments || []).filter(function(a) { return a.user_id === u.id; }).length;
+      var sessoes = (_db().sessions || []).filter(function(s) { return s.user_id === u.id; }).length;
       return {
         id: u.id, name: u.name, email: u.email, phone: u.phone,
         role: u.role, agendamentos: agCount, sessoes: sessoes,
@@ -378,14 +368,14 @@ window.API = (function () {
   }
 
   function saDetalheLoja(shopId) {
-    var b = (db.barbershops || []).find(function(x) { return x.id == shopId; });
+    var b = (_db().barbershops || []).find(function(x) { return x.id == shopId; });
     if (!b) err(404, 'Loja não encontrada.');
-    var owner = (db.users || []).find(function(u) { return u.id === b.owner_id; });
-    var svcs = (db.services || []).filter(function(s) { return s.barbershop_id === b.id; });
-    var profs = (db.professionals || []).filter(function(p) { return p.barbershop_id === b.id; });
-    var ags = (db.appointments || []).filter(function(a) { return a.barbershop_id === b.id; });
-    var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
-    var totalPago = (db.payments || []).filter(function(p) { return p.barbershop_id === b.id; })
+    var owner = (_db().users || []).find(function(u) { return u.id === b.owner_user_id; });
+    var svcs = (_db().services || []).filter(function(s) { return s.barbershop_id === b.id; });
+    var profs = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; });
+    var ags = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id; });
+    var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+    var totalPago = (_db().payments || []).filter(function(p) { return p.barbershop_id === b.id; })
       .reduce(function(sum, p) { return sum + (Number(p.amount) || 0); }, 0);
     return {
       loja: b, owner: owner, planos: sub,
@@ -401,7 +391,7 @@ window.API = (function () {
   }
 
   function saAtualizarPlano(shopId, dados) {
-    var sub = (db.subscriptions || []).find(function(s) { return s.barbershop_id == shopId; });
+    var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id == shopId; });
     if (!sub) err(404, 'Assinatura não encontrada.');
     if (dados.status) sub.status = dados.status;
     if (dados.current_period_end) sub.current_period_end = dados.current_period_end;
@@ -411,38 +401,38 @@ window.API = (function () {
   }
 
   function saExcluirLoja(shopId) {
-    var b = (db.barbershops || []).find(function(x) { return x.id == shopId; });
+    var b = (_db().barbershops || []).find(function(x) { return x.id == shopId; });
     if (!b) err(404, 'Loja não encontrada.');
-    db.services = (db.services || []).filter(function(s) { return s.barbershop_id !== b.id; });
-    db.professionals = (db.professionals || []).filter(function(p) { return p.barbershop_id !== b.id; });
-    db.clients = (db.clients || []).filter(function(c) { return c.barbershop_id !== b.id; });
-    db.appointments = (db.appointments || []).filter(function(a) { return a.barbershop_id !== b.id; });
-    db.notifications = (db.notifications || []).filter(function(n) { return n.barbershop_id !== b.id; });
-    db.subscriptions = (db.subscriptions || []).filter(function(s) { return s.barbershop_id !== b.id; });
-    db.payments = (db.payments || []).filter(function(p) { return p.barbershop_id !== b.id; });
-    db.reviews = (db.reviews || []).filter(function(r) { return r.barbershop_id !== b.id; });
-    db.gallery_images = (db.gallery_images || []).filter(function(g) { return g.barbershop_id !== b.id; });
-    db.working_hours = (db.working_hours || []).filter(function(w) { return w.barbershop_id !== b.id; });
-    db.schedule_exceptions = (db.schedule_exceptions || []).filter(function(e) { return e.barbershop_id !== b.id; });
-    db.appointment_services = (db.appointment_services || []).filter(function(a) {
-      var ag = (db.appointments || []).find(function(x) { return x.id === a.appointment_id; });
+    _db().services = (_db().services || []).filter(function(s) { return s.barbershop_id !== b.id; });
+    _db().professionals = (_db().professionals || []).filter(function(p) { return p.barbershop_id !== b.id; });
+    _db().clients = (_db().clients || []).filter(function(c) { return c.barbershop_id !== b.id; });
+    _db().appointments = (_db().appointments || []).filter(function(a) { return a.barbershop_id !== b.id; });
+    _db().notifications = (_db().notifications || []).filter(function(n) { return n.barbershop_id !== b.id; });
+    _db().subscriptions = (_db().subscriptions || []).filter(function(s) { return s.barbershop_id !== b.id; });
+    _db().payments = (_db().payments || []).filter(function(p) { return p.barbershop_id !== b.id; });
+    _db().reviews = (_db().reviews || []).filter(function(r) { return r.barbershop_id !== b.id; });
+    _db().gallery_images = (_db().gallery_images || []).filter(function(g) { return g.barbershop_id !== b.id; });
+    _db().working_hours = (_db().working_hours || []).filter(function(w) { return w.barbershop_id !== b.id; });
+    _db().schedule_exceptions = (_db().schedule_exceptions || []).filter(function(e) { return e.barbershop_id !== b.id; });
+    _db().appointment_services = (_db().appointment_services || []).filter(function(a) {
+      var ag = (_db().appointments || []).find(function(x) { return x.id === a.appointment_id; });
       return !ag || ag.barbershop_id !== b.id;
     });
-    db.tickets = (db.tickets || []).filter(function(t) { return t.salaoId !== b.id; });
-    db.barbershops = db.barbershops.filter(function(x) { return x.id !== b.id; });
+    _db().tickets = (_db().tickets || []).filter(function(t) { return t.salaoId !== b.id; });
+    _db().barbershops = _db().barbershops.filter(function(x) { return x.id !== b.id; });
     DB.salvar();
     return { ok: true };
   }
 
   function saDashboard() {
     return {
-      totalLojas: (db.barbershops || []).length,
-      totalUsuarios: (db.users || []).length,
-      totalAgendamentos: (db.appointments || []).length,
-      totalReceita: (db.payments || []).reduce(function(s, p) { return s + (Number(p.amount) || 0); }, 0),
-      lojasTrial: (db.subscriptions || []).filter(function(s) { return s.status === 'trial'; }).length,
-      lojasAtivas: (db.subscriptions || []).filter(function(s) { return s.status === 'ativa'; }).length,
-      agendamentosHoje: (db.appointments || []).filter(function(a) { return a.date === agoraISO().slice(0, 10); }).length
+      totalLojas: (_db().barbershops || []).length,
+      totalUsuarios: (_db().users || []).length,
+      totalAgendamentos: (_db().appointments || []).length,
+      totalReceita: (_db().payments || []).reduce(function(s, p) { return s + (Number(p.amount) || 0); }, 0),
+      lojasTrial: (_db().subscriptions || []).filter(function(s) { return s.status === 'trial'; }).length,
+      lojasAtivas: (_db().subscriptions || []).filter(function(s) { return s.status === 'ativa'; }).length,
+      agendamentosHoje: (_db().appointments || []).filter(function(a) { return a.date === agoraISO().slice(0, 10); }).length
     };
   }
 
@@ -2304,7 +2294,7 @@ window.API = (function () {
     listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura,
 
     // uploads / galeria
-    processarImagem, definirLogo, definirCapa,
+    definirLogo, definirCapa,
     galeriaDaLoja, adicionarGaleria, removerGaleria,
 
     // notificações

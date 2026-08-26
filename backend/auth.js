@@ -354,7 +354,7 @@ window.Auth = (function () {
         Mailer.enviarBoasVindas({
           email: usuario.email, nome: usuario.name,
           nomeSalao: p.salon_name || (barbearia && barbearia.name) || 'Seu salão',
-          trialDias: 10
+          trialDias: 7
         }).catch(function(e) { console.error('[onboarding] falha:', e); });
       }
       DB.salvar();
@@ -397,14 +397,6 @@ window.Auth = (function () {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     };
     db.barbershops.push(loja);
-
-    /* geocodificação automática se já tiver endereço */
-    if (loja.address && loja.city) {
-      var Geocode = require('./geocode');
-      Geocode.geocodificar(loja.address, loja.city, loja.uf).then(function(coords) {
-        if (coords) { loja.lat = coords.lat; loja.lng = coords.lng; DB.salvar(); }
-      }).catch(function() {});
-    }
 
     /* horários padrão da LOJA: seg–sáb 09–18 sem almoço, dom fechado */
     for (let dow = 1; dow <= 6; dow++) {
@@ -462,6 +454,7 @@ window.Auth = (function () {
     publicUser,
     salaoDoUsuario,
     logout,
-    limparSessao
+    limparSessao,
+    criarSessao
   };
 })();

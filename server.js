@@ -251,16 +251,21 @@ function handleWebhookAbacate(req, res, url) {
   });
   req.on('end', () => {
     const secretEnv = String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
+    var urlOk = false;
+    var hmacOk = false;
     if (secretEnv) {
       const secretUrl = url.searchParams.get('webhookSecret') || '';
-      const a = Buffer.from(secretEnv, 'utf8');
-      const b = Buffer.from(secretUrl, 'utf8');
-      const urlOk = a.length === b.length && crypto.timingSafeEqual(a, b);
-      if (!urlOk && !assinaturaValida(corpo, req.headers['x-webhook-signature'])) {
+      if (secretUrl) {
+        const a = Buffer.from(secretEnv, 'utf8');
+        const b = Buffer.from(secretUrl, 'utf8');
+        urlOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+      }
+      if (!urlOk) {
+        hmacOk = assinaturaValida(corpo, req.headers['x-webhook-signature']);
+      }
+      if (!urlOk && !hmacOk) {
         return json(res, 401, { ok: false, error: 'Unauthorized' });
       }
-    } else {
-      return json(res, 401, { ok: false, error: 'Webhook secret não configurado no servidor.' });
     }
     let ev;
     try { ev = JSON.parse(corpo || '{}'); }

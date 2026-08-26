@@ -445,7 +445,7 @@ window.DB = (function () {
     const subscriptions = [
       {
         id: 401, barbershop_id: 1, plan_id: 2, status: 'trial',
-        trial_ends_at: D(10), current_period_end: D(10),
+        trial_ends_at: D(7), current_period_end: D(7),
         created_at: D(-400) + 'T09:00', updated_at: D(-400) + 'T09:00'
       }
     ];
