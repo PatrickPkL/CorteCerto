@@ -89,7 +89,7 @@ function enviarLinkMagico(email, token, nome) {
     '<p style="color:#999999;font-size:12px;margin:24px 0 0 0;text-align:center;">Este link expira em 15 minutos.</p>';
 
   return enviarEmailComTimeout({
-    from: RESEND_FROM,
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
     subject: "Confirme seu e-mail — Corte Certo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
@@ -108,7 +108,7 @@ function enviarConfirmacaoAgendamento(email, dados) {
     '<p style="color:#555555;font-size:14px;margin:16px 0 0 0;">Até lá!</p>';
 
   return enviarEmailComTimeout({
-    from: RESEND_FROM,
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
     subject: "Agendamento confirmado — " + (dados.salaoNome || "Corte Certo"),
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
@@ -127,7 +127,7 @@ function enviarNovoAgendamento(email, dados) {
     "</div>";
 
   return enviarEmailComTimeout({
-    from: RESEND_FROM,
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
     subject: "Novo agendamento — " + (dados.clienteNome || "Cliente"),
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
@@ -154,7 +154,7 @@ function enviarBoasVindas(dados) {
     "</div>";
 
   return enviarEmailComTimeout({
-    from: RESEND_FROM,
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: dados.email,
     subject: "Bem-vindo ao Corte Certo, " + (dados.nome || "") + "!",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
@@ -185,7 +185,7 @@ function enviarLembrete(email, dados) {
     "</div>";
 
   return enviarEmailComTimeout({
-    from: RESEND_FROM,
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
     subject: assunto,
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
