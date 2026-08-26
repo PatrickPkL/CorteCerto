@@ -60,6 +60,7 @@
 
   <!-- Próximos agendamentos -->
   <div class="profile-tab-content active" id="tab-proximos">
+    <div id="banner-lembrete" style="display:none; background:var(--accent); color:#fff; padding:14px 18px; border-radius:10px; margin-bottom:16px; font-size:14px;"></div>
     <div class="card">
       <h3 class="section-title">Próximos agendamentos</h3>
       <table>
@@ -195,6 +196,26 @@
     </div>
   </div>
 
+  <!-- Modal de reagendamento -->
+  <div id="modal-reagendar" style="display:none;">
+    <div class="card" style="width:400px;">
+      <h3 class="section-title">Alterar horário</h3>
+      <form id="form-reagendar">
+        <div class="field">
+          <label for="reagendar-data">Nova data</label>
+          <input type="date" id="reagendar-data" required>
+        </div>
+        <div class="field">
+          <label for="reagendar-hora">Novo horário</label>
+          <select id="reagendar-hora" required></select>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" class="btn btn-outline" id="btn-fechar-reagendar">Cancelar</button>
+          <button type="submit" class="btn btn-brass">Confirmar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </main>
 <script src="../shared/js/db.js"></script>

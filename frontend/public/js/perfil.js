@@ -85,6 +85,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const prox = ags.filter(a =>
       a.date >= hojeISO && (a.status === 'pendente' || a.status === 'confirmado'));
 
+    /* banner lembrete 24h */
+    const banner = document.getElementById('banner-lembrete');
+    if (banner) {
+      const em24h = prox.find(a => {
+        const ms = new Date(a.date + 'T' + a.time).getTime() - Date.now();
+        return ms > 0 && ms < 86400000;
+      });
+      if (em24h) {
+        banner.style.display = 'block';
+        banner.textContent = 'Lembrete: você tem agendamento amanhã às ' + em24h.time +
+          ' no ' + em24h.barbershop_name + ' (' + em24h.services.map(s => s.name).join(', ') + ').';
+      } else if (banner) {
+        banner.style.display = 'none';
+      }
+    }
+
     if (!prox.length) {
       tbProx.innerHTML = '<tr><td colspan="6"><div class="empty-state"><h3>Nada agendado por aqui</h3><p>Escolha um salão no catálogo e marque seu próximo horário.</p></div></td></tr>';
       return;
@@ -97,7 +113,11 @@ document.addEventListener('DOMContentLoaded', () => {
         '<td>' + esc(a.barbershop_name) + '</td>' +
         '<td>' + esc(a.services.map(s => s.name).join(' + ') || '—') + '</td>' +
         '<td>' + badgeStatus(a.status) + '</td>' +
-        '<td><button class="btn btn-danger btn-cancelar" data-id="' + a.id + '">Cancelar</button></td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn btn-outline btn-acao" data-acao="reagendar" data-id="' + a.id + '" ' +
+            'data-shop="' + a.barbershop_id + '" data-date="' + a.date + '" data-time="' + a.time + '">Alterar</button> ' +
+          '<button class="btn btn-danger btn-cancelar" data-id="' + a.id + '">Cancelar</button>' +
+        '</td>' +
       '</tr>'
     ).join('');
   }
@@ -109,6 +129,59 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       API.atualizarAgendamento(btn.dataset.id, { status: 'cancelado' });
       showToast('Agendamento cancelado.', 'error');
+      recarregar();
+    } catch (err2) {
+      showToast(msgErro(err2), 'error');
+    }
+  });
+
+  /* ---------- reagendamento (P3-1) ---------- */
+  const modalReag = document.getElementById('modal-reagendar');
+  const inputReagData = document.getElementById('reagendar-data');
+  const selReagHora = document.getElementById('reagendar-hora');
+  let agParaReagendar = null;
+
+  tbProx?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-acao="reagendar"]');
+    if (!btn || !modalReag) return;
+    agParaReagendar = { id: btn.dataset.id, shopId: Number(btn.dataset.shop) };
+    inputReagData.value = btn.dataset.date || '';
+    inputReagData.min = hojeISO;
+    carregarSlotsReagendar(btn.dataset.date);
+    abrirModal(modalReag);
+  });
+
+  inputReagData?.addEventListener('change', () => {
+    if (inputReagData.value) carregarSlotsReagendar(inputReagData.value);
+  });
+
+  function carregarSlotsReagendar(dateISO) {
+    if (!selReagHora || !agParaReagendar) return;
+    selReagHora.innerHTML = '<option value="">Carregando…</option>';
+    try {
+      const disp = API.disponibilidade(agParaReagendar.shopId, dateISO);
+      selReagHora.innerHTML = disp.available_slots.length
+        ? disp.available_slots.map(h => '<option value="' + h + '">' + h + '</option>').join('')
+        : '<option value="">Nenhum horário livre</option>';
+    } catch (e) {
+      selReagHora.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
+  }
+
+  document.getElementById('btn-fechar-reagendar')
+    ?.addEventListener('click', () => fecharModal(modalReag));
+  modalReag?.addEventListener('click', e => { if (e.target === modalReag) fecharModal(modalReag); });
+
+  document.getElementById('form-reagendar')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!agParaReagendar) return;
+    const novaData = inputReagData.value;
+    const novaHora = selReagHora.value;
+    if (!novaData || !novaHora) { showToast('Selecione data e horário.', 'error'); return; }
+    try {
+      API.atualizarAgendamento(agParaReagendar.id, { date: novaData, start_time: novaHora });
+      showToast('Horário alterado com sucesso!');
+      fecharModal(modalReag);
       recarregar();
     } catch (err2) {
       showToast(msgErro(err2), 'error');

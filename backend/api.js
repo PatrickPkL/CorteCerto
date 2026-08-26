@@ -1035,11 +1035,12 @@ window.API = (function () {
     const ehCliente = ag.user_id === user.id;
     if (!ehEquipe && !ehCliente) err(403, 'Você não tem permissão sobre este agendamento.');
 
-    /* cliente só cancela o próprio (RF-041) */
+    /* cliente só cancela ou reagenda o próprio (RF-041 + self-service) */
     if (!ehEquipe) {
-      if (patch.status !== 'cancelado') err(403, 'Cliente só pode cancelar o próprio agendamento.');
+      if (patch.status !== undefined && patch.status !== 'cancelado')
+        err(403, 'Cliente só pode cancelar ou reagendar o próprio agendamento.');
       if (ag.status === 'concluido' || ag.status === 'cancelado') {
-        err(400, 'Este agendamento já está ' + ag.status + ' e não pode ser cancelado.');
+        err(400, 'Este agendamento já está ' + ag.status + ' e não pode ser alterado.');
       }
     }
 
@@ -1055,7 +1056,7 @@ window.API = (function () {
     /* reagendamento: recalcula fim e revalida conflito (DT-07) */
     let novaData = ag.starts_at.slice(0, 10);
     let novaHora = ag.starts_at.slice(11);
-    if (ehEquipe) {
+    if (ehEquipe || ehCliente) {
       if (patch.date) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) err(400, 'Data inválida.');
         novaData = patch.date;
@@ -1064,7 +1065,7 @@ window.API = (function () {
         novaHora = String(patch.start_time || patch.hora);
         if (!/^\d{2}:\d{2}$/.test(novaHora)) err(400, 'Horário inválido.');
       }
-      if (patch.professional_id !== undefined) {
+      if (patch.professional_id !== undefined && ehEquipe) {
         const pid = patch.professional_id ? Number(patch.professional_id) : null;
         if (pid) {
           const p = db.professionals.find(x => x.id == pid && x.barbershop_id === ag.barbershop_id);
