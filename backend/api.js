@@ -794,21 +794,31 @@ window.API = (function () {
 
   /**
    * RF-039 — criação de agendamento.
-   * Funciona anônimo (UC-14.7); usuário logado é vinculado quando existe.
+   * Exige usuário autenticado (cliente, dono ou barbeiro) — anônimo
+   * recebe 401. No painel, staff agenda para clientes cadastrados.
    */
   function criarAgendamento(payload) {
     const db = DB._d();
-    const user = Auth.usuarioAtual(); // opcional
+    const user = Auth.usuarioAtual();
+    if (!user) err(401, 'Faça login para agendar.');
 
     let shopId = payload.barbershop_id;
     let origin = payload.origin || 'online';
-    if (!shopId && user && user.role === 'dono') {
+    if (!shopId && (user.role === 'dono' || user.role === 'barbeiro')) {
       const loja = Auth.salaoDoUsuario(user);
       if (loja) { shopId = loja.id; origin = origin === 'online' ? 'admin' : origin; }
     }
     if (!shopId) err(400, 'Informe o salão do agendamento.');
     const shop = db.barbershops.find(b => b.id == shopId);
     if (!shop) err(404, 'Salão não encontrado.');
+
+    /* staff só cria na própria loja — nunca numa alheia */
+    if (user.role === 'dono' || user.role === 'barbeiro') {
+      const minha = Auth.salaoDoUsuario(user);
+      if (!minha || minha.id != shop.id) {
+        err(403, 'Você só pode agendar pela sua própria loja.');
+      }
+    }
 
     /* assinatura em dia é exigida só do painel — o agendamento
        público do catálogo não pune o cliente final (RF-039) */
@@ -1698,6 +1708,13 @@ window.API = (function () {
   function notificar(n) {
     const db = DB._d();
     if (!n.user_id) return;
+    /* limita a 100 notificações por usuário */
+    const doUser = db.notifications.filter(x => x.user_id === n.user_id);
+    if (doUser.length >= 100) {
+      const ids = doUser.sort((a, b) => a.created_at.localeCompare(b.created_at))
+                         .slice(0, doUser.length - 99).map(x => x.id);
+      db.notifications = db.notifications.filter(x => !ids.includes(x.id));
+    }
     db.notifications.push({
       id: DB.proximoId(),
       barbershop_id: n.barbershop_id || null,
