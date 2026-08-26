@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "nodemailer": "^9.0.5",
     "resend": "^6.22.1",
     "totalvoice-node": "^1.12.0"
   }

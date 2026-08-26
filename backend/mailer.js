@@ -1,39 +1,43 @@
 "use strict";
 
-var RESEND_API_KEY = process.env.RESEND_API_KEY;
-var RESEND_FROM = process.env.RESEND_FROM || "Corte Certo <noreply@cortecerto.com.br>";
+var GMAIL_USER = process.env.GMAIL_USER || "";
+var GMAIL_PASS = process.env.GMAIL_PASS || "";
+var FROM_NAME = process.env.EMAIL_FROM || "Corte Certo";
 var APP_URL = process.env.APP_URL || "http://localhost:3000";
-var DEMODO_MODE = !RESEND_API_KEY;
+var DEMO_MODE = !GMAIL_USER || !GMAIL_PASS;
 
-var resend = null;
-if (!DEMODO_MODE) {
-  var Resend = require("resend").Resend;
-  resend = new Resend(RESEND_API_KEY);
-}
-
-function enviarEmail(destino) {
-  if (DEMODO_MODE) {
-    return Promise.resolve();
-  }
-  return resend.emails.send(destino);
+var transporter = null;
+if (!DEMO_MODE) {
+  var nodemailer = require("nodemailer");
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: GMAIL_USER, pass: GMAIL_PASS.replace(/\s/g, "") }
+  });
 }
 
 function enviarEmailComTimeout(destino, tag) {
-  if (DEMODO_MODE) {
+  if (DEMO_MODE) {
     console.log("========================================");
     console.log("[EMAIL - MODO DEMO] " + (tag || ""));
-    console.log("De:", RESEND_FROM);
+    console.log("De:", FROM_NAME + " <" + GMAIL_USER + ">");
     console.log("Para:", destino.to);
     console.log("Assunto:", destino.subject);
     console.log("========================================");
     return Promise.resolve();
   }
 
+  var mailOptions = {
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
+    to: destino.to,
+    subject: destino.subject,
+    html: destino.html
+  };
+
   var timer = setTimeout(function () {
     console.log("[EMAIL] Timeout no envio de", tag || "email");
   }, 10000);
 
-  enviarEmail(destino)
+  transporter.sendMail(mailOptions)
     .then(function () {
       clearTimeout(timer);
       console.log("[EMAIL] Enviado:", tag || "email", "->", destino.to);
