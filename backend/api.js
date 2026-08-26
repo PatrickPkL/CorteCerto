@@ -2431,6 +2431,7 @@ window.API = (function () {
     // LGPD
     exportarMeusDados, revogarConsentimento, solicitarExclusao,
     enviarSolicitacaoLGPD, meusLogsDeAcesso, logoutTodosDispositivos,
+    _auditLog,
 
     // favoritos
     alternarFavorito, meusFavoritos,

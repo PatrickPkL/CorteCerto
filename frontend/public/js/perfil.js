@@ -463,5 +463,62 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  /* ---------- tab segurança ---------- */
+  var tabSeguranca = document.querySelector('.profile-tab[data-tab="seguranca"]');
+  if (tabSeguranca) {
+    tabSeguranca.addEventListener('click', function() {
+      tabsPerfil.forEach(function(t) { t.classList.remove('active'); });
+      conteudosPerfil.forEach(function(c) { c.classList.remove('active'); });
+      tabSeguranca.classList.add('active');
+      var secContent = document.getElementById('tab-seguranca');
+      if (secContent) secContent.classList.add('active');
+      carregarLogsAcesso();
+    });
+  }
+
+  function carregarLogsAcesso() {
+    var box = document.getElementById('logs-acesso');
+    if (!box) return;
+    try {
+      var logs = API.meusLogsDeAcesso();
+      if (!logs || !logs.length) {
+        box.innerHTML = '<p style="color:var(--text-muted);">Nenhum registro recente.</p>';
+        return;
+      }
+      var acoes = {
+        login_sucesso: 'Login realizado',
+        logout_todos_dispositivos: 'Logout de todos os dispositivos',
+        exportar_dados: 'Exportação de dados',
+        excluir_conta: 'Exclusão de conta',
+        revogar_consentimento: 'Revogação de consentimento',
+        alterar_dados: 'Alteração de dados pessoais'
+      };
+      box.innerHTML = logs.slice(0, 10).map(function(log) {
+        var nomeAcao = acoes[log.acao] || log.acao;
+        var data = log.timestamp ? log.timestamp.replace('T', ' ').slice(0, 19) : '';
+        return '<div style="padding:10px 0;border-bottom:1px solid #1a1a1a;">' +
+          '<strong style="color:#f0f0f0;">' + esc(nomeAcao) + '</strong>' +
+          '<br><small style="color:var(--text-muted);">' + esc(data) + '</small>' +
+          '</div>';
+      }).join('');
+    } catch(e) {
+      box.innerHTML = '<p style="color:var(--text-muted);">Erro ao carregar logs.</p>';
+    }
+  }
+
+  /* ---------- sair todos dispositivos (tab segurança) ---------- */
+  var btnSairTodosSeg = document.getElementById('btn-sair-todos-seg');
+  if (btnSairTodosSeg) {
+    btnSairTodosSeg.addEventListener('click', function() {
+      if (!confirm('Sair de todos os dispositivos? Você precisará logar novamente.')) return;
+      try {
+        API.logoutTodosDispositivos();
+        Auth.logout();
+        showToast('Sessões encerradas.');
+        setTimeout(function() { window.location.href = 'catalogo.html'; }, 800);
+      } catch(e) { showToast(msgErro(e), 'error'); }
+    });
+  }
+
   renderFavoritos();
 });

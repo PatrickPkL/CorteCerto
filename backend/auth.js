@@ -374,6 +374,12 @@ window.Auth = (function () {
 
     criarSessao(usuario.id);
 
+    /* audit log: login bem-sucedido */
+    try {
+      var _apiRef = require('./api');
+      if (_apiRef && _apiRef._auditLog) _apiRef._auditLog(usuario.id, 'login_sucesso');
+    } catch(e) { /* noop */ }
+
     return { token: localStorage.getItem('token'), user: publicUser(usuario), barbershop: barbearia };
   }
 

@@ -9,7 +9,7 @@ window.DB = (function () {
   'use strict';
 
   const DB_KEY = 'cc_db';
-  const DB_VERSION = 6;
+  const DB_VERSION = 7;
 
   var _crypto;
   try { _crypto = require('crypto'); } catch(e) { _crypto = null; }
@@ -160,6 +160,20 @@ window.DB = (function () {
           if (u.email && !u.email.startsWith('enc:')) u.email = criptografar(u.email);
         });
       }
+    }
+    /* v6 → v7: backfill de consentimentos para usuários antigos */
+    if (p.v === 6) {
+      p.v = 7;
+      (p.users || []).forEach(function(u) {
+        if (!u.consentimentos || u.consentimentos.length === 0) {
+          u.consentimentos = [{
+            tipo: 'privacidade',
+            data: u.created_at || new Date().toISOString(),
+            versao: '1.0',
+            origem: 'backfill-migracao-v7'
+          }];
+        }
+      });
     }
     try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
     catch (e) { console.error('[DB] Falha ao persistir migração.', e); }

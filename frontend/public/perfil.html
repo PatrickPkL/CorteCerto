@@ -56,6 +56,7 @@
     <button class="profile-tab" data-tab="historico">Histórico</button>
     <button class="profile-tab" data-tab="favoritos">Favoritos</button>
     <button class="profile-tab" data-tab="config">Configurações</button>
+    <button class="profile-tab" data-tab="seguranca">Segurança</button>
   </div>
 
   <!-- Próximos agendamentos -->
@@ -171,6 +172,23 @@
       <h3 class="section-title" style="border-bottom-color: var(--danger);">Zona de risco</h3>
       <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">Ações abaixo não podem ser desfeitas.</p>
       <button class="btn btn-danger" id="btn-excluir-conta-cliente">Excluir minha conta</button>
+    </div>
+  </div>
+
+  <!-- Segurança -->
+  <div class="profile-tab-content" id="tab-seguranca">
+    <div class="card">
+      <h3 class="section-title">Últimos acessos</h3>
+      <div id="logs-acesso">
+        <p style="color:var(--text-muted);">Carregando...</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <h3 class="section-title">Sessão</h3>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">
+        Encerre a sessão de todos os dispositivos.
+      </p>
+      <button class="btn btn-outline" id="btn-sair-todos-seg">Sair de todos os dispositivos</button>
     </div>
   </div>
 
