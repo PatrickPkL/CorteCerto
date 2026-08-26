@@ -59,9 +59,29 @@ function json(res, status, obj) {
   res.end(corpo);
 }
 
+/* ---------------- rate-limit ---------------- */
+const _rateMap = new Map();
+const RATE_WINDOW_MS = 60000;
+const RATE_MAX = 60;
+
 /* ---------------- RPC ---------------- */
 
 function handleRpc(req, res) {
+  /* rate-limit por IP */
+  const ip = req.socket.remoteAddress || '0.0.0.0';
+  const now = Date.now();
+  const rec = _rateMap.get(ip);
+  if (rec && now < rec.reset) {
+    rec.count++;
+    if (rec.count > RATE_MAX) {
+      const retryAfter = Math.ceil((rec.reset - now) / 1000);
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) });
+      return res.end(JSON.stringify({ ok: false, error: 'Muitas requisições. Aguarde ' + retryAfter + 's.' }));
+    }
+  } else {
+    _rateMap.set(ip, { count: 1, reset: now + RATE_WINDOW_MS });
+  }
+
   let corpo = '';
   req.on('data', c => {
     corpo += c;
