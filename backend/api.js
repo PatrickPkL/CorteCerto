@@ -702,13 +702,23 @@ window.API = (function () {
     return respostaBase;
   }
 
-  /** Dado um slot livre na união, escolhe o profissional que pode atendê-lo (DT-04). */
+  /** Dado um slot livre na união, escolhe o profissional com menos agendamentos no dia (round-robin leve). */
   function profissionalParaSlot(barbershopId, dateISO, hora, durMin) {
     const disp = disponibilidade(barbershopId, dateISO, durMin);
     const alvo = DB.hhmmToMin(hora);
     const aptos = disp.per_professional.filter(p =>
       p.slots.some(h => DB.hhmmToMin(h) === alvo));
     if (!aptos.length) return null;
+    const db = DB._d();
+    const contagem = {};
+    aptos.forEach(p => { contagem[p.professional_id] = 0; });
+    db.appointments.filter(a =>
+      a.barbershop_id === barbershopId &&
+      a.starts_at.startsWith(dateISO) &&
+      a.status !== 'cancelado' &&
+      aptos.some(p => p.professional_id === a.professional_id)
+    ).forEach(a => { contagem[a.professional_id] = (contagem[a.professional_id] || 0) + 1; });
+    aptos.sort((a, b) => (contagem[a.professional_id] || 0) - (contagem[b.professional_id] || 0));
     return { professional_id: aptos[0].professional_id, professional_name: aptos[0].professional_name };
   }
 
