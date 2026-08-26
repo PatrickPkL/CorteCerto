@@ -103,6 +103,12 @@ window.Auth = (function () {
 
   function criarSessao(userId) {
     const db = DB._d();
+    /* limita a 5 sessões ativas por usuário */
+    const ativas = db.sessions.filter(s => s.user_id === userId);
+    if (ativas.length >= 5) {
+      const maisAntiga = ativas.sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0];
+      db.sessions = db.sessions.filter(s => s.id !== maisAntiga.id);
+    }
     const expira = new Date(Date.now() + TOKEN_TTL_DIAS * 24 * 3600 * 1000).toISOString();
     const sessao = { id: DB.proximoId(), user_id: userId, token: gerarToken(), expires_at: expira };
     db.sessions.push(sessao);
@@ -201,6 +207,8 @@ window.Auth = (function () {
       throw { status: 400, error: 'Modo inválido (use login ou registro).' };
     }
 
+    // limpa códigos usados/expirados da mesma identidade
+    db.sms_codes = db.sms_codes.filter(c => c.ident !== ident || (c.used && agoraMs() > c.expires_at));
     // RF-002: novo pedido substitui o código anterior da mesma identidade
     db.sms_codes = db.sms_codes.filter(c => c.ident !== ident);
 
