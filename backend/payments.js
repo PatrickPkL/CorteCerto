@@ -316,7 +316,7 @@
     return { ok: true, payment_db_id: pag.id, applied: mudou };
   }
 
-  function err400(msg) { throw { status: 404, error: msg }; }
+  function err400(msg) { throw { status: 400, error: msg }; }
 
   /**
    * A loja pode criar conteúdo? Liberada com trial vigente ou
