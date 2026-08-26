@@ -98,13 +98,28 @@
         <h1>Bom dia, Marcos</h1>
         <p>Aqui está o resumo do seu salão.</p>
       </div>
-      <div style="display:flex; gap:10px; align-items:center;">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <select id="sel-periodo" style="min-width:150px;">
           <option value="today">Hoje</option>
           <option value="week">Últimos 7 dias</option>
           <option value="month" selected>Últimos 30 dias</option>
           <option value="year">Último ano</option>
         </select>
+        <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" class="csv-status" value="pendente" checked> Pendente
+        </label>
+        <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" class="csv-status" value="confirmado" checked> Confirmado
+        </label>
+        <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" class="csv-status" value="concluido" checked> Concluído
+        </label>
+        <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" class="csv-status" value="cancelado"> Cancelado
+        </label>
+        <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center;">
+          <input type="checkbox" class="csv-status" value="nao_compareceu"> Não compareceu
+        </label>
         <button class="btn btn-outline" id="btn-exportar-csv" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px;"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
           Exportar CSV

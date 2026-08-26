@@ -1345,14 +1345,17 @@ window.API = (function () {
   function revenue(v) { return v * 100 / 100; }
 
   /** RF-049 — CSV com BOM UTF-8 e escaping de aspas. */
-  function exportarCSV(inicio, fim) {
+  function exportarCSV(inicio, fim, statuses) {
     const { shop } = exigirDono();
     const db = DB._d();
-    const linhas = db.appointments
+    const statusSet = Array.isArray(statuses) && statuses.length
+      ? new Set(statuses) : null;
+    let linhas = db.appointments
       .filter(a => a.barbershop_id === shop.id &&
         a.starts_at.slice(0, 10) >= (inicio || '0000-00-00') &&
-        a.starts_at.slice(0, 10) <= (fim || '9999-99-99'))
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+        a.starts_at.slice(0, 10) <= (fim || '9999-99-99'));
+    if (statusSet) linhas = linhas.filter(a => statusSet.has(a.status));
+    linhas.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
     function campo(v) {
       const s = v == null ? '' : String(v);
