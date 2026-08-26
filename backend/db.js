@@ -77,13 +77,19 @@ window.DB = (function () {
   }
 
   function migrar(p) {
+    /* v1/v2: garante campos básicos (não sabemos o esquema exato — preserva o que existe) */
+    if (p.v <= 2) {
+      if (!p.professionals) p.professionals = [];
+      if (!p.services)     p.services = [];
+      p.v = 3;
+    }
     /* v3 → v4: cobranças dos planos (AbacatePay) */
     if (p.v === 3) {
       p.v = 4;
       p.payments = Array.isArray(p.payments) ? p.payments : [];
-      try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
-      catch (e) { console.error('[DB] Falha ao persistir migração v4.', e); }
     }
+    try { localStorage.setItem(DB_KEY, JSON.stringify(p)); }
+    catch (e) { console.error('[DB] Falha ao persistir migração.', e); }
     return p;
   }
 
@@ -97,8 +103,11 @@ window.DB = (function () {
           try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
         }
         if (parsed && parsed.meta) {
+          /* aplica migrações encadeadas até atingir a versão atual */
+          while (parsed.v !== undefined && parsed.v < DB_VERSION) {
+            parsed = migrar(parsed);
+          }
           if (parsed.v === DB_VERSION) return parsed;
-          if (parsed.v === DB_VERSION - 1) return migrar(parsed);
         }
       }
     } catch (e) { console.warn('[DB] Estado corrompido — recriando dados demo.', e); }
