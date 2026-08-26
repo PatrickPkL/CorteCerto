@@ -86,12 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!tb) return;
     const hoje = DB.hojeISO();
     try {
-      agsHoje = API.listarAgendamentos({ date: hoje, ordem: 'asc', limit: 200 }).items;
+      agsHoje = API.listarAgendamentos({ de: hoje, ordem: 'asc', limit: 10 }).items;
     } catch (e) { agsHoje = []; }
 
     const prox = agsHoje
       .filter(a => a.status === 'pendente' || a.status === 'confirmado')
-      .slice(0, 6);
+      .slice(0, 10);
 
     tb.innerHTML = prox.map(a =>
       '<tr>' +
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '<td>' + badgeStatus(a.status) + '</td>' +
       '</tr>'
     ).join('') ||
-    '<tr><td colspan="4"><div class="empty-state"><h3>Agenda livre</h3><p>Sem agendamentos pendentes para hoje.</p></div></td></tr>';
+    '<tr><td colspan="4"><div class="empty-state"><h3>Agenda livre</h3><p>Sem agendamentos pendentes a partir de hoje.</p></div></td></tr>';
   }
 
   /* ---------- profissionais em atendimento agora ---------- */
