@@ -136,10 +136,15 @@ function handleWebhookAbacate(req, res, url) {
   req.on('end', () => {
     const secretEnv = String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
     if (secretEnv) {
-      const secretUrl = url.searchParams.get('webhookSecret');
-      if (secretUrl !== secretEnv && !assinaturaValida(corpo, req.headers['x-webhook-signature'])) {
+      const secretUrl = url.searchParams.get('webhookSecret') || '';
+      const a = Buffer.from(secretEnv, 'utf8');
+      const b = Buffer.from(secretUrl, 'utf8');
+      const urlOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+      if (!urlOk && !assinaturaValida(corpo, req.headers['x-webhook-signature'])) {
         return json(res, 401, { ok: false, error: 'Unauthorized' });
       }
+    } else {
+      return json(res, 401, { ok: false, error: 'Webhook secret não configurado no servidor.' });
     }
     let ev;
     try { ev = JSON.parse(corpo || '{}'); }
@@ -161,7 +166,7 @@ function handleWebhookAbacate(req, res, url) {
 function servirEstatico(req, res, url) {
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/') {
-    res.writeHead(302, { Location: '/public/catalogo.html' });
+    res.writeHead(302, { Location: '/public/telainicial.html' });
     return res.end();
   }
 
