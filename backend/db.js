@@ -97,6 +97,24 @@ window.DB = (function () {
       .map(p => p[0].toUpperCase()).join('');
   }
 
+  /* ---------------- criptografia transparente ---------------- */
+
+  function _encUsers(d) {
+    if (!_deriveKey()) return;
+    (d.users || []).forEach(function(u) {
+      if (u.phone && !u.phone.startsWith('enc:')) u.phone = criptografar(u.phone);
+      if (u.email && !u.email.startsWith('enc:')) u.email = criptografar(u.email);
+    });
+  }
+
+  function _decUsers(d) {
+    if (!_deriveKey()) return;
+    (d.users || []).forEach(function(u) {
+      u.phone = descriptografar(u.phone);
+      u.email = descriptografar(u.email);
+    });
+  }
+
   /* ---------------- estado ---------------- */
 
   let db;
@@ -105,7 +123,9 @@ window.DB = (function () {
 
   function save() {
     try {
-      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      var toSave = JSON.parse(JSON.stringify(db));
+      _encUsers(toSave);
+      localStorage.setItem(DB_KEY, JSON.stringify(toSave));
     } catch (e) {
       console.error('[DB] Falha ao gravar localStorage (quota?):', e);
       throw { status: 500, error: 'Armazenamento local cheio. Remova fotos antigas e tente novamente.' };
@@ -160,11 +180,12 @@ window.DB = (function () {
           while (parsed.v !== undefined && parsed.v < DB_VERSION) {
             parsed = migrar(parsed);
           }
-          if (parsed.v === DB_VERSION) return parsed;
+          if (parsed.v === DB_VERSION) { _decUsers(parsed); return parsed; }
         }
       }
     } catch (e) { console.warn('[DB] Estado corrompido — recriando dados demo.', e); }
     const fresh = seed();
+    _decUsers(fresh);
     try { localStorage.setItem(DB_KEY, JSON.stringify(fresh)); }
     catch (e) { console.error('[DB] Quota excedida no seed.', e); }
     return fresh;
@@ -576,6 +597,9 @@ window.DB = (function () {
     // datas/horas
     hojeISO, addDiasISO, parseISO, diaSemana, agoraMinutos,
     hhmmToMin, minToHHMM, pad2,
-    fmtDataBR, fmtBRL, iniciais
+    fmtDataBR, fmtBRL, iniciais,
+
+    // criptografia
+    criptografar, descriptografar
   };
 })();
