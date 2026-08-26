@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-exportar-csv')?.addEventListener('click', () => {
     if (!statsAtual) return;
     try {
-      const csv = API.exportarCSV(statsAtual.start_date, statsAtual.end_date);
+      const statuses = Array.from(document.querySelectorAll('.csv-status:checked')).map(cb => cb.value);
+      const csv = API.exportarCSV(statsAtual.start_date, statsAtual.end_date, statuses);
       baixarArquivo('agendamentos_' + statsAtual.start_date + '_a_' + statsAtual.end_date + '.csv', csv);
       showToast('CSV exportado!');
     } catch (e) {
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProximos() {
     const tb = document.getElementById('tb-proximos');
     if (!tb) return;
+    aguardarSkeleton(tb);
     const hoje = DB.hojeISO();
     try {
       agsHoje = API.listarAgendamentos({ de: hoje, ordem: 'asc', limit: 10 }).items;

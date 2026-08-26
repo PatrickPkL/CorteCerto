@@ -151,6 +151,12 @@ function debounce(fn, ms) {
   };
 }
 
+function aguardarSkeleton(el) {
+  if (!el) return;
+  el.classList.add('skeleton');
+  el.innerHTML = '<tr><td colspan="10" style="height:60px"></td></tr>';
+}
+
 /* Extrai a mensagem de erro de exceções {status, error} da LocalAPI */
 function msgErro(e) {
   if (e && e.error) return e.error;

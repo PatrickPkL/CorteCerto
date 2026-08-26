@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ---------- listagem com paginação (RF-040) ---------- */
   function render() {
+    aguardarSkeleton(tbody);
     let lista;
     try {
       lista = API.listarAgendamentos(Object.assign(
