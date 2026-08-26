@@ -1875,48 +1875,6 @@ window.API = (function () {
 
   /* ================= UPLOADS E GALERIA (RF-062..065, RNF-11) ================= */
 
-  /**
-   * Reencoda imagem via canvas (mitiga arquivo malicioso) e comprime
-   * até ~300KB (DECISÃO v2 do RF-063). Tipos: JPEG/PNG/WebP/GIF ≤ 5MB.
-   */
-  function processarImagem(file) {
-    return new Promise((resolve, reject) => {
-      const tiposOk = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      if (!tiposOk.includes(file.type)) {
-        return reject(err(400, 'Formato inválido. Use JPEG, PNG, WebP ou GIF.'));
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        return reject(err(400, 'Imagem muito grande (máx. 5MB).'));
-      }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const img = new Image();
-        img.onload = () => {
-          const MAX_DIM = 1000;
-          let w = img.width, h = img.height;
-          if (w > MAX_DIM || h > MAX_DIM) {
-            const escala = Math.min(MAX_DIM / w, MAX_DIM / h);
-            w = Math.round(w * escala); h = Math.round(h * escala);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          let qualidade = 0.82;
-          let url = canvas.toDataURL('image/jpeg', qualidade);
-          while (url.length > 300 * 1024 && qualidade > 0.45) {
-            qualidade -= 0.08;
-            url = canvas.toDataURL('image/jpeg', qualidade);
-          }
-          resolve(url);
-        };
-        img.onerror = () => reject(err(400, 'Não foi possível ler a imagem.'));
-        img.src = ev.target.result;
-      };
-      reader.onerror = () => reject(err(400, 'Falha ao carregar o arquivo.'));
-      reader.readAsDataURL(file);
-    });
-  }
-
   function definirLogo(dataUrl) {
     const { shop } = exigirDono();
     shop.logo_url = dataUrl;
