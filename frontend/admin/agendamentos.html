@@ -98,6 +98,10 @@
         <h1>Agendamentos</h1>
         <p>Veja, confirme e organize os horários do dia.</p>
       </div>
+      <button class="btn btn-brass" id="btn-novo-agendamento" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;"><path d="M12 5v14M5 12h14"/></svg>
+        Agendar Cliente
+      </button>
     </div>
 
     <div class="toolbar">
@@ -141,6 +145,46 @@
         <span style="color:var(--text-muted); font-size:13px;" id="pag-info">—</span>
         <button class="btn btn-outline" id="btn-pag-prev" type="button" style="padding:6px 12px; font-size:13px;">‹ Anterior</button>
         <button class="btn btn-outline" id="btn-pag-next" type="button" style="padding:6px 12px; font-size:13px;">Próxima ›</button>
+      </div>
+    </div>
+
+    <div id="modal-novo-agendamento" style="display:none;">
+      <div class="card" style="width:440px;">
+        <h3 class="section-title">Agendar cliente</h3>
+        <form id="form-novo-agendamento">
+          <div class="field">
+            <label for="na-cliente">Cliente cadastrado</label>
+            <select id="na-cliente" name="cliente" required></select>
+          </div>
+          <div class="field">
+            <label for="na-servico">Serviço</label>
+            <select id="na-servico" name="servico" required></select>
+          </div>
+          <div class="field">
+            <label for="na-profissional">Profissional</label>
+            <select id="na-profissional" name="profissional"></select>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="na-data">Data</label>
+              <input type="date" id="na-data" name="data" required>
+            </div>
+            <div class="field">
+              <label for="na-hora">Horário</label>
+              <input type="time" id="na-hora" name="hora" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="na-notas">Observações</label>
+            <textarea id="na-notas" name="notas" rows="2"></textarea>
+          </div>
+          <p style="color:var(--text-muted); font-size:12.5px;">
+            Conflitos de horário são validados antes de salvar.</p>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+            <button type="button" class="btn btn-outline" id="btn-fechar-modal-novo-ag">Cancelar</button>
+            <button type="submit" class="btn btn-brass">Criar agendamento</button>
+          </div>
+        </form>
       </div>
     </div>
 

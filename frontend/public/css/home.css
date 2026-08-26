@@ -1,0 +1,116 @@
+/* ============================================================
+   Corte Certo – public/css/home.css
+   Tela inicial: splash animada (fundo preto + logo) e hero.
+   ============================================================ */
+
+/* ---------------- splash ---------------- */
+
+.splash {
+  position: fixed;
+  inset: 0;                       /* cobre 100% da viewport */
+  z-index: 9999;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash img {
+  width: min(340px, 72vw);
+  height: auto;
+  opacity: 0;                     /* invisível até o fade-in */
+  transform: scale(0.96);
+  will-change: opacity, transform;
+}
+
+/* estado controlado pelo JS: dispara o surgimento suave da logo */
+.splash.splash-pronta img {
+  animation: logoEntra 0.9s ease forwards;
+}
+
+/* estado final: tela inteira desaparece suavemente */
+.splash.splash-saindo {
+  animation: splashSai 0.7s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes logoEntra {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes splashSai {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* fallback caso a imagem não carregue (troca por marca em texto) */
+.splash-marca {
+  font-size: clamp(28px, 6vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #fff;
+  opacity: 0;
+}
+.splash.splash-pronta .splash-marca {
+  animation: logoEntra 0.9s ease forwards;
+}
+.splash-marca span { color: var(--brass); }
+
+/* acessibilidade: quem prefere menos movimento pula a coreografia */
+@media (prefers-reduced-motion: reduce) {
+  .splash img,
+  .splash.splash-pronta img,
+  .splash-marca,
+  .splash.splash-pronta .splash-marca {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+  .splash.splash-saindo { animation-duration: 0.01s; }
+}
+
+/* ---------------- hero da página revelada ---------------- */
+
+.hero-home {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 20px 80px;
+}
+
+.hero-logo {
+  width: 120px;
+  height: auto;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-home h1 {
+  font-size: clamp(34px, 6vw, 56px);
+  line-height: 1.08;
+  margin: 10px 0 12px;
+  letter-spacing: -1px;
+}
+
+.hero-home p {
+  max-width: 520px;
+  color: var(--text-muted);
+  font-size: 17px;
+  margin: 0 0 30px;
+}
+
+.hero-acoes {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-lg {
+  padding: 14px 38px;
+  font-size: 16.5px;
+}

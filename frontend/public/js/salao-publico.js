@@ -209,6 +209,19 @@ document.addEventListener('DOMContentLoaded', () => {
   let horaEscolhida = null;
   let profResolvido = null;
 
+  /* Tarefa 3: agendar exige conta. Sem sessão → login com retorno
+     para esta mesma página do salão (?next= é honrado pós-login). */
+  function exigirSessao() {
+    if (Auth.usuarioAtual()) return true;
+    sessionStorage.setItem('cc_flash', JSON.stringify({
+      texto: 'Faça login para agendar seu horário.',
+      tipo: 'error'
+    }));
+    const volta = 'salao-publico.html?id=' + encodeURIComponent(loja.id);
+    window.location.href = '../admin/login.html?next=' + encodeURIComponent(volta);
+    return false;
+  }
+
   if (ehClienteLogado) {
     if (acNome) acNome.value = logado.name || '';
     if (acTelefone) acTelefone.value = logado.phone || '';
@@ -316,6 +329,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.btn-agendar').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (!exigirSessao()) return; /* anônimo vai para o login */
+
       const row = btn.closest('.service-row-public');
       svcSelecionado = servicos.find(s => String(s.id) === row?.dataset.servicoId) || null;
 
@@ -347,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (!exigirSessao()) return; /* sessão pode ter caído no meio do fluxo */
     if (!svcSelecionado || !dataEscolhida || !horaEscolhida) return;
 
     const nome = (acNome?.value || '').trim();

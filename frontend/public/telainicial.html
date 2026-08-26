@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corte Certo — Agende seu horário</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/public.css">
+<link rel="stylesheet" href="css/home.css">
+</head>
+<body data-page="telainicial">
+<div class="stripe"></div>
+
+<!-- ===== SPLASH: cobre a viewport e revela a página ao terminar ===== -->
+<div id="splash" class="splash" aria-hidden="true">
+  <img id="splash-logo" src="assets/cortecertologo.png" alt="Corte Certo">
+</div>
+
+<header class="public-header">
+  <div class="brand">Corte<span>Certo</span></div>
+  <nav class="public-nav">
+    <a href="catalogo.html">Catálogo</a>
+    <span id="nav-auth" class="nav-auth-slot"></span>
+    <a href="../admin/login.html">Sou dono de salão</a>
+  </nav>
+</header>
+
+<main class="public-main">
+  <section class="hero-home">
+    <img class="hero-logo" src="assets/cortecertologo.png" alt=""
+         onerror="this.style.display='none'">
+    <span class="eyebrow">Bem-vindo</span>
+    <h1>Seu corte, na hora certa.</h1>
+    <p>Agende em segundos nas melhores barbearias e salões — sem fila, sem ligação.</p>
+
+    <!-- CTA principal exigido: leva à página de login -->
+    <div class="hero-acoes">
+      <a class="btn btn-brass btn-lg" href="../admin/login.html">Entrar</a>
+      <a class="btn btn-outline" href="catalogo.html">Explorar catálogo</a>
+    </div>
+  </section>
+</main>
+
+<script src="../shared/js/db.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="../shared/js/shared.js"></script>
+<script src="js/telainicial.js"></script>
+</body>
+</html>
