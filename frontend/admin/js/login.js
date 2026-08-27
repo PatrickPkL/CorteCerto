@@ -65,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bannerCodigo) {
       bannerCodigo.hidden = false;
       bannerCodigo.innerHTML =
-        '<strong>Modo demonstração</strong> — seu código de verificação é: ' +
-        '<span class="mono codigo-demo">' + esc(res.demo_code) + '</span>';
+        '<strong>Código enviado!</strong> ' +
+        'Verifique seu telefone ou e-mail para o código de verificação.';
     }
     if (infoFone) {
       infoFone.textContent = 'Digite o código de 6 dígitos enviado para ' +
@@ -105,7 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modo: 'registro',
       name: document.getElementById('cli-nome').value,
       email: document.getElementById('cli-email').value,
-      role: 'cliente'
+      role: 'cliente',
+      aceite_privacidade: true
     });
   });
 
@@ -125,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
       name: document.getElementById('cad-nome-resp').value,
       salon_name: document.getElementById('cad-salao-nome').value,
       email: document.getElementById('cad-email').value,
-      role: 'dono'
+      role: 'dono',
+      aceite_privacidade: true
     });
   });
 

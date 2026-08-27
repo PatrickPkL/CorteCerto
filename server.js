@@ -64,6 +64,37 @@ const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
 const RATE_MAX = 60;
 
+/* ---------------- auth-brute-force ---------------- */
+const _failedAuth = new Map();
+const AUTH_FAIL_MAX = 5;
+const AUTH_FAIL_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_BLOCK_MS = 15 * 60 * 1000;
+
+/* Métodos RPC que exigem sessão válida (segunda camada de defesa) */
+const _authRequired = new Set([
+  'criarAgendamento', 'listarAgendamentos', 'atualizarAgendamento',
+  'excluirAgendamento', 'meusAgendamentos', 'getAgendamento',
+  'listarClientes', 'getCliente', 'criarCliente', 'atualizarCliente', 'agendamentosDoCliente',
+  'dashboardStats', 'exportarCSV',
+  'minhaLoja', 'atualizarLoja', 'excluirLoja',
+  'criarServico', 'atualizarServico', 'excluirServico',
+  'criarProfissional', 'atualizarProfissional', 'desativarProfissional',
+  'salvarHorariosLoja', 'atualizarLinhaHorario',
+  'listarExcecoes', 'criarExcecao', 'excluirExcecao',
+  'minhaAssinatura', 'trocarPlano', 'cancelarAssinatura',
+  'minhasNotificacoes', 'naoLidasCount', 'marcarNotificacaoLida', 'marcarTodasLidas',
+  'mePerfil', 'atualizarMe', 'atualizarPreferencias', 'excluirMinhaConta',
+  'exportarMeusDados', 'revogarConsentimento', 'solicitarExclusao',
+  'enviarSolicitacaoLGPD', 'meusLogsDeAcesso', 'logoutTodosDispositivos',
+  'alternarFavorito', 'meusFavoritos',
+  'criarTicket', 'ticketsDoSalao',
+  'definirLogo', 'definirCapa',
+  'galeriaDaLoja', 'adicionarGaleria', 'removerGaleria',
+  'servicosDaLoja', 'profissionaisDaLoja', 'horariosDaLoja',
+  'gerarLembretesAmanha', 'gerarLembretesPendentes',
+  'logout'
+]);
+
 /* ---------------- RPC ---------------- */
 
 function handleRpc(req, res) {
@@ -96,13 +127,34 @@ function handleRpc(req, res) {
       return json(res, 400, { ok: false, error: 'JSON inválido.' });
     }
     if (!metodo) {
-      return json(res, 400, { ok: false, error: 'Informe o método.' });
+      return json(res, 400, { ok: false, error: 'Requisição inválida.' });
     }
     // métodos de sessão vivem em Auth; o resto, em API
     const fn = typeof API[metodo] === 'function' ? API[metodo]
       : (typeof Auth[metodo] === 'function' ? Auth[metodo] : null);
     if (!fn) {
-      return json(res, 404, { ok: false, error: 'Método desconhecido: ' + metodo });
+      return json(res, 400, { ok: false, error: 'Requisição inválida.' });
+    }
+
+    /* segunda camada: métodos autenticados exigem token válido */
+    if (_authRequired.has(metodo)) {
+      const tk = req.headers['x-cc-token'] || null;
+      if (!tk) {
+        return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
+      }
+      global.__CC_REQUEST_TOKEN = tk;
+      global.__CC_HTTP = true;
+      try {
+        const u = Auth.usuarioAtual();
+        if (!u) {
+          return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
+        }
+      } catch (e) {
+        return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
+      } finally {
+        delete global.__CC_REQUEST_TOKEN;
+        delete global.__CC_HTTP;
+      }
     }
 
     global.__CC_REQUEST_TOKEN = req.headers['x-cc-token'] || null;
@@ -110,22 +162,65 @@ function handleRpc(req, res) {
     const ip = req.socket.remoteAddress || '0.0.0.0';
     const ts = new Date().toISOString();
     const argsStr = JSON.stringify(Array.isArray(args) ? args : []).slice(0, 200);
+
+    /* brute-force guard para verifyCode */
+    if (metodo === 'verifyCode') {
+      const rec = _failedAuth.get(ip);
+      if (rec && Date.now() < rec.blockedUntil) {
+        const retryAfter = Math.ceil((rec.blockedUntil - Date.now()) / 1000);
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) });
+        return res.end(JSON.stringify({ ok: false, status: 429, error: 'Muitas tentativas. Aguarde ' + retryAfter + 's.' }));
+      }
+    }
+
     try {
       const dados = fn.apply(null, Array.isArray(args) ? args : []);
       /* função assíncrona: resolve a resposta fora daqui — sem isso,
          uma Promise rejeitada seria serializada como {} com status 200 */
       if (dados && typeof dados.then === 'function') {
         return void dados.then(
-          valor => json(res, 200, { ok: true, data: valor === undefined ? null : valor }),
+          valor => {
+            if (metodo === 'verifyCode') _failedAuth.delete(ip);
+            json(res, 200, { ok: true, data: valor === undefined ? null : valor });
+          },
           e => {
             const st = (e && e.status) || 500;
+            if (metodo === 'verifyCode' && st >= 400 && st < 500) {
+              const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
+              prev.count++;
+              if (prev.count >= AUTH_FAIL_MAX) {
+                prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+              }
+              prev.windowStart = prev.windowStart || Date.now();
+              if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
+                prev.count = 1;
+                prev.windowStart = Date.now();
+                prev.blockedUntil = 0;
+              }
+              _failedAuth.set(ip, prev);
+            }
             if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
             json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
           });
       }
+      if (metodo === 'verifyCode') _failedAuth.delete(ip);
       return json(res, 200, { ok: true, data: dados === undefined ? null : dados });
     } catch (e) {
       const status = (e && e.status) || 500;
+      if (metodo === 'verifyCode' && status >= 400 && status < 500) {
+        const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
+        prev.count++;
+        if (prev.count >= AUTH_FAIL_MAX) {
+          prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+        }
+        prev.windowStart = prev.windowStart || Date.now();
+        if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
+          prev.count = 1;
+          prev.windowStart = Date.now();
+          prev.blockedUntil = 0;
+        }
+        _failedAuth.set(ip, prev);
+      }
       if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
       return json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
     } finally {
@@ -326,7 +421,7 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
   if (req.method === 'GET' && pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true, version: '2.1.0', uptime: process.uptime(), timestamp: new Date().toISOString() }));
+    return res.end(JSON.stringify({ ok: true }));
   }
   /* magic-link */
   if (req.method === 'GET' && url.pathname === '/magic-link') {

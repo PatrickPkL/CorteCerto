@@ -16,7 +16,7 @@ window.Auth = (function () {
   const TOKEN_TTL_DIAS = 7;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
   const MAX_TENTATIVAS = 5;               // RNF-10
-  const COOLDOWN_MS = 30 * 1000;          // RNF-10
+  const COOLDOWN_MS = 5 * 60 * 1000;     // 5 minutos entre pedidos de código
 
   /* ---------------- utilidades ---------------- */
 
@@ -231,7 +231,8 @@ window.Auth = (function () {
             name: String(dados.name || '').trim(),
             email: String(dados.email || '').trim(),
             role: dados.role === 'dono' ? 'dono' : 'cliente',
-            salon_name: String(dados.salon_name || '').trim()
+            salon_name: String(dados.salon_name || '').trim(),
+            aceite_privacidade: !!(dados.aceite_privacidade || dados.aceiteTermos || dados.termosAceitos || dados.termsAccepted)
           }
         : { modo: 'login' },
       created_at: new Date().toISOString()
@@ -288,8 +289,7 @@ window.Auth = (function () {
     return {
       ok: true,
       expires_in_seconds: 600,
-      cooldown_seconds: COOLDOWN_MS / 1000,
-      demo_code: code // RNF-19: exibido na UI como banner de demonstração
+      cooldown_seconds: COOLDOWN_MS / 1000
     };
   }
 
@@ -337,7 +337,7 @@ window.Auth = (function () {
 
     if (!usuario) {
       if (p.modo === 'registro' && !p.aceite_privacidade) {
-        throw { status: 400, error: 'Aceite da Política de Privacidade e Termos de Uso é obrigatório.' };
+        throw { status: 400, error: 'O aceite da Política de Privacidade e Termos de Uso é obrigatório. Envie o campo aceite_privacidade (ou aceiteTermos) como true no registro.' };
       }
       // criação no verify (RF-004) — apenas por telefone
       usuario = {
