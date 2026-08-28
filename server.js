@@ -284,6 +284,13 @@ function handleSuperAdmin(req, res, pathname, url) {
     return;
   }
 
+  /* GET /api/super-admin/relatorios */
+  if (rota === 'relatorios' && req.method === 'GET') {
+    try { const r = API.saRelatorios(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
   /* GET /api/super-admin/lojas */
   if (rota === 'lojas' && req.method === 'GET' && !idParam) {
     try { const r = API.saListarLojas(); json(res, 200, { ok: true, data: r }); }

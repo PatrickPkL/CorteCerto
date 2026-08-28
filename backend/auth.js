@@ -372,9 +372,14 @@ window.Auth = (function () {
 
     /* audit log: login bem-sucedido */
     try {
-      var _apiRef = require('./api');
-      if (_apiRef && _apiRef._auditLog) _apiRef._auditLog(usuario.id, 'login_sucesso');
-    } catch(e) { /* noop */ }
+      var _apiGlobal = (typeof window !== 'undefined') ? (window.API || null) : null;
+      var _auditFn = _apiGlobal ? _apiGlobal._auditLog : null;
+      if (typeof _auditFn === 'function') {
+        _auditFn(usuario.id, 'login_sucesso');
+      } else {
+        console.warn('[auth] _auditLog indisponível no login');
+      }
+    } catch(e) { console.error('[auth] falha ao registrar login no audit log:', e); }
 
     return { token: localStorage.getItem('token'), user: publicUser(usuario), barbershop: barbearia };
   }

@@ -464,6 +464,78 @@ window.API = (function () {
     };
   }
 
+  /**
+   * Relatórios globais da plataforma (página "Relatórios" do admin).
+   * Retorna assinaturas por plano, séries mensais de uso, clientes e
+   * logins de TODO o site, além dos totais atuais. Fonte: PostgreSQL
+   * (coleções do pg_map via _db()).
+   */
+  function saRelatorios() {
+    const db = _db();
+
+    const meses = [];
+    const agora = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+      meses.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+    }
+    const setMeses = new Set(meses);
+
+    function serieMensal(lista, extrair) {
+      const map = {};
+      (lista || []).forEach(r => {
+        const k = String(extrair(r) || '').slice(0, 7);
+        if (setMeses.has(k)) map[k] = (map[k] || 0) + 1;
+      });
+      return meses.map(m => ({ mes: m, valor: map[m] || 0 }));
+    }
+
+    const assinaturas = db.subscriptions || [];
+
+    const planos = (db.plans || []).map(p => {
+      const subs = assinaturas.filter(s => s.plan_id === p.id);
+      return {
+        plan_id: p.id,
+        name: p.name,
+        price_monthly: p.price_monthly,
+        total: subs.length,
+        ativas: subs.filter(s => s.status === 'ativa').length,
+        trial: subs.filter(s => s.status === 'trial').length,
+        canceladas: subs.filter(s => s.status === 'cancelada').length
+      };
+    }).sort((a, b) => b.total - a.total);
+
+    const lojas = db.barbershops || [];
+    const lojasComPlano = new Set(assinaturas.map(s => s.barbershop_id));
+    const logins = (db.audit_log || []).filter(l => String(l.acao || '').indexOf('login') === 0);
+
+    return {
+      generated_at: agoraISO(),
+      meses,
+      planos,
+      sem_plano: lojas.filter(b => b && b.id != null && !lojasComPlano.has(b.id)).length,
+      assinaturas: {
+        total: assinaturas.length,
+        ativas: assinaturas.filter(s => s.status === 'ativa').length,
+        trial: assinaturas.filter(s => s.status === 'trial').length,
+        canceladas: assinaturas.filter(s => s.status === 'cancelada').length,
+        receita_mensal_projetada: Math.round(planos.reduce((s, p) => s + Number(p.price_monthly || 0) * p.ativas, 0) * 100) / 100
+      },
+      series: {
+        uso_por_mes: serieMensal(db.appointments || [], a => a.starts_at || a.date),
+        clientes_por_mes: serieMensal(db.clients || [], c => c.created_at),
+        logins_por_mes: serieMensal(logins, l => l.timestamp)
+      },
+      totais: {
+        total_lojas: lojas.length,
+        total_usuarios: (db.users || []).length,
+        total_agendamentos: (db.appointments || []).length,
+        agendamentos_hoje: (db.appointments || []).filter(a => (a.starts_at || a.date || '').slice(0, 10) === agoraISO().slice(0, 10)).length,
+        logins_30d: logins.filter(l => (l.timestamp || '') >= new Date(Date.now() - 30 * 86400000).toISOString()).length
+      }
+    };
+  }
+
   /* ================= SERVIÇOS (RF-018..021) ================= */
 
   function validarServico(dados, parcial) {
@@ -2455,8 +2527,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     verificarMagicLink, gerarLembretesAmanha,
 
     // super-admin
-    superAdminLogin, superAdminLogout,
+    superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
-    saAtualizarPlano, saExcluirLoja, saDashboard
+    saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios
   };
 })();

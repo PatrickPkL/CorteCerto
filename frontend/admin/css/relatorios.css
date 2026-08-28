@@ -1,0 +1,138 @@
+/* ============================================================
+   Corte Certo – admin/css/relatorios.css
+   Estilos da página Relatórios (gráficos em canvas).
+   ============================================================ */
+
+.chart-box {
+  width: 100%;
+  height: 240px;
+  margin-top: 8px;
+}
+
+.chart-box canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-caption {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.stat-value-sm {
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.sa-status {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sa-status.erro { color: var(--warn-text); }
+.sa-status.ok { color: var(--success); }
+
+#tb-plataforma td {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+#tb-plataforma td:last-child {
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ---------- atualização em tempo real ---------- */
+.ult-atual {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ---------- tabela de assinaturas por plano ---------- */
+.chart-box-sm { height: 190px; }
+
+.plans-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+  font-size: 13.5px;
+}
+
+.plans-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.plans-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line-soft, rgba(220, 212, 194, .35));
+  vertical-align: middle;
+}
+
+.plans-table td:nth-child(2),
+.plans-table td:nth-child(6) {
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+.plans-table tr.plan-top td { background: var(--brass-soft, rgba(184, 134, 59, .16)); }
+.plans-table tr.plan-final td {
+  font-weight: 700;
+  border-top: 2px solid var(--line);
+  border-bottom: none;
+}
+
+.plan-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #fff;
+  background: var(--brass, #B8863B);
+}
+
+.plan-total {
+  position: relative;
+  width: 74px;
+  height: 8px;
+  margin: 0 6px 0 0;
+  border-radius: 999px;
+  background: var(--line-soft, rgba(220, 212, 194, .3));
+  display: inline-block;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.plan-total span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--brass, #B8863B);
+}
+
+.plans-empty {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}

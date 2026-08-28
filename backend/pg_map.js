@@ -244,6 +244,17 @@ const MAP = [
     })
   },
   {
+    colecao: 'audit_log', tabela: 'audit_log', pk: 'id', dateOut: 'iso',
+    toPg: (a) => ({
+      id: a.id, user_id: a.user_id || null, acao: a.acao, extra: a.extra || null,
+      ip_address: a.ip_address || null, timestamp: toPgDate(a.timestamp) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, user_id: r.user_id, acao: r.acao, extra: r.extra,
+      ip_address: r.ip_address, timestamp: toMemDate(r.timestamp, 'iso')
+    })
+  },
+  {
     colecao: 'appointments', tabela: 'appointments', pk: 'id', dateOut: 'local',
     toPg: (a) => ({
       id: a.id, barbershop_id: a.barbershop_id, client_id: a.client_id || null,
@@ -372,7 +383,8 @@ const CASTS = {
   notifications: { barbershop_id: 'uuid', user_id: 'uuid', read: 'boolean', created_at: 'timestamptz' },
   tickets: { salao_id: 'uuid', user_id: 'uuid', status: 'tik_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
   magic_tokens: { user_id: 'uuid', used: 'boolean', expires_at: 'timestamptz', created_at: 'timestamptz' },
-  superadmin_sessions: { expires_at: 'timestamptz', created_at: 'timestamptz' }
+  superadmin_sessions: { expires_at: 'timestamptz', created_at: 'timestamptz' },
+  audit_log: { user_id: 'uuid', extra: 'jsonb', ip_address: 'inet', timestamp: 'timestamptz' }
 };
 
 const BY_COLECAO = {};
