@@ -16,9 +16,13 @@ const MIGRATION_URL =
   process.env.DATABASE_URL ||
   'postgres://postgres:SUA_SENHA@127.0.0.1:5432/cortecerto';
 
+const SSL = /(ssl=true|sslmode=(require|prefer|verify-ca|verify-full))/i.test(MIGRATION_URL)
+  ? { rejectUnauthorized: false }
+  : undefined;
+
 const base = {
   client: 'pg',
-  connection: MIGRATION_URL,
+  connection: SSL ? { connectionString: MIGRATION_URL, ssl: SSL } : MIGRATION_URL,
   pool: { min: 0, max: 10 },
   migrations: {
     directory: path.join(__dirname, 'database', 'migrations'),

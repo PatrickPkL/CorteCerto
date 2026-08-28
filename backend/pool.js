@@ -12,10 +12,18 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+const _url = process.env.DATABASE_URL ||
+  'postgres://cortecerto_app:SUA_SENHA@127.0.0.1:5432/cortecerto';
+
+/* Hosts gerenciados (Render/Neon) usam SSL self-signed; "ssl=true" faz o
+   cliente verificar o cert e falhar. Normaliza para aceitar o certificado. */
+const _ssl = /(ssl=true|sslmode=(require|prefer|verify-ca|verify-full))/i.test(_url)
+  ? { rejectUnauthorized: false }
+  : undefined;
+
 const knex = require('knex')({
   client: 'pg',
-  connection: process.env.DATABASE_URL ||
-    'postgres://cortecerto_app:SUA_SENHA@127.0.0.1:5432/cortecerto',
+  connection: _ssl ? { connectionString: _url, ssl: _ssl } : _url,
   pool: { min: 0, max: 10 },
   searchPath: ['public'],
   timezone: process.env.TZ || 'America/Sao_Paulo'
