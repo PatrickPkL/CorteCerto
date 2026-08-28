@@ -15,15 +15,29 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const _url = process.env.DATABASE_URL ||
   'postgres://cortecerto_app:SUA_SENHA@127.0.0.1:5432/cortecerto';
 
-/* Hosts gerenciados (Render/Neon) usam SSL self-signed; "ssl=true" faz o
-   cliente verificar o cert e falhar. Normaliza para aceitar o certificado. */
-const _ssl = /(ssl=true|sslmode=(require|prefer|verify-ca|verify-full))/i.test(_url)
-  ? { rejectUnauthorized: false }
-  : undefined;
+/* Hosts gerenciados (Render/Neon) pedem SSL self-signed; o pg moderno
+   trata "sslmode=require/ssl=true" como verify-full e exige cert válido.
+   Parseamos a URL nós mesmos e repassamos ssl com rejectUnauthorized:false
+   para não depender da versão do pg-connection-string no servidor. */
+const _temSsl = /(ssl=true|sslmode)/i.test(_url);
+let _conn;
+if (_temSsl) {
+  const _p = new URL(_url);
+  _conn = {
+    host: _p.hostname,
+    port: Number(_p.port || 5432),
+    database: (_p.pathname || '').replace(/^\//, ''),
+    user: decodeURIComponent(_p.username || ''),
+    password: decodeURIComponent(_p.password || ''),
+    ssl: { rejectUnauthorized: false }
+  };
+} else {
+  _conn = _url;
+}
 
 const knex = require('knex')({
   client: 'pg',
-  connection: _ssl ? { connectionString: _url, ssl: _ssl } : _url,
+  connection: _conn,
   pool: { min: 0, max: 10 },
   searchPath: ['public'],
   timezone: process.env.TZ || 'America/Sao_Paulo'
