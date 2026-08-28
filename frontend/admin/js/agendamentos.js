@@ -224,12 +224,12 @@ document.addEventListener('DOMContentLoaded', () => {
       origin: 'admin',
       date: data,
       start_time: hora,
-      service_ids: [Number(selSvc.value)],
+      service_ids: [String(selSvc.value)],
       client_name: cli.name,
       client_phone: cli.phone || '',
       notes: document.getElementById('na-notas').value
     };
-    if (selPro.value) payload.professional_id = Number(selPro.value);
+    if (selPro.value) payload.professional_id = selPro.value;
 
     try {
       API.criarAgendamento(payload);
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
       date: document.getElementById('ea-data').value,
       start_time: document.getElementById('ea-hora').value,
       professional_id: document.getElementById('ea-profissional').value
-        ? Number(document.getElementById('ea-profissional').value)
+        ? document.getElementById('ea-profissional').value
         : null,
       status: document.getElementById('ea-status').value,
       notes: document.getElementById('ea-notas').value

@@ -306,7 +306,7 @@
     let pag = null;
     const db = DB._d();
     if (dados.metadata && dados.metadata.payment_db_id != null) {
-      pag = db.payments.find(p => p.id == Number(dados.metadata.payment_db_id));
+      pag = db.payments.find(p => p.id == String(dados.metadata.payment_db_id));
     }
     if (!pag && dados.id) {
       pag = db.payments.find(p => p.abacate_id === dados.id);

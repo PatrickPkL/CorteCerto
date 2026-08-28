@@ -5,11 +5,18 @@
   "description": "Corte Certo — agendamento para salões e barbearias (demo)",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "migrate:status": "knex migrate:list",
+    "seed": "knex seed:run"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "knex": "^3.3.0",
     "nodemailer": "^9.0.5",
+    "pg": "^8.23.0",
     "resend": "^6.22.1",
     "totalvoice-node": "^1.12.0"
   }

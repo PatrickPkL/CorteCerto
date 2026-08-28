@@ -2,9 +2,9 @@
    Corte Certo – auth.js  (PRD v2 · Seção 3.1 / RNF-06 / RNF-10)
    Autenticação SEM SENHA: telefone + código de 6 dígitos.
    O código é exibido na UI (modo demonstração — RNF-19).
-   Sessão: token opaco de 256 bits, validade 30 dias.
+   Sessão: token opaco de 256 bits, validade 7 dias.
    Chaves de compatibilidade: token / user / barbershop.
-   Requer db.js carregado antes.
+   Requer db.js carregado antes (fonte: PostgreSQL espelhado).
    ============================================================ */
 
 window.Auth = (function () {
@@ -24,7 +24,7 @@ window.Auth = (function () {
     return String(v || '').replace(/\D/g, '');
   }
 
-  /* Identidade de login: aceita telefone (só dígitos) OU e-mail (RBAC ajudante) */
+  /* Identidade de login: telefone (só dígitos) OU e-mail (RBAC ajudante) */
   function normalizarIdentidade(v) {
     const s = String(v || '').trim();
     if (!s) return '';
@@ -168,8 +168,6 @@ window.Auth = (function () {
    * Etapa 1 — solicitar código.
    * modo 'login' exige identidade (telefone OU e-mail) existente;
    * 'registro' exige telefone novo.
-   * Retorna { ok:true, expires_in_seconds, demo_code } — o campo demo_code
-   * existe porque não há servidor de SMS (RNF-19): a UI exibe o código.
    */
   function requestCode(dados) {
     const db = DB._d();
@@ -252,7 +250,6 @@ window.Auth = (function () {
     /* link mágico por e-mail (se usuário tem email) */
     var emailDestino = porEmail ? ident : (dados.email || '');
     if (!emailDestino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino)) {
-      /* tenta buscar email do usuário existente */
       if (existente && existente.email) emailDestino = existente.email;
     }
     if (emailDestino && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino)) {
@@ -300,7 +297,6 @@ window.Auth = (function () {
 
   /**
    * Etapa 2 — verificar código e abrir sessão (RF-004/RF-005).
-   * Aceita telefone OU e-mail como identidade (RBAC ajudante).
    * Provisionamento atômico do dono: usuário + loja + horários + trial.
    */
   function verifyCode(identBruto, codeBruto) {
@@ -384,8 +380,7 @@ window.Auth = (function () {
   }
 
   /**
-   * RF-005 — provisionamento do dono:
-   * barbearia + slug único + horários padrão seg–sáb 09–18 + trial Salao 10 dias.
+   * RF-005 — provisionamento do dono.
    */
   function provisionarSalao(usuario, nomeSalao) {
     const db = DB._d();

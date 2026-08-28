@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   tbProx?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-acao="reagendar"]');
     if (!btn || !modalReag) return;
-    agParaReagendar = { id: btn.dataset.id, shopId: Number(btn.dataset.shop) };
+    agParaReagendar = { id: btn.dataset.id, shopId: btn.dataset.shop };
     inputReagData.value = btn.dataset.date || '';
     inputReagData.min = hojeISO;
     carregarSlotsReagendar(btn.dataset.date);
@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-avaliar');
     if (!btn || !modalAv) return;
-    agParaAvaliar = { id: btn.dataset.id, shop: Number(btn.dataset.shop) };
+    agParaAvaliar = { id: btn.dataset.id, shop: btn.dataset.shop };
     avNota.value = '0';
     stars.forEach(s => s.classList.remove('active'));
     abrirModal(modalAv);

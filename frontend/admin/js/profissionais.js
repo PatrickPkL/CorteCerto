@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let linhas = [];
     try {
       linhas = API.horariosDaLoja(loja.id).filter(w =>
-        w.professional_id === Number(profId) && w.is_open);
+        w.professional_id === String(profId) && w.is_open);
     } catch (e) { /* noop */ }
     if (!linhas.length) return 'Sem expediente definido';
     const dows = linhas.map(l => l.day_of_week).sort((a, b) => a - b);
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function preencherServicos(containerId, selecionados) {
     const box = document.getElementById(containerId);
     if (!box) return;
-    const sel = new Set((selecionados || []).map(Number));
+    const sel = new Set((selecionados || []).map(String));
     box.innerHTML = servicosAtivos().map(s =>
       '<label class="check-inline">' +
         '<input type="checkbox" value="' + s.id + '"' + (sel.has(s.id) ? ' checked' : '') + '> ' +
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function coletarServicos(containerId) {
     return Array.from(
       document.getElementById(containerId)?.querySelectorAll('input:checked') || []
-    ).map(i => Number(i.value));
+    ).map(i => i.value);
   }
 
   grid.addEventListener('click', (e) => {

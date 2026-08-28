@@ -420,8 +420,23 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const pathname = url.pathname;
   if (req.method === 'GET' && pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true }));
+    return void (async () => {
+      let db = null;
+      let err = null;
+      try {
+        const { knex } = require('./backend/pool');
+        const r = await knex.raw(
+          'SELECT current_database() AS db, now() AS ts, 1 AS ok'
+        );
+        const linha = (r && r.rows && r.rows[0]) || {};
+        db = { database: linha.db || null, ok: linha.ok === 1 };
+      } catch (e) { err = e.message || 'erro'; }
+      if (db && db.ok) {
+        json(res, 200, { ok: true, status: 'up', postgres: db });
+      } else {
+        json(res, 503, { ok: false, status: 'down', error: err || 'banco indisponível' });
+      }
+    })();
   }
   /* magic-link */
   if (req.method === 'GET' && url.pathname === '/magic-link') {
@@ -444,16 +459,23 @@ const server = http.createServer((req, res) => {
   res.end('Método não permitido');
 });
 
-server.listen(PORTA, () => {
-  console.log('');
-  console.log('  Corte Certo rodando:');
-  console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
-  console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
-  console.log('  Banco de dados   : database/db.json');
-  console.log('  Códigos SMS demo aparecem no terminal e na tela de login.');
-  console.log(process.env.ABACATEPAY_API_KEY
-    ? '  Pagamentos PIX   : AbacatePay (' +
-      (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
-    : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
-  console.log('');
+/* Inicializa a persistência (PostgreSQL) antes de atender requisições */
+const boot = require('./backend/boot');
+boot.init().then(() => {
+  server.listen(PORTA, () => {
+    console.log('');
+    console.log('  Corte Certo rodando:');
+    console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
+    console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
+    console.log('  Banco de dados   : PostgreSQL (cortecerto)');
+    console.log('  Códigos SMS demo aparecem no terminal e na tela de login.');
+    console.log(process.env.ABACATEPAY_API_KEY
+      ? '  Pagamentos PIX   : AbacatePay (' +
+        (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
+      : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
+    console.log('');
+  });
+}).catch(e => {
+  console.error('[boot] Falha ao carregar o banco de dados:', e);
+  process.exit(1);
 });

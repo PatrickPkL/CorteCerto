@@ -1,0 +1,383 @@
+'use strict';
+/* ============================================================
+   Corte Certo – pg_map.js
+   Mapeamento entre o formato em memória da aplicação (db.js:
+   camelCase, flags 1/0, timestamps locais) e as tabelas do
+   PostgreSQL (snake_case, tipos SQL, cifragem de dados sensíveis).
+
+   Cada entrada define:
+     colecao  : chave do objeto _d() (ex: 'appointments')
+     tabela   : tabela no PostgreSQL
+     pk       : nome(s) da coluna chave no formato memória
+     toPg     : (obj memória) => objeto que será inserido no banco
+     toMem    : (linha banco)  => objeto no formato memória
+     dateOut  : formato de data na SAÍDA (memória):
+                 'local' -> "YYYY-MM-DDTHH:MM"  (fuso America/Sao_Paulo)
+                 'iso'   -> ISO com Z
+                 'ms'    -> milissegundos
+                 'date'  -> "YYYY-MM-DD"
+     encUsers : true => users (cifra/decifra email/phone + hashes)
+   ============================================================ */
+
+const crypt = require('./crypt');
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* Converte valor (string local/ISO, Date ou ms) -> Date */
+function toPgDate(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return v;
+  const n = Number(v);
+  if (typeof v === 'number' || (/^\d+$/.test(String(v)) && String(v).length >= 12)) {
+    return new Date(n);
+  }
+  // "YYYY-MM-DDTHH:MM[:ss]" ou "YYYY-MM-DD" — interpretado no fuso local do servidor
+  return new Date(String(v).length === 10 ? String(v) + 'T12:00:00' : String(v).replace(' ', 'T'));
+}
+
+function toMemDate(v, kind) {
+  if (v == null) return v;
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  switch (kind) {
+    case 'ms': return d.getTime();
+    case 'iso': return d.toISOString();
+    case 'date':
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    default: // local
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+        'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+}
+
+function hhmmToTime(v) {
+  if (!v) return null;
+  return /^\d{2}:\d{2}$/.test(v) ? v + ':00' : v;
+}
+function timeToHHMM(v) {
+  if (!v) return null;
+  const s = String(v);
+  return s.length >= 5 ? s.slice(0, 5) : s;
+}
+function tagNum(v) { return v ? 1 : 0; }
+function tagBool(v) { return !!v; }
+
+/* Configuração por tabela (no formato memória) */
+const MAP = [
+  {
+    colecao: 'users', tabela: 'users', pk: 'id', encUsers: true, dateOut: 'local',
+    toPg: (u) => ({
+      id: u.id, role: u.role, name: u.name,
+      email: crypt.criptografar(u.email), email_hash: crypt.hashSHA256((u.email || '').toLowerCase()),
+      phone: crypt.criptografar(u.phone), phone_hash: crypt.hashSHA256(u.phone || ''),
+      verified: tagBool(u.verified),
+      prefs: knexJson(u.prefs || { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }),
+      consentimentos: knexJsonArr(u.consentimentos || []),
+      created_at: toPgDate(u.created_at), updated_at: toPgDate(u.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, role: r.role, name: r.name,
+      email: crypt.descriptografar(r.email), phone: crypt.descriptografar(r.phone),
+      verified: r.verified ? 1 : 0,
+      prefs: r.prefs || null,
+      consentimentos: (r.consentimentos && r.consentimentos.length) ? r.consentimentos : [],
+      created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'sessions', tabela: 'sessions', pk: 'id', dateOut: 'iso',
+    toPg: (s) => ({ id: s.id, user_id: s.user_id, token: s.token, expires_at: toPgDate(s.expires_at) }),
+    toMem: (r) => ({ id: r.id, user_id: r.user_id, token: r.token, expires_at: toMemDate(r.expires_at, 'iso') })
+  },
+  {
+    colecao: 'sms_codes', tabela: 'sms_codes', pk: 'id', dateOut: 'ms',
+    toPg: (c) => ({
+      id: c.id, ident: c.ident, phone: c.phone, code: c.code,
+      expires_at: toPgDate(c.expires_at), attempts: c.attempts || 0, used: tagBool(c.used),
+      next_allowed_at: toPgDate(c.next_allowed_at),
+      payload: knexJson(c.payload), created_at: toPgDate(c.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, ident: r.ident, phone: r.phone, code: r.code,
+      expires_at: toMemDate(r.expires_at, 'ms'), attempts: r.attempts, used: r.used ? 1 : 0,
+      next_allowed_at: toMemDate(r.next_allowed_at, 'ms'),
+      payload: r.payload || {}, created_at: r.created_at ? toMemDate(r.created_at, 'iso') : undefined
+    })
+  },
+  {
+    colecao: 'barbershops', tabela: 'barbershops', pk: 'id', dateOut: 'local',
+    toPg: (b) => ({
+      id: b.id, owner_user_id: b.owner_user_id || null, name: b.name, slug: b.slug,
+      description: b.description || '', phone: b.phone || '', whatsapp: b.whatsapp || '',
+      email: b.email || '', instagram: b.instagram || '', address: b.address || '',
+      city: b.city || '', uf: b.uf || '', lat: b.lat, lng: b.lng,
+      logo_url: b.logo_url, cover_url: b.cover_url,
+      tags: knexArr(b.tags || []),
+      rating_base: (b.ratingBase || 0), rating_count_base: (b.ratingCountBase || 0),
+      created_at: toPgDate(b.created_at) || new Date(), updated_at: toPgDate(b.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, owner_user_id: r.owner_user_id, name: r.name, slug: r.slug,
+      description: r.description, phone: r.phone, whatsapp: r.whatsapp, email: r.email,
+      instagram: r.instagram, address: r.address, city: r.city, uf: r.uf,
+      lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng),
+      logo_url: r.logo_url, cover_url: r.cover_url, tags: r.tags || [],
+      ratingBase: Number(r.rating_base || 0), ratingCountBase: Number(r.rating_count_base || 0),
+      created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
+    })
+  },
+  {
+    colecao: 'services', tabela: 'services', pk: 'id', dateOut: 'local',
+    toPg: (s) => ({
+      id: s.id, barbershop_id: s.barbershop_id, name: s.name, category: s.category || '',
+      description: s.description || '', duration_min: s.duration_min, price: s.price,
+      active: tagBool(s.active), sort_order: s.sort_order || 0,
+      created_at: toPgDate(s.created_at) || new Date(), updated_at: toPgDate(s.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, name: r.name, category: r.category,
+      description: r.description, duration_min: r.duration_min,
+      price: Number(r.price), active: r.active ? 1 : 0, sort_order: r.sort_order,
+      created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'professionals', tabela: 'professionals', pk: 'id', dateOut: 'local',
+    toPg: (p) => ({
+      id: p.id, barbershop_id: p.barbershop_id, user_id: p.user_id || null, name: p.name,
+      color: p.color || null, bio: p.bio || '', phone: p.phone || '',
+      is_active: tagBool(p.is_active),
+      created_at: toPgDate(p.created_at) || new Date(), updated_at: toPgDate(p.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, user_id: r.user_id, name: r.name,
+      color: r.color, bio: r.bio, phone: r.phone, is_active: r.is_active ? 1 : 0,
+      created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'professional_services', tabela: 'professional_services', pk: ['professional_id', 'service_id'],
+    toPg: (ps) => ({ professional_id: ps.professional_id, service_id: ps.service_id, price_override: ps.price_override }),
+    toMem: (r) => ({ professional_id: r.professional_id, service_id: r.service_id, price_override: r.price_override })
+  },
+  {
+    colecao: 'working_hours', tabela: 'working_hours', pk: 'id',
+    toPg: (w) => ({
+      id: w.id, barbershop_id: w.barbershop_id, professional_id: w.professional_id || null,
+      day_of_week: w.day_of_week, start_time: hhmmToTime(w.start_time), end_time: hhmmToTime(w.end_time),
+      lunch_start: hhmmToTime(w.lunch_start), lunch_end: hhmmToTime(w.lunch_end),
+      is_open: tagBool(w.is_open)
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, professional_id: r.professional_id,
+      day_of_week: r.day_of_week, start_time: timeToHHMM(r.start_time), end_time: timeToHHMM(r.end_time),
+      lunch_start: timeToHHMM(r.lunch_start), lunch_end: timeToHHMM(r.lunch_end),
+      is_open: r.is_open ? 1 : 0
+    })
+  },
+  {
+    colecao: 'schedule_exceptions', tabela: 'schedule_exceptions', pk: 'id', dateOut: 'local',
+    toPg: (e) => ({
+      id: e.id, barbershop_id: e.barbershop_id, professional_id: e.professional_id || null,
+      type: e.type, starts_at: toPgDate(e.starts_at), ends_at: toPgDate(e.ends_at), reason: e.reason
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, professional_id: r.professional_id,
+      type: r.type, starts_at: toMemDate(r.starts_at, 'local'), ends_at: toMemDate(r.ends_at, 'local'),
+      reason: r.reason
+    })
+  },
+  {
+    colecao: 'clients', tabela: 'clients', pk: 'id', dateOut: 'local',
+    toPg: (c) => ({
+      id: c.id, barbershop_id: c.barbershop_id, name: c.name, phone: c.phone || '',
+      email: c.email || '', notes: c.notes || '', total_visits: c.total_visits || 0,
+      total_spent: c.total_spent || 0, last_visit_at: toPgDate(c.last_visit_at), user_id: c.user_id || null,
+      created_at: toPgDate(c.created_at) || new Date(), updated_at: toPgDate(c.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, name: r.name, phone: r.phone, email: r.email,
+      notes: r.notes, total_visits: r.total_visits, total_spent: Number(r.total_spent || 0),
+      last_visit_at: toMemDate(r.last_visit_at, 'local'), user_id: r.user_id,
+      created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'plans', tabela: 'plans', pk: 'id', dateOut: 'iso',
+    toPg: (p) => ({
+      id: p.id, name: p.name, price_monthly: p.price_monthly, price_per_employee: p.price_per_employee || 0,
+      max_professionals: p.max_professionals, features: knexArr(p.features || []), active: tagBool(p.active),
+      created_at: toPgDate(p.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, name: r.name, price_monthly: Number(r.price_monthly), price_per_employee: Number(r.price_per_employee || 0),
+      max_professionals: r.max_professionals, features: r.features || [], active: r.active ? 1 : 0,
+      created_at: toMemDate(r.created_at, 'iso')
+    })
+  },
+  {
+    colecao: 'subscriptions', tabela: 'subscriptions', pk: 'id', dateOut: 'local',
+    toPg: (s) => ({
+      id: s.id, barbershop_id: s.barbershop_id, plan_id: s.plan_id, status: s.status,
+      trial_ends_at: toPgDate(s.trial_ends_at), current_period_end: toPgDate(s.current_period_end),
+      created_at: toPgDate(s.created_at) || new Date(), updated_at: toPgDate(s.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, plan_id: r.plan_id, status: r.status,
+      trial_ends_at: toMemDate(r.trial_ends_at, 'date'), current_period_end: toMemDate(r.current_period_end, 'date'),
+      created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
+    })
+  },
+  {
+    colecao: 'payments', tabela: 'payments', pk: 'id', dateOut: 'iso',
+    toPg: (p) => ({
+      id: p.id, barbershop_id: p.barbershop_id, plan_id: p.plan_id || null, amount_cents: p.amount_cents,
+      status: p.status || 'pending', provider: p.provider || 'demo', abacate_id: p.abacate_id,
+      br_code: p.br_code, qr_base64: p.qr_base64, dev_mode: tagBool(p.dev_mode),
+      created_at: toPgDate(p.created_at) || new Date(), expires_at: toPgDate(p.expires_at), paid_at: toPgDate(p.paid_at)
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, plan_id: r.plan_id, amount_cents: r.amount_cents,
+      status: r.status, provider: r.provider, abacate_id: r.abacate_id, br_code: r.br_code,
+      qr_base64: r.qr_base64, dev_mode: r.dev_mode ? 1 : 0,
+      created_at: toMemDate(r.created_at, 'iso'), expires_at: toMemDate(r.expires_at, 'iso'), paid_at: toMemDate(r.paid_at, 'iso')
+    })
+  },
+  {
+    colecao: 'appointments', tabela: 'appointments', pk: 'id', dateOut: 'local',
+    toPg: (a) => ({
+      id: a.id, barbershop_id: a.barbershop_id, client_id: a.client_id || null,
+      professional_id: a.professional_id || null, user_id: a.user_id || null,
+      client_name: a.client_name, client_phone: a.client_phone || '', client_email: a.client_email || '',
+      starts_at: toPgDate(a.starts_at), ends_at: toPgDate(a.ends_at), status: a.status, origin: a.origin || 'online',
+      price_total: a.price_total, cancellation_reason: a.cancellation_reason, notes: a.notes,
+      created_at: toPgDate(a.created_at) || new Date(), updated_at: toPgDate(a.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, client_id: r.client_id, professional_id: r.professional_id,
+      user_id: r.user_id, client_name: r.client_name, client_phone: r.client_phone, client_email: r.client_email,
+      starts_at: toMemDate(r.starts_at, 'local'), ends_at: toMemDate(r.ends_at, 'local'),
+      status: r.status, origin: r.origin, price_total: Number(r.price_total || 0),
+      cancellation_reason: r.cancellation_reason, notes: r.notes,
+      created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'appointment_services', tabela: 'appointment_services', pk: 'id',
+    toPg: (as) => ({
+      id: as.id, appointment_id: as.appointment_id, service_id: as.service_id,
+      name_snapshot: as.name_snapshot, price_snapshot: as.price_snapshot, duration_snapshot: as.duration_snapshot
+    }),
+    toMem: (r) => ({
+      id: r.id, appointment_id: r.appointment_id, service_id: r.service_id,
+      name_snapshot: r.name_snapshot, price_snapshot: Number(r.price_snapshot), duration_snapshot: r.duration_snapshot
+    })
+  },
+  {
+    colecao: 'reviews', tabela: 'reviews', pk: 'id', dateOut: 'local',
+    toPg: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, user_id: r.user_id || null, rating: r.rating,
+      comment: r.comment, created_at: toPgDate(r.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, user_id: r.user_id, rating: r.rating,
+      comment: r.comment, created_at: toMemDate(r.created_at, 'local')
+    })
+  },
+  {
+    colecao: 'gallery_images', tabela: 'gallery_images', pk: 'id', dateOut: 'iso',
+    toPg: (g) => ({
+      id: g.id, barbershop_id: g.barbershop_id, url: g.url, caption: g.caption,
+      sort_order: g.sort_order || 0, created_at: toPgDate(g.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, url: r.url, caption: r.caption,
+      sort_order: r.sort_order, created_at: toMemDate(r.created_at, 'iso')
+    })
+  },
+  {
+    colecao: 'notifications', tabela: 'notifications', pk: 'id', dateOut: 'iso',
+    toPg: (n) => ({
+      id: n.id, barbershop_id: n.barbershop_id || null, user_id: n.user_id || null,
+      type: n.type, title: n.title, message: n.message, read: tagBool(n.read),
+      created_at: toPgDate(n.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, user_id: r.user_id, type: r.type, title: r.title,
+      message: r.message, read: r.read ? 1 : 0, created_at: toMemDate(r.created_at, 'iso')
+    })
+  },
+  {
+    colecao: 'tickets', tabela: 'tickets', pk: 'id', dateOut: 'iso',
+    toPg: (t) => ({
+      id: t.id, salao_id: t.salao_id || null, user_id: t.user_id || null, subject: t.subject,
+      message: t.message, status: t.status || 'aberto',
+      created_at: toPgDate(t.created_at) || new Date(), updated_at: toPgDate(t.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, salao_id: r.salao_id, user_id: r.user_id, subject: r.subject, message: r.message,
+      status: r.status, created_at: toMemDate(r.created_at, 'iso')
+    })
+  },
+  {
+    colecao: 'magic_tokens', tabela: 'magic_tokens', pk: 'id', dateOut: 'iso',
+    toPg: (m) => ({
+      id: m.id, token: m.token, user_id: m.user_id || null, email: m.email || null,
+      expires_at: toPgDate(m.expires_at), used: tagBool(m.used), created_at: toPgDate(m.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, token: r.token, user_id: r.user_id, email: r.email,
+      expires_at: toMemDate(r.expires_at, 'iso'), used: r.used ? 1 : 0, created_at: toMemDate(r.created_at, 'iso')
+    })
+  },
+  {
+    colecao: 'superadmin_sessions', tabela: 'superadmin_sessions', pk: 'id', dateOut: 'iso',
+    toPg: (s) => ({
+      id: s.id, token: s.token, email: s.email, created_at: toPgDate(s.created_at) || new Date(), expires_at: toPgDate(s.expires_at)
+    }),
+    toMem: (r) => ({
+      id: r.id, token: r.token, email: r.email, created_at: toMemDate(r.created_at, 'iso'), expires_at: toMemDate(r.expires_at, 'iso')
+    })
+  }
+];
+
+/* helpers de serialização JSON/array para tipos PG */
+function knexJson(v) { return (v == null) ? null : JSON.stringify(v); }
+function knexJsonArr(arr) {
+  // JSONB[] (array de objetos) — array de JSON strings; o writer monta ARRAY[...]::jsonb[]
+  return (arr || []).map(x => (typeof x === 'string' ? x : JSON.stringify(x)));
+}
+function knexArr(arr) { return arr || []; }
+
+/* Tipos SQL por coluna para casts explícitos no upsert.
+   Colunas não listadas são tratadas como texto/valor simples. */
+const CASTS = {
+  users: { role: 'usr_role', prefs: 'jsonb', consentimentos: 'jsonb[]', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  sessions: { user_id: 'uuid', expires_at: 'timestamptz', created_at: 'timestamptz' },
+  sms_codes: { expires_at: 'timestamptz', next_allowed_at: 'timestamptz', created_at: 'timestamptz', payload: 'jsonb' },
+  barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  services: { barbershop_id: 'uuid', price: 'numeric', duration_min: 'int', sort_order: 'int', updated_at: 'timestamptz', created_at: 'timestamptz' },
+  professionals: { barbershop_id: 'uuid', user_id: 'uuid', is_active: 'boolean', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  professional_services: { professional_id: 'uuid', service_id: 'uuid', price_override: 'numeric' },
+  working_hours: { barbershop_id: 'uuid', professional_id: 'uuid', day_of_week: 'int', start_time: 'time', end_time: 'time', lunch_start: 'time', lunch_end: 'time', is_open: 'boolean' },
+  schedule_exceptions: { barbershop_id: 'uuid', professional_id: 'uuid', type: 'exc_tipo', starts_at: 'timestamptz', ends_at: 'timestamptz' },
+  clients: { barbershop_id: 'uuid', user_id: 'uuid', total_spent: 'numeric', last_visit_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  plans: { max_professionals: 'int', features: 'text[]', price_monthly: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
+  subscriptions: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'sub_status', trial_ends_at: 'timestamptz', current_period_end: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
+  appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  appointment_services: { appointment_id: 'uuid', service_id: 'uuid', price_snapshot: 'numeric' },
+  reviews: { barbershop_id: 'uuid', user_id: 'uuid', rating: 'int', created_at: 'timestamptz' },
+  gallery_images: { barbershop_id: 'uuid', sort_order: 'int', created_at: 'timestamptz' },
+  notifications: { barbershop_id: 'uuid', user_id: 'uuid', read: 'boolean', created_at: 'timestamptz' },
+  tickets: { salao_id: 'uuid', user_id: 'uuid', status: 'tik_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  magic_tokens: { user_id: 'uuid', used: 'boolean', expires_at: 'timestamptz', created_at: 'timestamptz' },
+  superadmin_sessions: { expires_at: 'timestamptz', created_at: 'timestamptz' }
+};
+
+const BY_COLECAO = {};
+MAP.forEach(m => { BY_COLECAO[m.colecao] = m; });
+// 'favorites' não é uma tabela no schema (22 tabelas) — mantido só em memória
+BY_COLECAO.favorites = null;
+
+module.exports = { MAP, BY_COLECAO, CASTS, toPgDate, toMemDate };

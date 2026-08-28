@@ -7,7 +7,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
-  const lojaId = Number(params.get('id') || 0);
+  const lojaId = params.get('id') || '';
 
   let loja;
   try { loja = API.getLoja(lojaId); }

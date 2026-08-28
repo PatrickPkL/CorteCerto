@@ -205,7 +205,7 @@ window.API = (function () {
     db.subscriptions = db.subscriptions.filter(s => s.barbershop_id !== shop.id);
     db.reviews = db.reviews.filter(r => r.barbershop_id !== shop.id);
     db.clients = db.clients.filter(c => c.barbershop_id !== shop.id);
-    db.tickets = db.tickets.filter(t => t.salaoId !== shop.id);
+    db.tickets = db.tickets.filter(t => t.salao_id !== shop.id);
     db.barbershops = db.barbershops.filter(b => b.id !== shop.id);
   }
 
@@ -574,8 +574,8 @@ window.API = (function () {
       if (!existente) {
         if (!aberto) continue;
         db.working_hours.push({
-          id: DB.proximoId(), barbershop_id: Number(shopId), professional_id: profId,
-          day_of_week: dow,
+id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
+      day_of_week: dow,
           start_time: inicio, end_time: fim,
           lunch_start: lunchStart || null, lunch_end: lunchEnd || null,
           is_open: aberto
@@ -690,7 +690,7 @@ window.API = (function () {
     db.professional_services = db.professional_services.filter(ps => ps.professional_id !== profId);
     serviceIds.forEach(sid => {
       if (!db.services.some(s => s.id == sid)) return;
-      db.professional_services.push({ professional_id: profId, service_id: Number(sid), price_override: null });
+      db.professional_services.push({ professional_id: profId, service_id: sid, price_override: null });
     });
   }
 
@@ -1055,7 +1055,7 @@ window.API = (function () {
     }
     c = {
       id: DB.proximoId(),
-      barbershop_id: Number(shopId),
+      barbershop_id: shopId,
       name: dados.client_name,
       phone: tel,
       email: dados.client_email || '',
@@ -1111,8 +1111,8 @@ window.API = (function () {
 
     /* duração = soma dos serviços | informado | 30 (RF-039.2) */
     const idsServicos = Array.isArray(payload.service_ids) && payload.service_ids.length
-      ? payload.service_ids.map(Number)
-      : (payload.service_id ? [Number(payload.service_id)] : []);
+      ? payload.service_ids.map(String)
+      : (payload.service_id ? [String(payload.service_id)] : []);
     const svcs = idsServicos
       .map(id => db.services.find(s => s.id == id && s.barbershop_id == shop.id))
       .filter(Boolean);
@@ -1121,7 +1121,7 @@ window.API = (function () {
       : clampInt(payload.duration_min, 5, 600, 30);
 
     /* profissional informado ou primeiro ativo (RF-039.3) */
-    let profId = payload.professional_id ? Number(payload.professional_id) : null;
+    let profId = payload.professional_id ? String(payload.professional_id) : null;
     if (profId) {
       const p = db.professionals.find(p => p.id == profId && p.barbershop_id == shop.id && p.is_active);
       if (!p) profId = null;
@@ -1149,7 +1149,8 @@ window.API = (function () {
     const precoTotal = svcs.reduce((acc, s) => {
       const link = db.professional_services.find(ps =>
         ps.professional_id === profId && ps.service_id === s.id);
-      return acc + ((link && link.price_override != null) ? link.price_override : s.price);
+      const p = (link && link.price_override != null) ? link.price_override : s.price;
+      return acc + Number(p);
     }, 0);
 
     const ag = {
@@ -1193,25 +1194,25 @@ window.API = (function () {
 
     /* notificar dono da loja por e-mail */
     try {
-      var lojaRef = (db.barbershops || []).find(function(b) { return b.id === agendamento.barbershop_id; });
+      var lojaRef = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
       if (lojaRef && lojaRef.owner_email) {
-        var cliRef = (db.users || []).find(function(u) { return u.id === agendamento.user_id; });
+        var cliRef = (db.users || []).find(function(u) { return u.id === ag.user_id; });
         Mailer.enviarNovoAgendamento(lojaRef.owner_email, {
-          clienteNome: (cliRef && cliRef.name) || 'Cliente',
+          clienteNome: (cliRef && cliRef.name) || clientName,
           salaoNome: lojaRef.name,
-          servicos: agendamento.services || [],
-          data: agendamento.date,
-          hora: agendamento.time
+          servicos: svcs.map(function(s) { return s.name; }),
+          data: DB.fmtDataBR(date),
+          hora: hora
         }).catch(function() {});
       }
       /* confirmar para o cliente por e-mail */
-      var cliRef2 = (db.users || []).find(function(u) { return u.id === agendamento.user_id; });
+      var cliRef2 = (db.users || []).find(function(u) { return u.id === ag.user_id; });
       if (cliRef2 && cliRef2.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliRef2.email)) {
         Mailer.enviarConfirmacaoAgendamento(cliRef2.email, {
           salaoNome: lojaRef ? lojaRef.name : 'Seu salão',
-          servicos: agendamento.services || [],
-          data: agendamento.date,
-          hora: agendamento.time,
+          servicos: svcs.map(function(s) { return s.name; }),
+          data: DB.fmtDataBR(date),
+          hora: hora,
           clienteNome: cliRef2.name
         }).catch(function() {});
       }
@@ -1358,7 +1359,7 @@ window.API = (function () {
         if (!/^\d{2}:\d{2}$/.test(novaHora)) err(400, 'Horário inválido.');
       }
       if (patch.professional_id !== undefined && ehEquipe) {
-        const pid = patch.professional_id ? Number(patch.professional_id) : null;
+        const pid = patch.professional_id ? String(patch.professional_id) : null;
         if (pid) {
           const p = db.professionals.find(x => x.id == pid && x.barbershop_id === ag.barbershop_id);
           if (!p) err(400, 'Profissional inválido para esta loja.');
@@ -2189,7 +2190,7 @@ window.API = (function () {
     }
     db.favorites.push({
       id: DB.proximoId(), user_id: user.id,
-      barbershop_id: Number(shopId), created_at: agoraISO()
+      barbershop_id: shopId, created_at: agoraISO()
     });
     DB.salvar();
     return { favorito: true };
@@ -2214,11 +2215,13 @@ window.API = (function () {
     const user = sessao();
     const t = {
       id: DB.proximoId(),
-      salaoId: Number(salaoId),
-      assunto: assunto || 'Outro',
-      mensagem: (mensagem || '').trim(),
+      salao_id: String(salaoId),
+      user_id: user.id,
+      subject: String(assunto || 'Outro'),
+      message: String(mensagem || '').trim(),
       status: 'aberto',
-      criadoEm: DB.hojeISO()
+      created_at: agoraISO(),
+      updated_at: agoraISO()
     };
     DB._d().tickets.push(t);
     DB.salvar();
@@ -2226,7 +2229,7 @@ window.API = (function () {
   }
 
   function ticketsDoSalao(salaoId) {
-    return DB._d().tickets.filter(t => t.salaoId == salaoId).slice().reverse();
+    return DB._d().tickets.filter(t => t.salao_id == salaoId).slice().reverse();
   }
 
   function nomeLoja(id) {
@@ -2398,8 +2401,17 @@ window.API = (function () {
     criarAgendamento, listarAgendamentos, atualizarAgendamento,
     excluirAgendamento, meusAgendamentos, agendamentoPublico,
     getAgendamento: id => {
+      const user = sessao();
       const a = DB._d().appointments.find(x => x.id == id);
-      return a ? agendamentoPublico(a) : err(404, 'Agendamento não encontrado.');
+      if (!a) err(404, 'Agendamento não encontrado.');
+      const lojaAg = DB._d().barbershops.find(b => b.id === a.barbershop_id);
+      const ehEquipe = !!lojaAg && (
+        lojaAg.owner_user_id === user.id ||
+        (user.role === 'barbeiro' && (Auth.salaoDoUsuario(user) || {}).id === lojaAg.id)
+      );
+      const ehCliente = a.user_id === user.id;
+      if (!ehEquipe && !ehCliente) err(403, 'Você não tem permissão sobre este agendamento.');
+      return agendamentoPublico(a);
     },
 
     // clientes
