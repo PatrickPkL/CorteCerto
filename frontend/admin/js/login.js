@@ -1,8 +1,8 @@
 /* ============================================================
    Corte Certo – admin/js/login.js
-   Autenticação por telefone OU e-mail + código de verificação
-   (RF-001..005, DT-13). Requer db.js, auth.js, local-api.js e
-   shared.js antes.
+   Login por E-MAIL + código de verificação; recuperação de
+   acesso por telefone OU e-mail (RF-001..005, DT-13).
+   Requer db.js, auth.js, local-api.js e shared.js antes.
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function mostrarPapel(papel) {
     roleBtns.forEach(b => b.classList.toggle('active', b.dataset.role === papel));
+    const pr = document.getElementById('painel-recuperar');
+    if (pr) pr.style.display = 'none';
     if (painelCliente) painelCliente.style.display = papel === 'cliente' ? '' : 'none';
     if (painelDono) painelDono.style.display = papel === 'dono' ? '' : 'none';
     voltarAoInicio();
@@ -50,36 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const infoFone = document.getElementById('codigo-info');
   const inputCodigo = document.getElementById('input-codigo');
 
-  let fluxo = null; // {phone, payload}
-
-  function voltarAoInicio() {
-    if (etapaCodigo) etapaCodigo.style.display = 'none';
-    fluxo = null;
-    if (inputCodigo) inputCodigo.value = '';
-  }
-
-  function mostrarEtapaCodigo(res) {
-    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
-      f.style.display = 'none';
-    });
-    if (bannerCodigo) {
-      bannerCodigo.hidden = false;
-      bannerCodigo.innerHTML =
-        '<strong>Código enviado!</strong> ' +
-        'Verifique seu telefone ou e-mail para o código de verificação.';
-    }
-    if (infoFone) {
-      infoFone.textContent = 'Digite o código de 6 dígitos enviado para ' +
-        String(fluxo.phone || '').trim() + '.';
-    }
-    if (etapaCodigo) etapaCodigo.style.display = '';
-    if (inputCodigo) inputCodigo.focus();
-  }
+  let fluxo = null; // {ident, payload}
 
   async function pedirCodigo(payload) {
     try {
       const res = Auth.requestCode(payload);
-      fluxo = { phone: payload.phone, payload };
+      fluxo = { ident: payload.phone, payload };
       mostrarEtapaCodigo(res);
     } catch (e) {
       showToast(msgErro(e), 'error');
@@ -89,13 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
   /* entrada */
   document.getElementById('form-cli-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    var payload = {
-      phone: document.getElementById('cli-tel').value,
+    pedirCodigo({
+      phone: document.getElementById('cli-email-login').value,
       modo: 'login'
-    };
-    var emailCli = document.getElementById('cli-email-login');
-    if (emailCli && emailCli.value.trim()) payload.email = emailCli.value.trim();
-    pedirCodigo(payload);
+    });
   });
 
   document.getElementById('form-cli-cadastro')?.addEventListener('submit', (e) => {
@@ -113,9 +88,31 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('form-dono-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
     pedirCodigo({
-      phone: document.getElementById('dono-tel').value,
+      phone: document.getElementById('dono-email-login').value,
       modo: 'login'
     });
+  });
+
+  /* recuperar acesso */
+  document.getElementById('form-recuperar')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    pedirCodigo({
+      phone: document.getElementById('recup-ident').value,
+      modo: 'recuperar'
+    });
+  });
+
+  document.getElementById('link-cli-recuperar')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    abrirRecuperar();
+  });
+  document.getElementById('link-dono-recuperar')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    abrirRecuperar();
+  });
+  document.getElementById('btn-voltar-recuperar')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    fecharRecuperar();
   });
 
   document.getElementById('form-dono-cadastro')?.addEventListener('submit', (e) => {
@@ -136,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     if (!fluxo) return;
     try {
-      const r = Auth.verifyCode(fluxo.phone, inputCodigo.value);
+      const r = Auth.verifyCode(fluxo.ident, inputCodigo.value);
       showToast(r.user.role === 'dono'
         ? 'Bem-vindo de volta, ' + r.user.name.split(' ')[0] + '!'
         : 'Login realizado com sucesso!');
@@ -158,6 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-voltar-login')?.addEventListener('click', (e) => {
     e.preventDefault();
     voltarAoInicio();
+    const pr = document.getElementById('painel-recuperar');
+    if (pr) pr.style.display = 'none';
     roleBtns.forEach(b => {
       if (b.classList.contains('active')) mostrarPapel(b.dataset.role);
     });

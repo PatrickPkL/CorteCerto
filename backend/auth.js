@@ -173,6 +173,7 @@ window.Auth = (function () {
     const db = DB._d();
     const ident = normalizarIdentidade(dados && dados.phone);
     const porEmail = ehEmail(ident);
+    const modo = String(dados && dados.modo || '');
 
     if (porEmail) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ident)) {
@@ -187,13 +188,22 @@ window.Auth = (function () {
 
     const existente = usuarioPorIdentidade(db, ident);
 
-    if (dados.modo === 'login') {
+    if (modo === 'login') {
+      /* Login é feito SOMENTE por e-mail; telefone fica para a recuperação. */
+      if (!porEmail) {
+        throw { status: 400, error: 'Para entrar, use seu e-mail. Esqueceu o acesso? Use a opção "Recuperar acesso".' };
+      }
+      if (!existente) {
+        throw { status: 404, error: 'E-mail não cadastrado. Verifique o e-mail ou crie uma conta.' };
+      }
+    } else if (modo === 'recuperar') {
+      /* Recuperação de acesso: telefone OU e-mail (o usuário deve existir). */
       if (!existente) {
         throw { status: 404, error: porEmail
-          ? 'E-mail não cadastrado. Verifique o e-mail ou entre pelo telefone.'
-          : 'Número não cadastrado. Crie uma conta.' };
+          ? 'E-mail não encontrado. Verifique o e-mail cadastrado.'
+          : 'Número não cadastrado. Verifique o telefone.' };
       }
-    } else if (dados.modo === 'registro') {
+    } else if (modo === 'registro') {
       if (porEmail) throw { status: 400, error: 'O cadastro é feito por telefone. Use a opção Entrar com e-mail.' };
       if (existente) throw { status: 409, error: 'Número já cadastrado. Faça login.' };
       const nome = String(dados.name || '').trim();
@@ -205,7 +215,7 @@ window.Auth = (function () {
         throw { status: 400, error: 'Informe o nome do salão.' };
       }
     } else {
-      throw { status: 400, error: 'Modo inválido (use login ou registro).' };
+      throw { status: 400, error: 'Modo inválido (use login, registro ou recuperar).' };
     }
 
     // limpa códigos usados/expirados da mesma identidade
@@ -232,7 +242,7 @@ window.Auth = (function () {
             salon_name: String(dados.salon_name || '').trim(),
             aceite_privacidade: !!(dados.aceite_privacidade || dados.aceiteTermos || dados.termosAceitos || dados.termsAccepted)
           }
-        : { modo: 'login' },
+        : { modo: dados.modo === 'recuperar' ? 'recuperar' : 'login' },
       created_at: new Date().toISOString()
     };
     db.sms_codes.push(registro);

@@ -33,7 +33,7 @@
       </div>
 
       <div class="demo-hint">
-        <strong>Demo:</strong> informe seu telefone com DDD e receba um código de verificação por SMS.
+        <strong>Demo:</strong> informe seu e-mail e receba um código de verificação.
         Em modo de demonstração o código aparece direto na tela.
       </div>
 
@@ -46,14 +46,13 @@
 
         <form id="form-cli-login">
           <div class="field">
-            <label for="cli-tel">Telefone (com DDD)</label>
-            <input type="tel" id="cli-tel" placeholder="(71) 99999-0000" required>
-          </div>
-          <div class="field">
-            <label for="cli-email-login">E-mail <span style="opacity:.5;font-size:.85em">(opcional — para receber link mágico)</span></label>
-            <input type="email" id="cli-email-login" placeholder="seu@email.com">
+            <label for="cli-email-login">E-mail</label>
+            <input type="email" id="cli-email-login" placeholder="voce@email.com" required autocomplete="email">
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <p style="text-align:center; margin-top:12px; font-size:13px;">
+            <a href="#" id="link-cli-recuperar" style="color:var(--brass);">Esqueceu o acesso? Recuperar</a>
+          </p>
         </form>
 
         <form id="form-cli-cadastro" style="display:none;">
@@ -87,10 +86,13 @@
 
         <form id="form-dono-login">
           <div class="field">
-            <label for="dono-tel">Telefone ou e-mail</label>
-            <input type="text" id="dono-tel" placeholder="(71) 99999-0000 · voce@email.com" required>
+            <label for="dono-email-login">E-mail</label>
+            <input type="email" id="dono-email-login" placeholder="contato@seusalao.com.br" required autocomplete="email">
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <p style="text-align:center; margin-top:12px; font-size:13px;">
+            <a href="#" id="link-dono-recuperar" style="color:var(--brass);">Esqueceu o acesso? Recuperar</a>
+          </p>
         </form>
 
         <form id="form-dono-cadastro" style="display:none;">
@@ -116,6 +118,25 @@
             e os <a href="../public/termos.html" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
           </label>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta do salão</button>
+        </form>
+      </div>
+
+      <!-- RECUPERAR ACESSO (telefone OU e-mail) -->
+      <div id="painel-recuperar" style="display:none;">
+        <h3 class="section-title" style="margin-bottom:8px;">Recuperar acesso</h3>
+        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
+          Informe o telefone ou o e-mail cadastrado. Enviaremos um código para
+          recuperar seu acesso.
+        </p>
+        <form id="form-recuperar">
+          <div class="field">
+            <label for="recup-ident">Telefone ou e-mail cadastrado</label>
+            <input type="text" id="recup-ident" placeholder="(71) 99999-0000 · voce@email.com" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Enviar código de recuperação</button>
+          <p style="text-align:center; margin-top:14px; font-size:13.5px;">
+            <a href="#" id="btn-voltar-recuperar" style="color:var(--brass);">Voltar</a>
+          </p>
         </form>
       </div>
 
