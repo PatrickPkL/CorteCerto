@@ -1746,10 +1746,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   /* ================= BUSCA PÚBLICA (RF-050..054) ================= */
 
+  const TIPOS_BUSCA = ['all', 'shops', 'services', 'professionals'];
+
   function buscar(params) {
     params = params || {};
     const db = DB._d();
-    const tipo = params.type || 'all';
+    /* Resultado de coleção é SEMPRE um enum fixo — nunca o nome de uma
+       tabela/coleção vindo do cliente (NT: evita vazar dados alheios) */
+    const tipo = String(params.type || params.tipo || 'all').toLowerCase();
+    if (!TIPOS_BUSCA.includes(tipo)) {
+      throw { status: 400, error: 'Tipo de busca inválido.' };
+    }
     const q = String(params.q || '').toLowerCase().trim();
     const cidade = params.city ? String(params.city).toLowerCase() : '';
     const uf = params.uf ? String(params.uf).toUpperCase() : '';
@@ -2284,11 +2291,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* ================= SUPORTE (página extra mantida) ================= */
 
   function criarTicket(salaoId, assunto, mensagem) {
-    const user = sessao();
+    const u = sessao();
+    const loja = DB._d().barbershops.find(b => b.id == salaoId);
+    if (!loja) err(404, 'Salão não encontrado.');
+    /* IDOR: só dono/equipe da própria loja abre chamado daquela loja */
+    const naEquipe = loja.owner_user_id === u.id ||
+      (u.role === 'barbeiro' && Auth.salaoDoUsuario(u) && Auth.salaoDoUsuario(u).id === loja.id);
+    if (!naEquipe) err(403, 'Você só pode abrir chamados da sua própria loja.');
     const t = {
       id: DB.proximoId(),
       salao_id: String(salaoId),
-      user_id: user.id,
+      user_id: u.id,
       subject: String(assunto || 'Outro'),
       message: String(mensagem || '').trim(),
       status: 'aberto',
@@ -2301,6 +2314,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function ticketsDoSalao(salaoId) {
+    const u = sessao();
+    const loja = DB._d().barbershops.find(b => b.id == salaoId);
+    if (!loja) err(404, 'Salão não encontrado.');
+    /* IDOR: equipe só lê chamados da própria loja */
+    const naEquipe = loja.owner_user_id === u.id ||
+      (u.role === 'barbeiro' && Auth.salaoDoUsuario(u) && Auth.salaoDoUsuario(u).id === loja.id);
+    if (!naEquipe) err(403, 'Você só pode ver chamados da sua própria loja.');
     return DB._d().tickets.filter(t => t.salao_id == salaoId).slice().reverse();
   }
 
