@@ -18,6 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     logo.replaceWith(marca);
   });
 
+  /* logo do hero: se a imagem faltar, esconde */
+  document.querySelectorAll('img.hero-logo').forEach(img => {
+    img.addEventListener('error', () => { img.style.display = 'none'; });
+  });
+
   /* respeita quem prefere menos movimento */
   const reduz = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const T_ENTRA = reduz ? 0 : 900;   // fade-in da logo

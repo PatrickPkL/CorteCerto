@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Super Admin · Corte Certo</title>
-<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
 <style>
@@ -120,65 +120,7 @@
 </div>
 
 <script src="../shared/js/shared.js"></script>
-<script>
-(function () {
-  if (localStorage.getItem('cc_superadmin_token')) {
-    window.location.href = 'index.html';
-    return;
-  }
-
-  var form = document.getElementById('sa-login-form');
-  var btn = document.getElementById('sa-btn-entrar');
-  var erroEl = document.getElementById('sa-error-msg');
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var email = document.getElementById('sa-email').value.trim();
-    var senha = document.getElementById('sa-senha').value;
-
-    if (!email || !senha) {
-      erroEl.textContent = 'Preencha todos os campos.';
-      erroEl.style.display = 'block';
-      return;
-    }
-
-    erroEl.style.display = 'none';
-    btn.disabled = true;
-    btn.textContent = 'Entrando...';
-
-    fetch('/api/super-admin/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email, senha: senha })
-    })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        if (data.error) {
-          erroEl.textContent = data.error;
-          erroEl.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Entrar';
-          return;
-        }
-        if (data.token) {
-          localStorage.setItem('cc_superadmin_token', data.token);
-          window.location.href = 'index.html';
-        } else {
-          erroEl.textContent = 'Resposta inválida do servidor.';
-          erroEl.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Entrar';
-        }
-      })
-      .catch(function () {
-        erroEl.textContent = 'Erro de conexão. Tente novamente.';
-        erroEl.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Entrar';
-      });
-  });
-})();
-</script>
+<script src="js/sa-login.js"></script>
 
 </body>
 </html>

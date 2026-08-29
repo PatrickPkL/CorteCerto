@@ -49,6 +49,23 @@ const MIME = {
   '.map': 'application/json'
 };
 
+/* Cabeçalhos de segurança aplicados a TODAS as respostas (RNF-14) */
+function headersPadrao(extra) {
+  const base = {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'X-XSS-Protection': '1; mode=block',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Content-Security-Policy':
+      "default-src 'self'; script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; " +
+      "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; " +
+      "base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+  };
+  return Object.assign(base, extra || {});
+}
+
 function json(res, status, obj) {
   const corpo = JSON.stringify(obj);
   res.writeHead(status, {
@@ -99,6 +116,57 @@ const _authRequired = new Set([
 
 /* ---------------- RPC ---------------- */
 
+/* Allowlist do RPC: apenas métodos PROPRIEDADES PRÓPRIAS do API/Auth
+   (nunca herdadas do protótipo — elimina `constructor`, `__proto__`
+   etc.). Bloqueia ainda internos e todo o super-admin, que tem rotas
+   REST próprias com needAuth() + rate-limit. */
+const _RPC_BLOQUEADOS = new Set([
+  'err', '_auditLog', 'processarEventoWebhook',
+  'superAdminLogin', 'superAdminAuth', 'superAdminLogout',
+  'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
+  'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios'
+]);
+const _RPC_AUTH_PUBLICOS = new Set([
+  'requestCode', 'reenviarCodigo', 'verifyCode', 'logout'
+]);
+const _RPC_API = new Set();
+Object.keys(API).forEach(nome => {
+  if (_RPC_BLOQUEADOS.has(nome)) return;
+  if (nome.charCodeAt(0) === 95) return; // _-prefixo = interno
+  if (!Object.prototype.hasOwnProperty.call(API, nome)) return;
+  if (typeof API[nome] !== 'function') return;
+  _RPC_API.add(nome);
+});
+
+/* Métodos públicos do Bot (atendente + chat do site) expostos via RPC.
+   Mesmo critério da allowlist de API: nenhum `_`-prefixo, nenhum interno. */
+const _RPC_BOT = new Set();
+Object.keys(Bot).forEach(nome => {
+  if (nome.charCodeAt(0) === 95) return;
+  if (!Object.prototype.hasOwnProperty.call(Bot, nome)) return;
+  if (typeof Bot[nome] !== 'function') return;
+  _RPC_BOT.add(nome);
+});
+
+/* Rejeita chaves perigosas em payloads aninhados (defesa em
+   profundidade contra prototype pollution via dados mesclados). */
+function sanitizarParams(v, profundidade) {
+  if (profundidade > 12) return undefined;
+  if (Array.isArray(v)) {
+    return v.map(x => sanitizarParams(x, profundidade + 1))
+            .filter(x => x !== undefined);
+  }
+  if (v && typeof v === 'object' && v.constructor === Object) {
+    const limpo = {};
+    for (const chave of Object.keys(v)) {
+      if (chave === '__proto__' || chave === 'prototype' || chave === 'constructor') continue;
+      limpo[chave] = sanitizarParams(v[chave], profundidade + 1);
+    }
+    return limpo;
+  }
+  return v;
+}
+
 function handleRpc(req, res) {
   /* rate-limit por IP */
   const ip = req.socket.remoteAddress || '0.0.0.0';
@@ -131,13 +199,25 @@ function handleRpc(req, res) {
     if (!metodo) {
       return json(res, 400, { ok: false, error: 'Requisição inválida.' });
     }
-    // métodos de sessão vivem em Auth; o resto, em API
-    const fn = typeof API[metodo] === 'function' ? API[metodo]
-      : (typeof Auth[metodo] === 'function' ? Auth[metodo]
-        : (typeof Bot[metodo] === 'function' ? Bot[metodo] : null));
-    if (!fn) {
-      return json(res, 400, { ok: false, error: 'Requisição inválida.' });
+    /* Allowlist estrita: só métodos próprios e aprovados. Métodos
+       inexistentes/não permitidos respondem 401 idêntico ao de sessão
+       inválida — impede enumeração de métodos pelo erro. A allowlist
+       cobre API, métodos públicos de Auth e o Bot (chat + painel). */
+    let fn = null;
+    if (_RPC_API.has(metodo) && typeof API[metodo] === 'function') {
+      fn = API[metodo];
+    } else if (_RPC_AUTH_PUBLICOS.has(metodo) && typeof Auth[metodo] === 'function') {
+      fn = Auth[metodo];
+    } else if (_RPC_BOT.has(metodo) && typeof Bot[metodo] === 'function') {
+      fn = Bot[metodo];
     }
+    if (!fn) {
+      return json(res, 401, { ok: false, status: 401, error: 'Não autorizado.' });
+    }
+
+    /* argumentos: apenas array; qualquer outra forma é rejeitada.
+       Sanitiza __proto__/prototype/constructor em payloads aninhados. */
+    const argList = Array.isArray(args) ? args.map(a => sanitizarParams(a, 0)) : [];
 
     /* segunda camada: métodos autenticados exigem token válido */
     if (_authRequired.has(metodo)) {
@@ -177,7 +257,7 @@ function handleRpc(req, res) {
     }
 
     try {
-      const dados = fn.apply(null, Array.isArray(args) ? args : []);
+      const dados = fn.apply(null, argList);
       /* função assíncrona: resolve a resposta fora daqui — sem isso,
          uma Promise rejeitada seria serializada como {} com status 200 */
       if (dados && typeof dados.then === 'function') {
@@ -431,29 +511,22 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
   if (req.method === 'GET' && pathname === '/health') {
     return void (async () => {
-      let db = null;
-      let err = null;
+      let ok = false;
       try {
         const { knex } = require('./backend/pool');
-        const r = await knex.raw(
-          'SELECT current_database() AS db, now() AS ts, 1 AS ok'
-        );
-        const linha = (r && r.rows && r.rows[0]) || {};
-        db = { database: linha.db || null, ok: linha.ok === 1 };
-      } catch (e) { err = e.message || 'erro'; }
-      if (db && db.ok) {
-        json(res, 200, { ok: true, status: 'up', postgres: db });
-      } else {
-        json(res, 503, { ok: false, status: 'down', error: err || 'banco indisponível' });
-      }
+        const r = await knex.raw('SELECT 1 AS ok');
+        ok = !!(r && r.rows && r.rows[0] && r.rows[0].ok === 1);
+      } catch (e) { ok = false; }
+      /* resposta mínima — sem versão/stack/nome de servidor */
+      json(res, ok ? 200 : 503, { ok });
     })();
   }
   /* magic-link */
   if (req.method === 'GET' && url.pathname === '/magic-link') {
     const tk = url.searchParams.get('token');
-    if (!tk) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Token ausente.'); }
-    const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Certo...</p><script>\nvar params = new URLSearchParams(location.search);\nvar tk = params.get(\'token\');\nif (tk) { localStorage.setItem(\'cc_magic_token\', tk); }\nlocation.href = \'../admin/\';\n</script></body></html>';
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' });
+    if (!tk) { res.writeHead(400, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' })); return res.end('Token ausente.'); }
+    const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Certo...</p><script src="../shared/js/magic-link.js"></script></body></html>';
+    res.writeHead(200, headersPadrao({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' }));
     return res.end(html);
   }
   /* super-admin routes */

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seus Direitos (LGPD) · Corte Certo</title>
-<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/components.css">
 <style>
@@ -59,7 +59,7 @@
     <label for="lgpd-descricao">Descrição da solicitação *</label>
     <textarea id="lgpd-descricao" placeholder="Descreva detalhadamente sua solicitação..." required></textarea>
 
-    <button id="lgpd-enviar" onclick="enviarSolicitacao()">Enviar solicitação</button>
+    <button id="lgpd-enviar" type="button">Enviar solicitação</button>
   </div>
 
   <div class="lgpd-success" id="lgpd-sucesso">
@@ -74,40 +74,9 @@
     <strong>DPO:</strong> <a href="mailto:dpo@cortecerto.com">dpo@cortecerto.com</a>
   </p>
 </div>
-<script>
-function enviarSolicitacao() {
-  var nome = document.getElementById('lgpd-nome').value.trim();
-  var email = document.getElementById('lgpd-email').value.trim();
-  var telefone = document.getElementById('lgpd-telefone').value.trim();
-  var tipo = document.getElementById('lgpd-tipo').value;
-  var descricao = document.getElementById('lgpd-descricao').value.trim();
-  var btn = document.getElementById('lgpd-enviar');
-
-  if (!nome || !email || !tipo || !descricao) {
-    alert('Preencha todos os campos obrigatórios.');
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    alert('E-mail inválido.');
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Enviando...';
-
-  var protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
-
-  /* Em produção, isso enviaria um e-mail para dpo@cortecerto.com via backend.
-     Por agora, registra no console e mostra sucesso. */
-  console.log('[LGPD] Solicitação recebida:', { protocolo: protocolo, nome: nome, email: email, telefone: telefone, tipo: tipo, descricao: descricao });
-
-  document.getElementById('lgpd-form').style.display = 'none';
-  document.getElementById('lgpd-sucesso').style.display = 'block';
-  document.getElementById('lgpd-protocolo').textContent = 'Protocolo: ' + protocolo;
-}
-</script>
 <script src="../shared/js/api.js"></script>
 <script src="../shared/js/shared.js"></script>
+<script src="js/lgpd.js"></script>
 <script src="js/chatbot.js"></script>
 </body>
 </html>

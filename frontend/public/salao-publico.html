@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Barbearia · Corte Certo</title>
-<script>document.documentElement.dataset.theme = localStorage.getItem('cc_tema') || 'dark';</script>
+<script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
 <link rel="stylesheet" href="css/public.css">
@@ -51,21 +51,7 @@
     </div>
   </div>
 
-  <button onclick="compartilhar()" class="btn btn-outline" style="margin-top:8px;">📤 Compartilhar</button>
-  <script>
-  function compartilhar() {
-    var url = window.location.href;
-    var nome = document.querySelector('.salon-name, h1, .salao-nome');
-    var texto = 'Confira ' + (nome ? nome.textContent : 'esta barbearia') + ' no Corte Certo: ';
-    if (navigator.share) {
-      navigator.share({ title: 'Corte Certo', text: texto, url: url });
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(texto + url).then(function() { alert('Link copiado!'); });
-    } else {
-      window.open('https://wa.me/?text=' + encodeURIComponent(texto + url), '_blank');
-    }
-  }
-  </script>
+  <button id="btn-compartilhar" type="button" class="btn btn-outline" style="margin-top:8px;">📤 Compartilhar</button>
 
   <h3 class="section-title">Escolha o profissional</h3>
 

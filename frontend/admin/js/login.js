@@ -76,6 +76,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inputCodigo) inputCodigo.focus();
   }
 
+  function voltarAoInicio() {
+    if (etapaCodigo) etapaCodigo.style.display = 'none';
+    fluxo = null;
+    if (inputCodigo) inputCodigo.value = '';
+  }
+
+  function mostrarEtapaCodigo(res) {
+    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
+      f.style.display = 'none';
+    });
+    if (bannerCodigo) {
+      bannerCodigo.hidden = false;
+      const demo = (res && res.demo_code) ? '<span class="mono codigo-demo">' + esc(res.demo_code) + '</span>' : '';
+      bannerCodigo.innerHTML = demo
+        ? '<strong>Modo demonstração</strong> — seu código de verificação é: ' + demo
+        : '<strong>Verifique seu e-mail/telefone</strong> — você recebeu um código de 6 dígitos.';
+    }
+    if (infoFone) {
+      infoFone.textContent = 'Digite o código de 6 dígitos enviado para ' +
+        String(fluxo && fluxo.ident ? fluxo.ident : '').trim() + '.';
+    }
+    if (etapaCodigo) etapaCodigo.style.display = '';
+    if (inputCodigo) inputCodigo.focus();
+  }
+
+  function abrirRecuperar() {
+    if (painelCliente) painelCliente.style.display = 'none';
+    if (painelDono) painelDono.style.display = 'none';
+    const pr = document.getElementById('painel-recuperar');
+    if (pr) pr.style.display = '';
+    voltarAoInicio();
+  }
+
+  function fecharRecuperar() {
+    const pr = document.getElementById('painel-recuperar');
+    if (pr) pr.style.display = 'none';
+    roleBtns.forEach(b => {
+      if (b.classList.contains('active')) mostrarPapel(b.dataset.role);
+    });
+  }
+
   async function pedirCodigo(payload) {
     try {
       const res = Auth.requestCode(payload);

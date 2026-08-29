@@ -1,9 +1,10 @@
 'use strict';
 /* ============================================================
    Corte Certo – seeds/001_demo.js
-   Seed de demonstração: planos, super-admin e dados demo
-   (6 salões, usuários, serviços, profissionais, horários,
-   clientes, agendamentos, avaliações, assinaturas).
+   Seed de demonstração: planos e dados demo
+   (6 salões SEM usuário vinculado, serviços, profissionais,
+   horários, clientes, agendamentos, avaliações, assinaturas).
+   Sem usuários: ninguém loga como dono demo; contas reais vem do SMS.
 
    Usa UUIDs determinísticos para referências cruzadas consistentes.
    Roda como superuser (knexfile) — imune ao RLS.
@@ -59,14 +60,14 @@ exports.seed = async function (knex) {
 
   const D = addDiasISO;
   const hoje = hojeISO();
-  const users = [
-    mkUser(1, 'dono', 'Marcos Silva', 'marcos@saolojorge.com', '7132124455', true, D(-400) + 'T09:00'),
-    mkUser(2, 'cliente', 'João Silva', 'joao@email.com', '71991234455', true, D(-180) + 'T14:30')
-  ];
+  /* Sem usuários demo desde 28/08/2026: ninguém pode logar como dono
+     solto na plataforma. Os salões seguem no catálogo público sem dono
+     vinculado (owner_user_id null). Usuários reais entram pelo SMS. */
+  const users = [];
 
   // ---------- barbershops ----------
   const barbershops = [
-    { id: uuid(1), owner_user_id: uuid(1), name: 'Barbearia São Jorge', description: 'Tradição e precisão em cortes clássicos e modernos.', slug: 'barbearia-sao-jorge', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
+    { id: uuid(1), owner_user_id: null, name: 'Barbearia São Jorge', description: 'Tradição e precisão em cortes clássicos e modernos.', slug: 'barbearia-sao-jorge', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
     { id: uuid(2), owner_user_id: null, name: 'Studio Nova Era', description: 'Coloração e tratamentos capilares especializados.', slug: 'studio-nova-era', phone: '(71) 3344-1020', whatsapp: '', email: '', instagram: '', address: 'Av. Oceânica, 800', city: 'Salvador', uf: 'BA', lat: -13.0101, lng: -38.4985, logo_url: null, cover_url: null, tags: ['Corte', 'Coloração', 'Hidratação'], rating_base: 4.6, rating_count_base: 98, created_at: D(-300) + 'T10:00', updated_at: D(-20) + 'T10:00' },
     { id: uuid(3), owner_user_id: null, name: 'Barbearia do Zé', description: 'Barbearia de bairro com atendimento de qualidade.', slug: 'barbearia-do-ze', phone: '(75) 3612-7788', whatsapp: '', email: '', instagram: '', address: 'Rua Barão do Rio Branco, 55', city: 'Feira de Santana', uf: 'BA', lat: -12.2664, lng: -38.9663, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Sobrancelha'], rating_base: 4.9, rating_count_base: 210, created_at: D(-350) + 'T08:00', updated_at: D(-15) + 'T08:00' },
     { id: uuid(4), owner_user_id: null, name: 'Espaço Bela Vista', description: 'Beleza e bem-estar para todos os estilos.', slug: 'espaco-bela-vista', phone: '(71) 3621-3030', whatsapp: '', email: '', instagram: '', address: 'Praça Desembargador Hugo Gomes, 12', city: 'Camaçari', uf: 'BA', lat: -12.6976, lng: -38.3229, logo_url: null, cover_url: null, tags: ['Coloração', 'Corte'], rating_base: 4.5, rating_count_base: 76, created_at: D(-250) + 'T09:00', updated_at: D(-25) + 'T09:00' },
@@ -103,7 +104,7 @@ exports.seed = async function (knex) {
 
   // ---------- professionals ----------
   const profDefs = [
-    [1, 11, 'Marcos Silva', '#b8863b', 'Barbeiro · dono', '7132124455', 1],
+    [1, 11, 'Marcos Silva', '#b8863b', 'Barbeiro · dono', '7132124455', null],
     [1, 12, 'Bianca Rocha', '#4c7a5e', 'Colorista', '', null],
     [1, 13, 'Tiago Andrade', '#a1433c', 'Barbeiro', '', null],
     [2, 21, 'Carla Mendes', '#3b82f6', 'Hair stylist', '', null],
@@ -191,7 +192,7 @@ exports.seed = async function (knex) {
 
   // ---------- clients ----------
   const clients = [
-    { id: uuid(201), barbershop_id: uuid(1), name: 'João Silva', phone: '71991234455', email: 'joao@email.com', notes: 'Prefere degradê baixo.', total_visits: 3, total_spent: 175, last_visit_at: D(-21) + 'T11:30', user_id: uuid(2), created_at: D(-180) + 'T10:00' },
+    { id: uuid(201), barbershop_id: uuid(1), name: 'João Silva', phone: '71991234455', email: 'joao@email.com', notes: 'Prefere degradê baixo.', total_visits: 3, total_spent: 175, last_visit_at: D(-21) + 'T11:30', user_id: null, created_at: D(-180) + 'T10:00' },
     { id: uuid(202), barbershop_id: uuid(1), name: 'João Pedro', phone: '71998881122', email: '', notes: '', total_visits: 1, total_spent: 65, last_visit_at: D(-40) + 'T09:30', user_id: null, created_at: D(-40) + 'T09:00' },
     { id: uuid(203), barbershop_id: uuid(1), name: 'Ana Souza', phone: '71988772211', email: '', notes: 'Alergia a amônia.', total_visits: 1, total_spent: 90, last_visit_at: D(-60) + 'T15:00', user_id: null, created_at: D(-60) + 'T14:00' },
     { id: uuid(204), barbershop_id: uuid(1), name: 'Carlos Dias', phone: '71996540099', email: '', notes: '', total_visits: 2, total_spent: 60, last_visit_at: D(-30) + 'T14:20', user_id: null, created_at: D(-70) + 'T10:00' },
@@ -202,7 +203,7 @@ exports.seed = async function (knex) {
 
   // ---------- reviews ----------
   const reviews = [
-    { id: uuid(301), barbershop_id: uuid(1), user_id: uuid(2), rating: 5, comment: 'Melhor barbearia da região, atendimento impecável!', created_at: D(-20) + 'T18:00' },
+    { id: uuid(301), barbershop_id: uuid(1), user_id: null, rating: 5, comment: 'Melhor barbearia da região, atendimento impecável!', created_at: D(-20) + 'T18:00' },
     { id: uuid(302), barbershop_id: uuid(1), user_id: null, rating: 4, comment: 'Ótimo corte, só demorou um pouco.', created_at: D(-40) + 'T12:00' },
     { id: uuid(303), barbershop_id: uuid(1), user_id: null, rating: 5, comment: '', created_at: D(-29) + 'T16:00' },
     { id: uuid(304), barbershop_id: uuid(2), user_id: null, rating: 5, comment: 'Amei a coloração!', created_at: D(-30) + 'T17:00' },
@@ -287,8 +288,8 @@ exports.seed = async function (knex) {
 
   // ---------- notifications ----------
   const notifications = [
-    { id: uuid(501), barbershop_id: uuid(1), user_id: uuid(1), type: 'new_appointment', title: 'Novo agendamento', message: 'Ana Souza solicitou Coloração para ' + fmtDataBR(hoje) + ' às 11:15.', read: false, created_at: agoraISO() },
-    { id: uuid(502), barbershop_id: null, user_id: uuid(2), type: 'appointment_status', title: 'Agendamento confirmado', message: 'Seu agendamento na Barbearia São Jorge foi confirmado.', read: false, created_at: agoraISO() }
+    { id: uuid(501), barbershop_id: uuid(1), user_id: null, type: 'new_appointment', title: 'Novo agendamento', message: 'Ana Souza solicitou Coloração para ' + fmtDataBR(hoje) + ' às 11:15.', read: false, created_at: agoraISO() },
+    { id: uuid(502), barbershop_id: null, user_id: null, type: 'appointment_status', title: 'Agendamento confirmado', message: 'Seu agendamento na Barbearia São Jorge foi confirmado.', read: false, created_at: agoraISO() }
   ];
 
   // ---------- grava tudo ----------
@@ -311,7 +312,7 @@ exports.seed = async function (knex) {
   await knex('barbershops').del();
   await knex('users').del();
 
-  await knex('users').insert(users);
+  if (users.length) await knex('users').insert(users);
   await knex('barbershops').insert(barbershops);
   await knex('services').insert(services);
   await knex('professionals').insert(professionals);

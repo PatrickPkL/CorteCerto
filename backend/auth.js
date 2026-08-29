@@ -286,7 +286,9 @@ window.Auth = (function () {
     return {
       ok: true,
       expires_in_seconds: 600,
-      cooldown_seconds: COOLDOWN_MS / 1000
+      cooldown_seconds: COOLDOWN_MS / 1000,
+      /* RNF-19: sem servidor de SMS real, a UI exibe o código (banner demo) */
+      demo_code: String(code)
     };
   }
 
