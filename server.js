@@ -29,7 +29,7 @@ const { URL } = require('url');
   } catch (e) { /* projeto sem .env — ok */ }
 })();
 
-const { API, Auth } = require('./backend/boot');
+const { API, Auth, Bot } = require('./backend/boot');
 
 const PORTA = Number(process.env.PORT || 3000);
 const RAIZ = path.join(__dirname, 'frontend');
@@ -49,82 +49,26 @@ const MIME = {
   '.map': 'application/json'
 };
 
-/* Cabeçalhos de segurança aplicados a TODAS as respostas (RNF-14) */
-function headersPadrao(extra) {
-  const base = {
-    'X-Frame-Options': 'DENY',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
-    'X-XSS-Protection': '1; mode=block',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    'Content-Security-Policy':
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
-      "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; " +
-      "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; " +
-      "base-uri 'self'; form-action 'self'"
-  };
-  return Object.assign(base, extra || {});
-}
-
 function json(res, status, obj) {
   const corpo = JSON.stringify(obj);
-  res.writeHead(status, headersPadrao({
+  res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(corpo),
     'Cache-Control': 'no-store'
-  }));
+  });
   res.end(corpo);
-}
-
-/* IP real do cliente (o Render/Proxy seta x-forwarded-for; sem ele,
-   tudo cairia na mesma "caixa" e o limite valeria globalmente) */
-function ipCliente(req) {
-  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  if (fwd) return fwd;
-  return req.socket.remoteAddress || '0.0.0.0';
 }
 
 /* ---------------- rate-limit ---------------- */
 const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
-const RATE_MAX = 120;
-
-/* Limpeza periódica dos mapas para não crescer sem limite */
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, rec] of _rateMap) {
-    if (now >= rec.reset) _rateMap.delete(ip);
-  }
-  for (const [ip, rec] of _failedAuth) {
-    if (!rec.blockedUntil || now >= rec.blockedUntil) _failedAuth.delete(ip);
-  }
-}, 60 * 1000).unref();
+const RATE_MAX = 60;
 
 /* ---------------- auth-brute-force ---------------- */
 const _failedAuth = new Map();
 const AUTH_FAIL_MAX = 5;
-const AUTH_FAIL_WINDOW_MS = 10 * 60 * 1000;
-const AUTH_BLOCK_MS = 5 * 60 * 1000; // 5 min de bloqueio — não punir erro de digitação
-
-/* Registra uma falha de autenticação por IP; bloqueia após AUTH_FAIL_MAX */
-function registrarFalhaAuth(ip) {
-  const prev = _failedAuth.get(ip) || {};
-  const now = Date.now();
-  if (!prev.windowStart || now - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
-    prev.count = 0;
-    prev.windowStart = now;
-    prev.blockedUntil = 0;
-  }
-  prev.count += 1;
-  if (prev.count >= AUTH_FAIL_MAX) prev.blockedUntil = now + AUTH_BLOCK_MS;
-  _failedAuth.set(ip, prev);
-}
-
-function bloqueadoAuth(ip) {
-  const rec = _failedAuth.get(ip);
-  if (!rec || !rec.blockedUntil) return 0;
-  return Date.now() < rec.blockedUntil ? Math.ceil((rec.blockedUntil - Date.now()) / 1000) : 0;
-}
+const AUTH_FAIL_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_BLOCK_MS = 15 * 60 * 1000;
 
 /* Métodos RPC que exigem sessão válida (segunda camada de defesa) */
 const _authRequired = new Set([
@@ -148,6 +92,8 @@ const _authRequired = new Set([
   'galeriaDaLoja', 'adicionarGaleria', 'removerGaleria',
   'servicosDaLoja', 'profissionaisDaLoja', 'horariosDaLoja',
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
+  'botConfig', 'botAtivar', 'botConfigurar', 'botHistorico',
+  'botLimparHistorico', 'botTestar', 'botVerificarAgora',
   'logout'
 ]);
 
@@ -155,17 +101,15 @@ const _authRequired = new Set([
 
 function handleRpc(req, res) {
   /* rate-limit por IP */
-  const ip = ipCliente(req);
+  const ip = req.socket.remoteAddress || '0.0.0.0';
   const now = Date.now();
   const rec = _rateMap.get(ip);
   if (rec && now < rec.reset) {
     rec.count++;
     if (rec.count > RATE_MAX) {
       const retryAfter = Math.ceil((rec.reset - now) / 1000);
-      return json(res, 429, {
-        ok: false, status: 429,
-        error: 'Muitas requisições. Aguarde ' + retryAfter + 's.'
-      });
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) });
+      return res.end(JSON.stringify({ ok: false, error: 'Muitas requisições. Aguarde ' + retryAfter + 's.' }));
     }
   } else {
     _rateMap.set(ip, { count: 1, reset: now + RATE_WINDOW_MS });
@@ -182,39 +126,34 @@ function handleRpc(req, res) {
     try {
       ({ method: metodo, args } = JSON.parse(corpo || '{}'));
     } catch (e) {
-      return json(res, 400, { ok: false, status: 400, error: 'JSON malformado.' });
+      return json(res, 400, { ok: false, error: 'JSON inválido.' });
     }
-    if (!metodo || typeof metodo !== 'string') {
-      return json(res, 400, { ok: false, status: 400, error: 'Método inválido.' });
-    }
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(metodo)) {
-      return json(res, 400, { ok: false, status: 400, error: 'Método inválido.' });
+    if (!metodo) {
+      return json(res, 400, { ok: false, error: 'Requisição inválida.' });
     }
     // métodos de sessão vivem em Auth; o resto, em API
     const fn = typeof API[metodo] === 'function' ? API[metodo]
-      : (typeof Auth[metodo] === 'function' ? Auth[metodo] : null);
+      : (typeof Auth[metodo] === 'function' ? Auth[metodo]
+        : (typeof Bot[metodo] === 'function' ? Bot[metodo] : null));
     if (!fn) {
-      return json(res, 400, { ok: false, status: 400, error: 'Método não existe.' });
+      return json(res, 400, { ok: false, error: 'Requisição inválida.' });
     }
-
-    /* argumentos: apenas array; qualquer outra forma é rejeitada */
-    const argList = Array.isArray(args) ? args : [];
 
     /* segunda camada: métodos autenticados exigem token válido */
     if (_authRequired.has(metodo)) {
       const tk = req.headers['x-cc-token'] || null;
       if (!tk) {
-        return json(res, 401, { ok: false, status: 401, error: 'Sessão expirada. Faça login novamente.' });
+        return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
       }
       global.__CC_REQUEST_TOKEN = tk;
       global.__CC_HTTP = true;
       try {
         const u = Auth.usuarioAtual();
         if (!u) {
-          return json(res, 401, { ok: false, status: 401, error: 'Sessão expirada. Faça login novamente.' });
+          return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
         }
       } catch (e) {
-        return json(res, 401, { ok: false, status: 401, error: 'Sessão expirada. Faça login novamente.' });
+        return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
       } finally {
         delete global.__CC_REQUEST_TOKEN;
         delete global.__CC_HTTP;
@@ -223,45 +162,70 @@ function handleRpc(req, res) {
 
     global.__CC_REQUEST_TOKEN = req.headers['x-cc-token'] || null;
     global.__CC_HTTP = true;
+    const ip = req.socket.remoteAddress || '0.0.0.0';
     const ts = new Date().toISOString();
-    const argsStr = JSON.stringify(argList).slice(0, 200);
+    const argsStr = JSON.stringify(Array.isArray(args) ? args : []).slice(0, 200);
 
     /* brute-force guard para verifyCode */
     if (metodo === 'verifyCode') {
-      const bloqueio = bloqueadoAuth(ip);
-      if (bloqueio > 0) {
-        return json(res, 429, {
-          ok: false, status: 429,
-          error: 'Muitas tentativas. Aguarde ' + bloqueio + 's.'
-        });
+      const rec = _failedAuth.get(ip);
+      if (rec && Date.now() < rec.blockedUntil) {
+        const retryAfter = Math.ceil((rec.blockedUntil - Date.now()) / 1000);
+        res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) });
+        return res.end(JSON.stringify({ ok: false, status: 429, error: 'Muitas tentativas. Aguarde ' + retryAfter + 's.' }));
       }
     }
 
-    function responderErro(e) {
-      const status = (e && e.status) || 500;
-      if (metodo === 'verifyCode' && status >= 400 && status < 500) registrarFalhaAuth(ip);
-      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
-      return json(res, status, {
-        ok: false, status,
-        error: (e && e.error) || 'Erro interno.'
-      });
-    }
-
     try {
-      const dados = fn.apply(null, argList);
-      /* função assíncrona: resolve a resposta fora daqui */
+      const dados = fn.apply(null, Array.isArray(args) ? args : []);
+      /* função assíncrona: resolve a resposta fora daqui — sem isso,
+         uma Promise rejeitada seria serializada como {} com status 200 */
       if (dados && typeof dados.then === 'function') {
         return void dados.then(
           valor => {
             if (metodo === 'verifyCode') _failedAuth.delete(ip);
             json(res, 200, { ok: true, data: valor === undefined ? null : valor });
           },
-          e => responderErro(e));
+          e => {
+            const st = (e && e.status) || 500;
+            if (metodo === 'verifyCode' && st >= 400 && st < 500) {
+              const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
+              prev.count++;
+              if (prev.count >= AUTH_FAIL_MAX) {
+                prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+              }
+              prev.windowStart = prev.windowStart || Date.now();
+              if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
+                prev.count = 1;
+                prev.windowStart = Date.now();
+                prev.blockedUntil = 0;
+              }
+              _failedAuth.set(ip, prev);
+            }
+            if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
+            json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
+          });
       }
       if (metodo === 'verifyCode') _failedAuth.delete(ip);
       return json(res, 200, { ok: true, data: dados === undefined ? null : dados });
     } catch (e) {
-      return responderErro(e);
+      const status = (e && e.status) || 500;
+      if (metodo === 'verifyCode' && status >= 400 && status < 500) {
+        const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
+        prev.count++;
+        if (prev.count >= AUTH_FAIL_MAX) {
+          prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+        }
+        prev.windowStart = prev.windowStart || Date.now();
+        if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
+          prev.count = 1;
+          prev.windowStart = Date.now();
+          prev.blockedUntil = 0;
+        }
+        _failedAuth.set(ip, prev);
+      }
+      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
+      return json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
     } finally {
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
@@ -298,18 +262,8 @@ function handleSuperAdmin(req, res, pathname, url) {
     return true;
   }
 
-  /* POST /api/super-admin/login — sem auth, mas com rate-limit */
+  /* POST /api/super-admin/login — sem auth */
   if (rota === 'login' && req.method === 'POST') {
-    const ip = ipCliente(req);
-    const now = Date.now();
-    const rec = _rateMap.get(ip);
-    if (rec && now < rec.reset && rec.count > RATE_MAX / 2) {
-      const retryAfter = Math.ceil((rec.reset - now) / 1000);
-      return json(res, 429, {
-        ok: false, status: 429,
-        error: 'Muitas tentativas. Aguarde ' + retryAfter + 's.'
-      });
-    }
     return readBody().then(dados => {
       const r = API.superAdminLogin(dados);
       json(res, 200, { ok: true, data: r });
@@ -438,13 +392,13 @@ function handleWebhookAbacate(req, res, url) {
 function servirEstatico(req, res, url) {
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/') {
-    res.writeHead(302, headersPadrao({ Location: '/public/telainicial.html' }));
+    res.writeHead(302, { Location: '/public/telainicial.html' });
     return res.end();
   }
 
   const alvo = path.normalize(path.join(RAIZ, caminho));
   if (!alvo.startsWith(RAIZ)) {
-    res.writeHead(403, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' }));
+    res.writeHead(403);
     return res.end('Proibido');
   }
 
@@ -452,20 +406,20 @@ function servirEstatico(req, res, url) {
   try {
     if (fs.statSync(alvo).isDirectory()) arquivo = path.join(alvo, 'index.html');
   } catch (e) {
-    res.writeHead(404, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' }));
-    return res.end('404 — não encontrado.');
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('404 — não encontrado: ' + caminho);
   }
 
   fs.readFile(arquivo, (err, dados) => {
     if (err) {
-      res.writeHead(404, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' }));
-      return res.end('404 — não encontrado.');
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('404 — não encontrado: ' + caminho);
     }
-    res.writeHead(200, headersPadrao({
+    res.writeHead(200, {
       'Content-Type': MIME[path.extname(arquivo).toLowerCase()] || 'application/octet-stream',
       'Content-Length': dados.length,
       'Cache-Control': 'no-store'
-    }));
+    });
     res.end(req.method === 'HEAD' ? undefined : dados);
   });
 }
@@ -477,25 +431,29 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
   if (req.method === 'GET' && pathname === '/health') {
     return void (async () => {
-      let ok = false;
+      let db = null;
+      let err = null;
       try {
         const { knex } = require('./backend/pool');
-        const r = await knex.raw('SELECT 1 AS ok');
-        ok = !!(r && r.rows && r.rows[0] && r.rows[0].ok === 1);
-      } catch (e) { ok = false; }
-      if (ok) {
-        json(res, 200, { ok: true, status: 'up' });
+        const r = await knex.raw(
+          'SELECT current_database() AS db, now() AS ts, 1 AS ok'
+        );
+        const linha = (r && r.rows && r.rows[0]) || {};
+        db = { database: linha.db || null, ok: linha.ok === 1 };
+      } catch (e) { err = e.message || 'erro'; }
+      if (db && db.ok) {
+        json(res, 200, { ok: true, status: 'up', postgres: db });
       } else {
-        json(res, 503, { ok: false, status: 'down' });
+        json(res, 503, { ok: false, status: 'down', error: err || 'banco indisponível' });
       }
     })();
   }
   /* magic-link */
   if (req.method === 'GET' && url.pathname === '/magic-link') {
     const tk = url.searchParams.get('token');
-    if (!tk) { res.writeHead(400, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' })); return res.end('Token ausente.'); }
+    if (!tk) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Token ausente.'); }
     const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Certo...</p><script>\nvar params = new URLSearchParams(location.search);\nvar tk = params.get(\'token\');\nif (tk) { localStorage.setItem(\'cc_magic_token\', tk); }\nlocation.href = \'../admin/\';\n</script></body></html>';
-    res.writeHead(200, headersPadrao({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' }));
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' });
     return res.end(html);
   }
   /* super-admin routes */
@@ -507,13 +465,68 @@ const server = http.createServer((req, res) => {
     return handleWebhookAbacate(req, res, url);
   }
   if (req.method === 'GET' || req.method === 'HEAD') return servirEstatico(req, res, url);
-  res.writeHead(405, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' }));
+  res.writeHead(405);
   res.end('Método não permitido');
 });
 
 /* Inicializa a persistência (PostgreSQL) antes de atender requisições */
 const boot = require('./backend/boot');
-boot.init().then(() => {
+
+/* Se o PostgreSQL local (portátil em .pg/) não estiver na porta 5432,
+   inicia-o automaticamente — assim `npm run dev` funciona sem setup. */
+const net = require('net');
+const child_process = require('child_process');
+
+function portaAberta(porta, ms) {
+  return new Promise(resolve => {
+    const s = net.connect({ host: '127.0.0.1', port: porta });
+    s.setTimeout(ms || 1200);
+    s.once('connect', () => { s.destroy(); resolve(true); });
+    s.once('error', () => { s.destroy(); resolve(false); });
+    s.once('timeout', () => { s.destroy(); resolve(false); });
+  });
+}
+
+function iniciarPostgresLocal() {
+  const pgCtl = path.join(__dirname, '.pg', 'pgsql', 'bin', 'pg_ctl.exe');
+  const dataDir = path.join(__dirname, '.pg', 'data');
+  const logFile = path.join(__dirname, '.pg', 'pg.log');
+  if (!fs.existsSync(pgCtl) || !fs.existsSync(dataDir)) return Promise.resolve(false);
+  console.log('  [postgres] porta 5432 fechada — iniciando banco local (.pg)...');
+  return new Promise(resolve => {
+    child_process.execFile(pgCtl, ['-D', dataDir, '-l', logFile, 'start'], { timeout: 30000 }, err => {
+      if (err) {
+        console.log('  [postgres] já estava em execução ou houve erro: ' + (err.message || err));
+        return resolve(true);
+      }
+      resolve(true);
+    });
+  });
+}
+
+(async function iniciar() {
+  let bancoOk = await portaAberta(5432);
+  if (!bancoOk) {
+    await iniciarPostgresLocal();
+    for (let i = 0; i < 24 && !bancoOk; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      bancoOk = await portaAberta(5432);
+    }
+  }
+  if (!bancoOk) {
+    console.error('[boot] PostgreSQL não está rodando na porta 5432.');
+    console.error('[boot] Instale/aloque um PostgreSQL local ou rode `npm run db:start` (se usou o banco portátil de .pg/).');
+    process.exit(1);
+  }
+
+  try {
+    await boot.init();
+  } catch (e) {
+    console.error('[boot] Falha ao carregar o banco de dados:', e);
+    process.exit(1);
+  }
+
+  Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)
   server.listen(PORTA, () => {
     console.log('');
     console.log('  Corte Certo rodando:');
@@ -525,9 +538,11 @@ boot.init().then(() => {
       ? '  Pagamentos PIX   : AbacatePay (' +
         (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
       : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
+    if (process.env.GEMINI_API_KEY) {
+      console.log('  Atendente bot    : IA Gemini ativa (' + (process.env.GEMINI_MODEL || 'gemini-2.0-flash') + ')');
+    } else {
+      console.log('  Atendente bot    : classificação por palavras-chave — coloque GEMINI_API_KEY no .env para usar a IA Gemini');
+    }
     console.log('');
   });
-}).catch(e => {
-  console.error('[boot] Falha ao carregar o banco de dados:', e);
-  process.exit(1);
-});
+})();

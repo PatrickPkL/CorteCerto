@@ -16,24 +16,9 @@ const MIGRATION_URL =
   process.env.DATABASE_URL ||
   'postgres://postgres:SUA_SENHA@127.0.0.1:5432/cortecerto';
 
-const TEM_SSL = /(ssl=true|sslmode)/i.test(MIGRATION_URL);
-const CONN = TEM_SSL
-  ? (function () {
-      const p = new URL(MIGRATION_URL);
-      return {
-        host: p.hostname,
-        port: Number(p.port || 5432),
-        database: (p.pathname || '').replace(/^\//, ''),
-        user: decodeURIComponent(p.username || ''),
-        password: decodeURIComponent(p.password || ''),
-        ssl: { rejectUnauthorized: false }
-      };
-    })()
-  : MIGRATION_URL;
-
 const base = {
   client: 'pg',
-  connection: CONN,
+  connection: MIGRATION_URL,
   pool: { min: 0, max: 10 },
   migrations: {
     directory: path.join(__dirname, 'database', 'migrations'),

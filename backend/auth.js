@@ -16,15 +16,7 @@ window.Auth = (function () {
   const TOKEN_TTL_DIAS = 7;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
   const MAX_TENTATIVAS = 5;               // RNF-10
-  const COOLDOWN_BASE_MS = 30 * 1000;     // 30s entre reenvios (com backoff)
-  const COOLDOWN_MAX_MS = 5 * 60 * 1000;  // teto: só quem fica reenviando
-  const COOLDOWN_BACKOFF = 2;
-
-  function proximoCooldownMs(resends) {
-    const n = Math.max(1, Number(resends) || 1);
-    /* 1º envio: 30s; reenvios: 60s, 120s, ... cap 5min */
-    return Math.min(COOLDOWN_BASE_MS * Math.pow(COOLDOWN_BACKOFF, n - 1), COOLDOWN_MAX_MS);
-  }
+  const COOLDOWN_MS = 5 * 60 * 1000;     // 5 minutos entre pedidos de código
 
   /* ---------------- utilidades ---------------- */
 
@@ -181,7 +173,6 @@ window.Auth = (function () {
     const db = DB._d();
     const ident = normalizarIdentidade(dados && dados.phone);
     const porEmail = ehEmail(ident);
-    const modo = String(dados && dados.modo || '');
 
     if (porEmail) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ident)) {
@@ -192,25 +183,17 @@ window.Auth = (function () {
     }
 
     const cooldown = cooldownRestanteSeg(ident);
+    if (cooldown > 0) throw { status: 429, error: 'Aguarde ' + cooldown + 's para solicitar um novo código.' };
 
     const existente = usuarioPorIdentidade(db, ident);
 
-    if (modo === 'login') {
-      /* Login é feito SOMENTE por e-mail; telefone fica para a recuperação. */
-      if (!porEmail) {
-        throw { status: 400, error: 'Para entrar, use seu e-mail. Esqueceu o acesso? Use a opção "Recuperar acesso".' };
-      }
-      if (!existente) {
-        throw { status: 404, error: 'E-mail não cadastrado. Verifique o e-mail ou crie uma conta.' };
-      }
-    } else if (modo === 'recuperar') {
-      /* Recuperação de acesso: telefone OU e-mail (o usuário deve existir). */
+    if (dados.modo === 'login') {
       if (!existente) {
         throw { status: 404, error: porEmail
-          ? 'E-mail não encontrado. Verifique o e-mail cadastrado.'
-          : 'Número não cadastrado. Verifique o telefone.' };
+          ? 'E-mail não cadastrado. Verifique o e-mail ou entre pelo telefone.'
+          : 'Número não cadastrado. Crie uma conta.' };
       }
-    } else if (modo === 'registro') {
+    } else if (dados.modo === 'registro') {
       if (porEmail) throw { status: 400, error: 'O cadastro é feito por telefone. Use a opção Entrar com e-mail.' };
       if (existente) throw { status: 409, error: 'Número já cadastrado. Faça login.' };
       const nome = String(dados.name || '').trim();
@@ -222,20 +205,13 @@ window.Auth = (function () {
         throw { status: 400, error: 'Informe o nome do salão.' };
       }
     } else {
-      throw { status: 400, error: 'Modo inválido (use login, registro ou recuperar).' };
+      throw { status: 400, error: 'Modo inválido (use login ou registro).' };
     }
 
-    /* cooldown só protege pedidos válidos — quem erra o e-mail vê o erro,
-       não um 429 que parece bloqueio sem motivo */
-    if (cooldown > 0) throw { status: 429, error: 'Aguarde ' + cooldown + 's para solicitar um novo código.' };
-
-    /* RF-002: novo pedido substitui o código anterior da mesma identidade */
-    const anterior = codigoAtivo(ident); // captura ANTES de limpar (backoff)
+    // limpa códigos usados/expirados da mesma identidade
     db.sms_codes = db.sms_codes.filter(c => c.ident !== ident || (c.used && agoraMs() > c.expires_at));
+    // RF-002: novo pedido substitui o código anterior da mesma identidade
     db.sms_codes = db.sms_codes.filter(c => c.ident !== ident);
-
-    const resends = ((anterior && anterior.resends) || 0) + 1;
-    const cooldownAt = agoraMs() + proximoCooldownMs(resends);
 
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const registro = {
@@ -246,8 +222,7 @@ window.Auth = (function () {
       expires_at: agoraMs() + CODIGO_TTL_MS,
       attempts: 0,
       used: 0,
-      resends,
-      next_allowed_at: cooldownAt,
+      next_allowed_at: agoraMs() + COOLDOWN_MS,
       payload: dados.modo === 'registro'
         ? {
             modo: 'registro',
@@ -257,7 +232,7 @@ window.Auth = (function () {
             salon_name: String(dados.salon_name || '').trim(),
             aceite_privacidade: !!(dados.aceite_privacidade || dados.aceiteTermos || dados.termosAceitos || dados.termsAccepted)
           }
-        : { modo: dados.modo === 'recuperar' ? 'recuperar' : 'login' },
+        : { modo: 'login' },
       created_at: new Date().toISOString()
     };
     db.sms_codes.push(registro);
@@ -311,7 +286,7 @@ window.Auth = (function () {
     return {
       ok: true,
       expires_in_seconds: 600,
-      cooldown_seconds: Math.round(proximoCooldownMs(resends) / 1000)
+      cooldown_seconds: COOLDOWN_MS / 1000
     };
   }
 

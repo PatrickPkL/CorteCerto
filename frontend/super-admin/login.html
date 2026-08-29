@@ -153,17 +153,15 @@
     })
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        var token = (data && data.data && data.data.token) || data.token;
-        var erro = (data && data.error) || (data && data.data && data.data.error);
-        if (erro) {
-          erroEl.textContent = erro;
+        if (data.error) {
+          erroEl.textContent = data.error;
           erroEl.style.display = 'block';
           btn.disabled = false;
           btn.textContent = 'Entrar';
           return;
         }
-        if (token) {
-          localStorage.setItem('cc_superadmin_token', token);
+        if (data.token) {
+          localStorage.setItem('cc_superadmin_token', data.token);
           window.location.href = 'index.html';
         } else {
           erroEl.textContent = 'Resposta inválida do servidor.';

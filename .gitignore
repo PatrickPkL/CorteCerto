@@ -3,6 +3,10 @@ npm-debug.log*
 ignore/
 docs/
 .env
+.env.bak
 database/db.json
+database/bot.json
+database/chats.json
+.pg/
 .DS_Store
 Thumbs.db

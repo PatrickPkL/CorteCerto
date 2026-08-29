@@ -9,14 +9,18 @@
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:status": "knex migrate:list",
-    "seed": "knex seed:run"
+    "seed": "knex seed:run",
+    "db:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-db.ps1",
+    "db:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-db.ps1"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
+    "imapflow": "^1.7.6",
     "knex": "^3.3.0",
     "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
+    "postal-mime": "^2.7.5",
     "resend": "^6.22.1",
     "totalvoice-node": "^1.12.0"
   }

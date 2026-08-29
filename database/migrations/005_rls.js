@@ -34,24 +34,11 @@ exports.up = async function (knex) {
       END IF;
     END $$;`);
 
-  // Super-admin ignora RLS — somente quando o executor é superuser
-  // (ex.: Postgres local). Em hosts gerenciados (Render/Neon/etc.) o
-  // executor não é superuser; aí o bypass é garantido pelas policies
-  // "<tabela>_sa_*" criadas ao final desta migração.
-  await knex.raw(`
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND rolsuper) THEN
-        EXECUTE 'ALTER ROLE cortecerto_admin BYPASSRLS';
-      END IF;
-    END $$;`);
+  // Super-admin ignora RLS
+  await knex.raw(`ALTER ROLE cortecerto_admin BYPASSRLS;`);
 
-  // Permite que a aplicação assuma o papel admin em transações controladas.
-  // WITHOUT INHERIT: o app continua podendo fazer SET ROLE cortecerto_admin
-  // (sempre parte do papel), mas NÃO herda políticas/permissões do admin nas
-  // queries normais — isso preserva o isolamento por loja (RLS) enquanto o
-  // admin enxerga tudo via policies "_sa_all".
-  await knex.raw(`GRANT cortecerto_admin TO cortecerto_app WITH INHERIT FALSE;`);
+  // Permite que a aplicação assuma o papel admin em transações controladas
+  await knex.raw(`GRANT cortecerto_admin TO cortecerto_app;`);
 
   // Grants de schema
   await knex.raw(`GRANT USAGE ON SCHEMA public TO cortecerto_app, cortecerto_readonly;`);
@@ -154,22 +141,6 @@ exports.up = async function (knex) {
   await knex.raw(`ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;`);
   await knex.raw(`CREATE POLICY audit_log_self ON audit_log
     USING (user_id = ${uId});`);
-
-  // ===== Policies do super-admin (visão total) =====
-  // Garantem acesso global ao cortecerto_admin mesmo quando BYPASSRLS
-  // não pode ser concedido (executor sem privilégio de superuser).
-  const tabelasSa = [
-    'barbershops', 'services', 'professionals', 'working_hours',
-    'schedule_exceptions', 'clients', 'subscriptions', 'payments',
-    'appointments', 'notifications', 'reviews', 'gallery_images',
-    'tickets', 'users', 'audit_log'
-  ];
-  for (const t of tabelasSa) {
-    await knex.raw(`DROP POLICY IF EXISTS ${t}_sa_all ON ${t};`);
-    await knex.raw(`CREATE POLICY ${t}_sa_all ON ${t}
-      TO cortecerto_admin
-      USING (true) WITH CHECK (true);`);
-  }
 };
 
 exports.down = async function (knex) {
@@ -178,26 +149,11 @@ exports.down = async function (knex) {
     'notifications', 'appointments', 'payments', 'subscriptions', 'clients',
     'schedule_exceptions', 'working_hours', 'professionals', 'services', 'barbershops'
   ];
-  const tabelasSa = [
-    'barbershops', 'services', 'professionals', 'working_hours',
-    'schedule_exceptions', 'clients', 'subscriptions', 'payments',
-    'appointments', 'notifications', 'reviews', 'gallery_images',
-    'tickets', 'users', 'audit_log'
-  ];
-  for (const t of tabelasSa) {
-    await knex.raw(`DROP POLICY IF EXISTS ${t}_sa_all ON ${t};`);
-  }
   for (const t of tabelas) {
     await knex.raw(`ALTER TABLE ${t} DISABLE ROW LEVEL SECURITY;`);
   }
   await knex.raw(`REVOKE cortecerto_admin FROM cortecerto_app;`);
-  await knex.raw(`
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND rolsuper) THEN
-        EXECUTE 'ALTER ROLE cortecerto_admin NOBYPASSRLS';
-      END IF;
-    END $$;`);
+  await knex.raw(`ALTER ROLE cortecerto_admin NOBYPASSRLS;`);
   await knex.raw(`REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM cortecerto_app;`);
   await knex.raw(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM cortecerto_app, cortecerto_readonly, cortecerto_admin;`);
   await knex.raw(`REVOKE USAGE ON SCHEMA public FROM cortecerto_app, cortecerto_readonly;`);
