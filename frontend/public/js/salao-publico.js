@@ -397,4 +397,20 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   renderReviews();
+
+  const btnCompartilhar = document.getElementById('btn-compartilhar');
+  if (btnCompartilhar) {
+    btnCompartilhar.addEventListener('click', () => {
+      const url = window.location.href;
+      const nomeEl = document.querySelector('.salon-name, h1, .salao-nome');
+      const texto = 'Confira ' + (nomeEl ? nomeEl.textContent : 'esta barbearia') + ' no Corte Certo: ';
+      if (navigator.share) {
+        navigator.share({ title: 'Corte Certo', text: texto, url: url });
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(texto + url).then(() => alert('Link copiado!'));
+      } else {
+        window.open('https://wa.me/?text=' + encodeURIComponent(texto + url), '_blank');
+      }
+    });
+  }
 });
