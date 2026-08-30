@@ -652,6 +652,11 @@ function bancoRemoto() {
     console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
     console.log('  Banco de dados   : PostgreSQL (cortecerto)');
     console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+      console.log('  E-mail (código)  : Gmail real (' + process.env.GMAIL_USER + ')');
+    } else {
+      console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
+    }
     console.log(process.env.ABACATEPAY_API_KEY
       ? '  Pagamentos PIX   : AbacatePay (' +
         (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'

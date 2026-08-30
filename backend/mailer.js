@@ -50,6 +50,8 @@ function enviarEmailComTimeout(destino, tag) {
       clearTimeout(timer);
       console.log("[EMAIL] Erro no envio de", tag || "email");
       console.log("[EMAIL] Erro:", err && err.message ? err.message : err);
+      var detalhe = (err && err.response) ? (" — resposta SMTP: " + err.response) : "";
+      console.log("[EMAIL] Dica:", "verifique GMAIL_USER/GMAIL_PASS (senha de app)", detalhe);
     });
 
   return Promise.resolve();
