@@ -7,16 +7,55 @@ var APP_URL = process.env.APP_URL || "http://localhost:3000";
 var DEMO_MODE = !GMAIL_USER || !GMAIL_PASS;
 
 var transporter = null;
-if (!DEMO_MODE) {
+var transporterPorta = null;
+
+/* Render/Neon bloqueiam certas portas no egress — experimenta as
+   portas SMTP do Gmail até uma conectar. 465 (SSL) primeiro e 587
+   (STARTTLS) como fallback. family:4 evita ENETUNREACH de IPv6. */
+var PORTAS_SMTP = [465, 587];
+
+function criarTransporter(porta) {
   var nodemailer = require("nodemailer");
-  transporter = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: porta,
+    secure: porta === 465,
     family: 4,
+    requireTLS: porta !== 465,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     auth: { user: GMAIL_USER, pass: GMAIL_PASS.replace(/\s/g, "") }
   });
 }
+
+/* Monta o transporter na primeira porta que verificar a conexão.
+   Testa as portas em paralelo e usa a que responder primeiro. */
+function garantirTransporter() {
+  if (transporter) return Promise.resolve(transporter);
+  var tentativas = PORTAS_SMTP.map(function (porta) {
+    var t = criarTransporter(porta);
+    return t.verify()
+      .then(function () {
+        throw { porta: porta, t: t }; // sinaliza sucesso
+      })
+      .catch(function (e) {
+        return { porta: porta, t: t, erro: e };
+      });
+  });
+  return Promise.all(tentativas).then(function (resultados) {
+    var ok = resultados.find(function (r) { return r && r.t; });
+    if (!ok) { // nenhuma porta conectou — usa a primeira e deixa o envio falhar com erro real
+      ok = { porta: PORTAS_SMTP[0], t: criUltimo(PORTAS_SMTP[0]) };
+    }
+    transporter = ok.t;
+    transporterPorta = ok.porta;
+    console.log("[EMAIL] Conectado ao Gmail via porta " + ok.porta);
+    return transporter;
+  });
+}
+
+function criUltimo(porta) { return criarTransporter(porta); }
 
 function temEmailReal() {
   return !DEMO_MODE;
@@ -40,24 +79,29 @@ function enviarEmailComTimeout(destino, tag) {
     html: destino.html
   };
 
-  var timer = setTimeout(function () {
-    console.log("[EMAIL] Timeout no envio de", tag || "email");
-  }, 10000);
+  return garantirTransporter().then(function () {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () {
+        console.log("[EMAIL] Timeout no envio de", tag || "email");
+        reject(new Error("Timeout no envio de " + (tag || "email")));
+      }, 25000);
 
-  transporter.sendMail(mailOptions)
-    .then(function () {
-      clearTimeout(timer);
-      console.log("[EMAIL] Enviado:", tag || "email", "->", destino.to);
-    })
-    .catch(function (err) {
-      clearTimeout(timer);
-      console.log("[EMAIL] Erro no envio de", tag || "email");
-      console.log("[EMAIL] Erro:", err && err.message ? err.message : err);
-      var detalhe = (err && err.response) ? (" — resposta SMTP: " + err.response) : "";
-      console.log("[EMAIL] Dica:", "verifique GMAIL_USER/GMAIL_PASS (senha de app)", detalhe);
+      transporter.sendMail(mailOptions)
+        .then(function () {
+          clearTimeout(timer);
+          console.log("[EMAIL] Enviado:", tag || "email", "->", destino.to);
+          resolve();
+        })
+        .catch(function (err) {
+          clearTimeout(timer);
+          console.log("[EMAIL] Erro no envio de", tag || "email");
+          console.log("[EMAIL] Erro:", err && err.message ? err.message : err);
+          var detalhe = (err && err.response) ? (" — resposta SMTP: " + err.response) : "";
+          console.log("[EMAIL] Dica:", "verifique GMAIL_USER/GMAIL_PASS (senha de app)", detalhe);
+          reject(err);
+        });
     });
-
-  return Promise.resolve();
+  });
 }
 
 function cabecalhoHTML() {
