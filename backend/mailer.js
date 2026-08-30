@@ -2,9 +2,14 @@
 
 var GMAIL_USER = process.env.GMAIL_USER || "";
 var GMAIL_PASS = process.env.GMAIL_PASS || "";
+var RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 var FROM_NAME = process.env.EMAIL_FROM || "Corte Certo";
+var FROM_EMAIL = process.env.EMAIL_FROM_EMAIL || "Corte Certo <noreply@cortecerto.com.br>";
 var APP_URL = process.env.APP_URL || "http://localhost:3000";
-var DEMO_MODE = !GMAIL_USER || !GMAIL_PASS;
+/* Considera e-mail real se houver Gmail configurado OU Resend configurado.
+   Preferência de envio: Resend (API HTTPS, nunca bloqueada em clouds) ->
+   Gmail SMTP (fallback). */
+var DEMO_MODE = (!GMAIL_USER || !GMAIL_PASS) && !RESEND_API_KEY;
 
 var transporter = null;
 var transporterPorta = null;
@@ -140,11 +145,37 @@ function temEmailReal() {
   return !DEMO_MODE;
 }
 
+/* Envia via Resend (API HTTPS) — funciona em qualquer nuvem, inclusive Render. */
+function enviarResend(destino, tag) {
+  var Resend = require("resend").Resend;
+  var resend = new Resend(RESEND_API_KEY);
+  return new Promise(function (resolve, reject) {
+    var timer = setTimeout(function () {
+      reject(new Error("Timeout no envio via Resend de " + (tag || "email")));
+    }, 30000);
+    resend.emails.send({
+      from: FROM_EMAIL,
+      to: [destino.to],
+      subject: destino.subject,
+      html: destino.html
+    }).then(function (r) {
+      clearTimeout(timer);
+      if (r && r.error) {
+        reject(new Error(r.error.message || "Erro Resend"));
+      } else {
+        resolve(r);
+      }
+    }).catch(function (e) {
+      clearTimeout(timer);
+      reject(e);
+    });
+  });
+}
+
 function enviarEmailComTimeout(destino, tag) {
   if (DEMO_MODE) {
     console.log("========================================");
     console.log("[EMAIL - MODO DEMO] " + (tag || ""));
-    console.log("De:", FROM_NAME + " <" + GMAIL_USER + ">");
     console.log("Para:", destino.to);
     console.log("Assunto:", destino.subject);
     console.log("========================================");
@@ -158,28 +189,23 @@ function enviarEmailComTimeout(destino, tag) {
     html: destino.html
   };
 
-  return garantirTransporter().then(function () {
-    return new Promise(function (resolve, reject) {
-      var timer = setTimeout(function () {
-        console.log("[EMAIL] Timeout no envio de", tag || "email");
-        reject(new Error("Timeout no envio de " + (tag || "email")));
-      }, 25000);
-
-      transporter.sendMail(mailOptions)
-        .then(function () {
-          clearTimeout(timer);
-          console.log("[EMAIL] Enviado:", tag || "email", "->", destino.to);
-          resolve();
-        })
-        .catch(function (err) {
-          clearTimeout(timer);
-          console.log("[EMAIL] Erro no envio de", tag || "email");
-          console.log("[EMAIL] Erro:", err && err.message ? err.message : err);
-          var detalhe = (err && err.response) ? (" — resposta SMTP: " + err.response) : "";
-          console.log("[EMAIL] Dica:", "verifique GMAIL_USER/GMAIL_PASS (senha de app)", detalhe);
-          reject(err);
-        });
+  var tentativa;
+  if (RESEND_API_KEY) {
+    tentativa = enviarResend(destino, tag);
+  } else {
+    tentativa = garantirTransporter().then(function () {
+      return transporter.sendMail(mailOptions);
     });
+  }
+
+  return tentativa.then(function () {
+    console.log("[EMAIL] Enviado:", tag || "email", "->", destino.to);
+  }, function (err) {
+    console.log("[EMAIL] Erro no envio de", tag || "email");
+    console.log("[EMAIL] Erro:", err && err.message ? err.message : err);
+    var detalhe = (err && err.response) ? (" — resposta SMTP: " + err.response) : "";
+    console.log("[EMAIL] Dica:", RESEND_API_KEY ? "verifique RESEND_API_KEY e com FROM_EMAIL aprovado." : "verifique GMAIL_USER/GMAIL_PASS (senha de app)", detalhe);
+    throw err;
   });
 }
 
@@ -345,6 +371,8 @@ module.exports = {
   enviarLinkMagico: enviarLinkMagico,
   enviarCodigoVerificacao: enviarCodigoVerificacao,
   temEmailReal: temEmailReal,
+  temResend: function () { return !!RESEND_API_KEY; },
+  enviarEmailResend: enviarResend,
   enviarConfirmacaoAgendamento: enviarConfirmacaoAgendamento,
   enviarNovoAgendamento: enviarNovoAgendamento,
   enviarBoasVindas: enviarBoasVindas,

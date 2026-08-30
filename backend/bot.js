@@ -82,6 +82,7 @@ function _cfgInit() {
     forwardTo: String(process.env.BOT_FORWARD_TO || '').trim(),
     assistantName: String(process.env.BOT_ASSISTANT_NAME || 'Equipe Corte Certo').trim(),
     barbershopId: null,
+    resendKey: String(process.env.RESEND_API_KEY || '').trim(),
     seconds: Math.max(10, Math.min(3600, parseInt(process.env.BOT_CHECK_SECONDS, 10) || 30))
   };
 }
@@ -1501,6 +1502,19 @@ function enviarEmail(opts) {
   mailOptions.headers = mailOptions.headers || {};
   mailOptions.headers['X-Auto-Response-Suppress'] = 'All';
   mailOptions.headers['Precedence'] = 'bulk';
+
+  if (_cfg.resendKey) {
+    const _mailer = require('./mailer');
+    return _mailer.enviarEmailResend({ to: opts.to, subject: opts.subject, html: opts.html })
+      .then(() => {
+        console.log('[BOT][envio]', opts.tag, '->', opts.to);
+        return { simulado: false, messageId: null, via: 'resend' };
+      })
+      .catch(err => {
+        console.error('[BOT][envio][ERR]', opts.tag, err && err.message ? err.message : err);
+        return { simulado: false, via: 'resend', erro: (err && err.message) || 'Falha no envio.' };
+      });
+  }
 
   return Promise.resolve(_transporter)
     .then(t => t.sendMail(mailOptions))
