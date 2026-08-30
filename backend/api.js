@@ -170,6 +170,11 @@ window.API = (function () {
 
   function atualizarLoja(patch) {
     const { shop } = exigirDono();
+    if (patch.slot_interval_min !== undefined && patch.slot_interval_min !== null) {
+      const v = clampInt(patch.slot_interval_min, 5, 180, 15);
+      shop.slotIntervalMin = v;
+      shop.slot_interval_min = v;
+    }
     const campos = ['name', 'description', 'phone', 'email', 'whatsapp',
       'instagram', 'address', 'city', 'uf', 'logo_url', 'cover_url', 'tags',
       'lat', 'lng'];
@@ -367,13 +372,16 @@ window.API = (function () {
     var lojas = (_db().barbershops || []).map(function(b) {
       var owner = (_db().users || []).find(function(u) { return u.id === b.owner_user_id; });
       var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+      var planoDb = sub && (_db().plans || []).find(function(p) { return p.id === sub.plan_id; });
       var profCount = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; }).length;
       var agCount = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id && a.status !== 'cancelado'; }).length;
       return {
         id: b.id, name: b.name, city: b.city, uf: b.uf,
         owner_name: owner ? owner.name : '?',
         owner_email: owner ? owner.email : '',
-        plano: sub ? sub.status : 'nenhum',
+        plano: planoDb ? planoDb.name : 'nenhum',
+        plan_name: planoDb ? planoDb.name : null,
+        status: sub ? sub.status : 'nenhum',
         trial_ends_at: sub && sub.trial_ends_at ? sub.trial_ends_at : null,
         profissionais: profCount,
         agendamentos: agCount,
@@ -403,8 +411,8 @@ window.API = (function () {
     var profs = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; });
     var ags = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id; });
     var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
-    var totalPago = (_db().payments || []).filter(function(p) { return p.barbershop_id === b.id; })
-      .reduce(function(sum, p) { return sum + (Number(p.amount) || 0); }, 0);
+    var totalPago = (_db().payments || []).filter(function(p) { return p.barbershop_id === b.id && p.status === 'paid'; })
+      .reduce(function(sum, p) { return sum + (Number(p.amount_cents) || 0) / 100; }, 0);
     return {
       loja: b, owner: owner, planos: sub,
       servicos: svcs, profissionais: profs,
@@ -457,7 +465,8 @@ window.API = (function () {
       totalLojas: (_db().barbershops || []).length,
       totalUsuarios: (_db().users || []).length,
       totalAgendamentos: (_db().appointments || []).length,
-      totalReceita: (_db().payments || []).reduce(function(s, p) { return s + (Number(p.amount) || 0); }, 0),
+      totalReceita: (_db().payments || []).filter(function(p) { return p.status === 'paid'; })
+        .reduce(function(s, p) { return s + (Number(p.amount_cents) || 0) / 100; }, 0),
       lojasTrial: (_db().subscriptions || []).filter(function(s) { return s.status === 'trial'; }).length,
       lojasAtivas: (_db().subscriptions || []).filter(function(s) { return s.status === 'ativa'; }).length,
       agendamentosHoje: (_db().appointments || []).filter(function(a) { return a.date === agoraISO().slice(0, 10); }).length
@@ -509,6 +518,47 @@ window.API = (function () {
     const lojasComPlano = new Set(assinaturas.map(s => s.barbershop_id));
     const logins = (db.audit_log || []).filter(l => String(l.acao || '').indexOf('login') === 0);
 
+    function dentroDe(ts, dias) {
+      if (!ts) return false;
+      const d = new Date(ts).getTime();
+      return Number.isFinite(d) && d >= Date.now() - dias * 86400000;
+    }
+
+    const pagos = (db.payments || []).filter(p => p.status === 'paid');
+    const receitaLoja = {};
+    pagos.forEach(p => {
+      receitaLoja[p.barbershop_id] = (receitaLoja[p.barbershop_id] || 0) + (Number(p.amount_cents) || 0) / 100;
+    });
+
+    const usuariosMap = (db.users || []).reduce(function(m, u) { m[u.id] = u; return m; }, {});
+
+    const top10 = lojas.map(b => {
+      const sub = assinaturas.find(s => s.barbershop_id === b.id);
+      const planoDb = sub && (db.plans || []).find(p => p.id === sub.plan_id);
+      return {
+        id: b.id,
+        nome: b.name,
+        cidade: b.city,
+        plano: planoDb ? planoDb.name : 'nenhum',
+        status: sub ? sub.status : 'nenhum',
+        receita: Math.round((receitaLoja[b.id] || 0) * 100) / 100,
+        agendamentos: (db.appointments || []).filter(a => a.barbershop_id === b.id && a.status !== 'cancelado').length
+      };
+    }).sort((a, b) => b.receita - a.receita).slice(0, 10);
+
+    const atividade = logins
+      .map(l => {
+        const u = usuariosMap[l.user_id] || {};
+        return {
+          timestamp: l.timestamp,
+          nome: u.name || null,
+          email: u.email || null,
+          papel: u.role || null
+        };
+      })
+      .sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')))
+      .slice(0, 20);
+
     return {
       generated_at: agoraISO(),
       meses,
@@ -532,7 +582,65 @@ window.API = (function () {
         total_agendamentos: (db.appointments || []).length,
         agendamentos_hoje: (db.appointments || []).filter(a => (a.starts_at || a.date || '').slice(0, 10) === agoraISO().slice(0, 10)).length,
         logins_30d: logins.filter(l => (l.timestamp || '') >= new Date(Date.now() - 30 * 86400000).toISOString()).length
-      }
+      },
+      por_periodo: {
+        novas_lojas: { d30: lojas.filter(b => dentroDe(b.created_at, 30)).length, d90: lojas.filter(b => dentroDe(b.created_at, 90)).length, d365: lojas.filter(b => dentroDe(b.created_at, 365)).length },
+        novos_usuarios: { d30: (db.users || []).filter(u => dentroDe(u.created_at, 30)).length, d90: (db.users || []).filter(u => dentroDe(u.created_at, 90)).length, d365: (db.users || []).filter(u => dentroDe(u.created_at, 365)).length },
+        agendamentos: { d30: (db.appointments || []).filter(a => dentroDe(a.starts_at || a.date, 30)).length, d90: (db.appointments || []).filter(a => dentroDe(a.starts_at || a.date, 90)).length, d365: (db.appointments || []).filter(a => dentroDe(a.starts_at || a.date, 365)).length },
+        receita: { d30: pagos.filter(p => dentroDe(p.paid_at, 30)).reduce((s, p) => s + (Number(p.amount_cents) || 0) / 100, 0), d90: pagos.filter(p => dentroDe(p.paid_at, 90)).reduce((s, p) => s + (Number(p.amount_cents) || 0) / 100, 0), d365: pagos.filter(p => dentroDe(p.paid_at, 365)).reduce((s, p) => s + (Number(p.amount_cents) || 0) / 100, 0) }
+      },
+      top10_lojas: top10,
+      atividade_recente: atividade,
+      total_receita: Math.round((receitaLoja && Object.values(receitaLoja).reduce((a, b) => a + (Number(b) || 0), 0)) * 100) / 100
+    };
+  }
+
+  /* Lista todos os tickets (visão super admin). */
+  function saTickets(filtros) {
+    var db = _db();
+    var lista = db.tickets || [];
+    if (filtros && filtros.status && filtros.status !== 'todos') {
+      lista = lista.filter(function(t) { return t.status === filtros.status; });
+    }
+    return lista.map(function(t) {
+      var loja = (db.barbershops || []).find(function(b) { return b.id === t.salao_id; });
+      return {
+        id: t.id,
+        assunto: t.subject,
+        mensagem: t.message,
+        status: t.status || 'aberto',
+        resposta: t.resposta != null ? t.resposta : null,
+        criadoEm: t.created_at,
+        lojaId: t.salao_id,
+        lojaNome: loja ? loja.name : ('Loja #' + t.salao_id),
+        lojaCidade: loja ? (loja.city || '') : ''
+      };
+    }).sort(function(a, b) { return String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')); });
+  }
+
+  /* Atualiza status/resposta de um ticket (visão super admin). */
+  function saResponderTicket(ticketId, dados) {
+    var db = _db();
+    var t = (db.tickets || []).find(function(x) { return x.id == ticketId; });
+    if (!t) err(404, 'Ticket não encontrado.');
+    var novaStatus = dados && dados.status;
+    if (novaStatus && ['aberto', 'em_andamento', 'respondido', 'resolvido', 'fechado'].indexOf(novaStatus) === -1) {
+      err(400, 'Status inválido.');
+    }
+    if (novaStatus) t.status = novaStatus;
+    if (dados && dados.resposta != null && String(dados.resposta).trim()) {
+      t.resposta = String(dados.resposta).trim();
+    }
+    t.updated_at = agoraISO();
+    DB.salvar();
+    return {
+      id: t.id,
+      assunto: t.subject,
+      mensagem: t.message,
+      status: t.status,
+      resposta: t.resposta != null ? t.resposta : null,
+      criadoEm: t.created_at,
+      lojaId: t.salao_id
     };
   }
 
@@ -882,11 +990,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   function criarExcecao(dados) {
     const { shop } = exigirDono();
     if (!dados.starts_at) err(400, 'Informe a data inicial da folga.');
+    const TIPOS_EXC = ['folga', 'fechamento', 'feriado', 'evento'];
+    const type = TIPOS_EXC.indexOf(dados.type) >= 0 ? dados.type : 'folga';
     const exc = {
       id: DB.proximoId(),
       barbershop_id: shop.id,
       professional_id: dados.professional_id || null,
-      type: dados.type === 'fechamento' ? 'fechamento' : 'folga',
+      type: type,
       starts_at: dados.starts_at,
       ends_at: dados.ends_at || null,
       reason: String(dados.reason || '')
@@ -908,7 +1018,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   /* ================= MOTOR DE DISPONIBILIDADE (RF-032..036) ================= */
 
-  const STEP_MIN = 15;
+  const STEP_MIN = 15; // fallback quando o salão não define intervalo
 
   function periodosDeTrabalho(linhaWh) {
     if (!linhaWh || !linhaWh.is_open) return [];
@@ -961,10 +1071,11 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return blocks;
   }
 
-  function slotsLivres(periodos, durMin, bloqueios) {
+  function slotsLivres(periodos, durMin, bloqueios, stepMin) {
+    const passo = clampInt(stepMin, 5, 180, STEP_MIN);
     const out = new Set();
     periodos.forEach(([pIni, pFim]) => {
-      for (let t = pIni; t + durMin <= pFim; t += STEP_MIN) {
+      for (let t = pIni; t + durMin <= pFim; t += passo) {
         const conflita = bloqueios.some(([bIni, bFim]) => t < bFim && bIni < t + durMin);
         if (!conflita) out.add(DB.minToHHMM(t));
       }
@@ -984,6 +1095,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!shop) err(404, 'Salão não encontrado.');
     if (!dateISO || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) err(400, 'Informe uma data válida (AAAA-MM-DD).');
     const dur = clampInt(durMin, 5, 600, 30);
+    const slotInterval = clampInt(shop.slotIntervalMin || shop.slot_interval_min || STEP_MIN, 5, 180, STEP_MIN);
 
     const dow = DB.diaSemana(dateISO);
     const linhaLoja = db.working_hours.find(w =>
@@ -1014,7 +1126,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
             a.starts_at.startsWith(dateISO + 'T') &&
             a.status !== 'cancelado' && a.status !== 'nao_compareceu')
           .map(a => [DB.hhmmToMin(a.starts_at.slice(11)), DB.hhmmToMin(a.ends_at.slice(11))]));
-      const slots = slotsLivres(periodosLoja, dur, bloqueios).filter(h => !passou(DB.hhmmToMin(h)));
+      const slots = slotsLivres(periodosLoja, dur, bloqueios, slotInterval).filter(h => !passou(DB.hhmmToMin(h)));
       respostaBase.union = slots;
       respostaBase.available_slots = slots;
       respostaBase.shop_only = true;
@@ -1027,7 +1139,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
         w.barbershop_id == shop.id && w.professional_id === p.id && w.day_of_week === dow);
       const periodos = (linha && linha.is_open) ? periodosDeTrabalho(linha) : [];
       if (!periodos.length) periodos.push(...periodosLoja); // fallback ao expediente da loja
-      const slots = slotsLivres(periodos, dur, bloqueiosDoDia(db, shop.id, p.id, dateISO))
+      const slots = slotsLivres(periodos, dur, bloqueiosDoDia(db, shop.id, p.id, dateISO), slotInterval)
         .filter(h => !passou(DB.hhmmToMin(h)));
       respostaBase.per_professional.push({
         professional_id: p.id, professional_name: p.name, color: p.color, slots
@@ -2529,6 +2641,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // super-admin
     superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
-    saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios
+    saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
+    saTickets, saResponderTicket
   };
 })();

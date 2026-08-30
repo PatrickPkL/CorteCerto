@@ -410,6 +410,24 @@ function handleSuperAdmin(req, res, pathname, url) {
     return;
   }
 
+  /* GET /api/super-admin/tickets?status=... */
+  if (rota === 'tickets' && req.method === 'GET') {
+    try {
+      var qs = new URL(url, 'http://localhost').searchParams;
+      var r = API.saTickets({ status: qs.get('status') || 'todos' });
+      json(res, 200, { ok: true, data: r });
+    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/ticket/:id — responde/atualiza status */
+  if (rota === 'ticket' && idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saResponderTicket(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
   json(res, 404, { ok: false, error: 'Rota super-admin não encontrada.' });
 }
 

@@ -61,16 +61,6 @@
   background: linear-gradient(135deg, var(--ink) 0%, var(--ink-soft) 100%);
   position: relative;
 }
-.salon-card-cover::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    transparent 0px, transparent 18px,
-    rgba(184,134,59,0.25) 18px, rgba(184,134,59,0.25) 22px
-  );
-}
 
 .salon-card-body { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
 .salon-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: var(--heading); }

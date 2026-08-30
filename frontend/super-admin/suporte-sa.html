@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suporte · Super Admin · Corte Certo</title>
+<script src="../shared/js/tema-inicio.js"></script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #f0f0f0;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* sidebar */
+  .sa-sidebar {
+    width: 220px;
+    background: #161616;
+    border-right: 1px solid #222;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+  .sa-sidebar-brand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #222;
+    margin-bottom: 8px;
+  }
+  .sa-sidebar-brand span { color: #b8863b; }
+  .sa-sidebar-nav { flex: 1; padding: 8px 0; }
+  .sa-sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    color: #888;
+    text-decoration: none;
+    font-size: .9rem;
+    transition: color .2s, background .2s;
+  }
+  .sa-sidebar-nav a:hover,
+  .sa-sidebar-nav a.active {
+    color: #f0f0f0;
+    background: rgba(184,134,59,.1);
+  }
+  .sa-sidebar-nav a.active { border-right: 3px solid #b8863b; }
+  .sa-sidebar-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #222;
+  }
+  .sa-sidebar-footer a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #888;
+    text-decoration: none;
+    font-size: .85rem;
+    padding: 8px 0;
+    transition: color .2s;
+  }
+  .sa-sidebar-footer a:hover { color: #e74c3c; }
+
+  /* main */
+  .sa-main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  .sa-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .sa-header h1 { font-size: 1.4rem; font-weight: 600; }
+  .sa-header-extra {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .sa-count {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: .85rem;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sa-count strong { color: #b8863b; font-size: 1rem; }
+
+  /* filtros */
+  .sa-filtros {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .sa-filtro-btn {
+    padding: 8px 16px;
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #888;
+    font-size: .85rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .sa-filtro-btn:hover { color: #f0f0f0; border-color: #b8863b; }
+  .sa-filtro-btn.active {
+    color: #0c0c0c;
+    background: #b8863b;
+    border-color: #b8863b;
+    font-weight: 600;
+  }
+
+  /* tabela */
+  .sa-table-wrap {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  .sa-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .sa-table th {
+    text-align: left;
+    padding: 14px 16px;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    border-bottom: 1px solid #222;
+    white-space: nowrap;
+  }
+  .sa-table td {
+    padding: 12px 16px;
+    font-size: .9rem;
+    border-bottom: 1px solid #1a1a1a;
+    vertical-align: top;
+  }
+  .sa-table tbody tr:last-child td { border-bottom: none; }
+  .sa-table tbody tr:hover { background: rgba(184,134,59,.05); }
+  .sa-msg-trunc {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ccc;
+  }
+  .sa-data { color: #888; white-space: nowrap; font-size: .82rem; }
+
+  /* badges status */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-aberto { background: rgba(241,196,15,.15); color: #f1c40f; }
+  .badge-respondido { background: rgba(52,152,219,.15); color: #3498db; }
+  .badge-resolvido { background: rgba(46,204,113,.15); color: #2ecc71; }
+  .badge-fechado { background: #2a2a2a; color: #888; }
+  .badge-em_andamento { background: rgba(155,89,182,.15); color: #9b59b6; }
+
+  /* ação */
+  .sa-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 600;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .sa-btn:hover { opacity: .88; }
+  .sa-btn-brass { background: #b8863b; color: #0c0c0c; }
+  .sa-btn-ghost { background: transparent; border: 1px solid #333; color: #888; }
+
+  .sa-vazio {
+    color: #888;
+    text-align: center;
+    padding: 32px 0;
+  }
+
+  /* modal */
+  .sa-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+  }
+  .sa-modal.show { display: flex; }
+  .sa-modal-box {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 560px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .sa-modal-box h3 { font-size: 1.05rem; margin-bottom: 16px; }
+  .sa-modal-meta {
+    font-size: .85rem;
+    color: #888;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .sa-modal-block {
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  .sa-modal-block .lbl {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .sa-modal-block .txt { color: #f0f0f0; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
+  .sa-modal-field { margin-bottom: 16px; }
+  .sa-modal-field .lbl {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .sa-modal-field select,
+  .sa-modal-field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: .9rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    outline: none;
+  }
+  .sa-modal-field select:focus,
+  .sa-modal-field textarea:focus { border-color: #b8863b; }
+  .sa-modal-field textarea { min-height: 90px; resize: vertical; }
+  .sa-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  /* responsive */
+  @media (max-width: 768px) {
+    .sa-sidebar { width: 60px; }
+    .sa-sidebar-brand,
+    .sa-sidebar-nav a span,
+    .sa-sidebar-footer a span { display: none; }
+    .sa-sidebar-nav a { justify-content: center; padding: 12px 0; }
+    .sa-main { margin-left: 60px; padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sa-sidebar">
+  <div class="sa-sidebar-brand">Corte<span>Certo</span></div>
+  <nav class="sa-sidebar-nav">
+    <a href="index.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="relatorios.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Relatórios</span>
+    </a>
+    <a href="suporte-sa.html" class="active">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+      <span>Suporte</span>
+    </a>
+    <a href="index.html#lojas-section">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Lojas</span>
+    </a>
+  </nav>
+  <div class="sa-sidebar-footer">
+    <a href="#" id="btn-sair">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>Sair</span>
+    </a>
+  </div>
+</aside>
+
+<main class="sa-main">
+  <div class="sa-header">
+    <h1>Suporte</h1>
+    <div class="sa-header-extra">
+      <div class="sa-count">Tickets abertos: <strong id="sa-total-abertos">0</strong></div>
+    </div>
+  </div>
+
+  <div class="sa-filtros" id="sa-filtros">
+    <button class="sa-filtro-btn active" data-status="todos">Todos</button>
+    <button class="sa-filtro-btn" data-status="aberto">Aberto</button>
+    <button class="sa-filtro-btn" data-status="respondido">Respondido</button>
+    <button class="sa-filtro-btn" data-status="resolvido">Resolvido</button>
+  </div>
+
+  <div class="sa-table-wrap">
+    <table class="sa-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Loja</th>
+          <th>Cidade</th>
+          <th>Assunto</th>
+          <th>Mensagem</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-tickets">
+        <tr><td colspan="7" class="sa-vazio">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- modal -->
+<div class="sa-modal" id="sa-modal">
+  <div class="sa-modal-box">
+    <h3 id="sa-modal-titulo">Responder Ticket</h3>
+    <div class="sa-modal-meta" id="sa-modal-meta"></div>
+    <div class="sa-modal-block">
+      <div class="lbl">Assunto</div>
+      <div class="txt" id="sa-modal-assunto"></div>
+    </div>
+    <div class="sa-modal-block">
+      <div class="lbl">Mensagem</div>
+      <div class="txt" id="sa-modal-mensagem"></div>
+    </div>
+    <input type="hidden" id="sa-modal-ticket-id">
+    <div class="sa-modal-field">
+      <div class="lbl">Status</div>
+      <select id="sa-modal-status">
+        <option value="respondido">Marcado como Respondido</option>
+        <option value="resolvido">Marcado como Resolvido</option>
+        <option value="aberto">Manter Aberto</option>
+        <option value="fechado">Fechar</option>
+      </select>
+    </div>
+    <div class="sa-modal-field">
+      <div class="lbl">Resposta (opcional)</div>
+      <textarea id="sa-modal-resposta" placeholder="Digite a resposta que será exibida ao dono da loja..."></textarea>
+    </div>
+    <div class="sa-modal-actions">
+      <button class="sa-btn sa-btn-ghost" id="sa-modal-cancel">Cancelar</button>
+      <button class="sa-btn sa-btn-brass" id="sa-modal-salvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../shared/js/shared.js"></script>
+<script src="js/super-auth.js"></script>
+<script src="js/suporte-sa.js"></script>
+
+</body>
+</html>

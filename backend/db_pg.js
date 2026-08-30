@@ -88,6 +88,7 @@ function lojaPublica(b) {
     lat: b.lat == null ? null : Number(b.lat), lng: b.lng == null ? null : Number(b.lng),
     logo_url: b.logo_url, cover_url: b.cover_url, tags: b.tags || [],
     rating_base: Number(b.rating_base || 0), rating_count_base: Number(b.rating_count_base || 0),
+    slot_interval_min: Number(b.slot_interval_min || 15),
     created_at: fmtLocal(b.created_at), updated_at: fmtLocal(b.updated_at)
   };
 }

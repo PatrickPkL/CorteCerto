@@ -290,6 +290,19 @@
   margin-top: 14px;
 }
 
+.exc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #222;
+}
+.exc-item:last-child { border-bottom: 0; }
+.exc-info { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.exc-info strong { color: var(--brass); }
+.exc-list { margin-top: 8px; }
+
 .btn-back {
   position: static;
   display: inline-flex;

@@ -94,8 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
         : '<strong>Verifique seu e-mail/telefone</strong> — você recebeu um código de 6 dígitos.';
     }
     if (infoFone) {
+      const destinoRegistro = (fluxo && fluxo.payload && fluxo.payload.modo === 'registro' && fluxo.payload.email)
+        ? String(fluxo.payload.email).trim() : '';
       infoFone.textContent = 'Digite o código de 6 dígitos enviado para ' +
-        String(fluxo && fluxo.ident ? fluxo.ident : '').trim() + '.';
+        (destinoRegistro ? destinoRegistro : String(fluxo && fluxo.ident ? fluxo.ident : '').trim()) + '.';
     }
     if (etapaCodigo) etapaCodigo.style.display = '';
     if (inputCodigo) inputCodigo.focus();

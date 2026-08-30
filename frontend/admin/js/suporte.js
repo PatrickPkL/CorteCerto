@@ -22,8 +22,18 @@ document.addEventListener('DOMContentLoaded', () => {
       respondido: ['badge-confirmado', 'Respondido'],
       resolvido: ['badge-confirmado', 'Resolvido']
     };
-    const [cls, txt] = map[status] || ['', status];
+    const [cls, txt] = map[status] || ['badge-pendente', status];
     return '<span class="badge ' + cls + '">' + esc(txt) + '</span>';
+  }
+
+  function corpoMensagem(c) {
+    const msg = esc(c.message || c.mensagem || '');
+    let html = '<div>' + msg + '</div>';
+    const resposta = c.resposta;
+    if (c.status !== 'aberto' && resposta != null && String(resposta).trim() !== '') {
+      html += '<div class="suporte-resposta">Resposta da equipe: ' + esc(String(resposta)) + '</div>';
+    }
+    return html;
   }
 
   function renderChamados() {
@@ -37,9 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     tb.innerHTML = chamados.map(c =>
       '<tr>' +
-        '<td class="mono">' + DB.fmtDataBR(c.criadoEm) + '</td>' +
-        '<td style="white-space:nowrap;">' + esc(c.assunto) + '</td>' +
-        '<td style="max-width:420px;">' + esc(c.mensagem) + '</td>' +
+        '<td class="mono">' + DB.fmtDataBR(c.created_at || c.criadoEm) + '</td>' +
+        '<td style="white-space:nowrap;">' + esc(c.subject || c.assunto || '') + '</td>' +
+        '<td style="max-width:420px;">' + corpoMensagem(c) + '</td>' +
         '<td>' + badge(c.status) + '</td>' +
       '</tr>'
     ).join('');

@@ -10,3 +10,5 @@ database/chats.json
 .pg/
 .DS_Store
 Thumbs.db
+*.log
+Tela inicial.html

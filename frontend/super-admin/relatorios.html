@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard · Super Admin · Corte Certo</title>
+<title>Relatórios · Super Admin · Corte Certo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -83,12 +83,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
     margin-bottom: 28px;
   }
-  .sa-header h1 {
-    font-size: 1.4rem;
-    font-weight: 600;
+  .sa-header h1 { font-size: 1.4rem; font-weight: 600; }
+
+  /* periodo */
+  .sa-periodo select {
+    padding: 10px 14px;
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: .9rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .2s;
   }
+  .sa-periodo select:focus { border-color: #b8863b; }
 
   /* stats */
   .sa-stats-grid {
@@ -116,54 +130,26 @@
     color: #b8863b;
   }
 
-  /* busca */
-  .sa-busca {
-    margin-bottom: 16px;
-  }
-  .sa-busca input {
-    width: 100%;
-    max-width: 400px;
-    padding: 10px 14px;
-    background: #161616;
-    border: 1px solid #222;
-    border-radius: 8px;
-    color: #f0f0f0;
-    font-size: .9rem;
-    font-family: system-ui, -apple-system, sans-serif;
-    outline: none;
-    transition: border-color .2s;
-  }
-  .sa-busca input:focus { border-color: #b8863b; }
-  .sa-busca input::placeholder { color: #555; }
-
-  /* filtros */
-  .sa-filtros {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-  }
-  .sa-filtros select {
-    padding: 10px 14px;
-    background: #161616;
-    border: 1px solid #222;
-    border-radius: 8px;
-    color: #f0f0f0;
-    font-size: .9rem;
-    font-family: system-ui, -apple-system, sans-serif;
-    outline: none;
-    cursor: pointer;
-    transition: border-color .2s;
-  }
-  .sa-filtros select:focus { border-color: #b8863b; }
-
-  /* tabela */
-  .sa-table-wrap {
+  /* section */
+  .sa-section {
     background: #161616;
     border: 1px solid #222;
     border-radius: 10px;
-    overflow-x: auto;
+    margin-bottom: 20px;
+    overflow: hidden;
   }
+  .sa-section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #222;
+    font-size: .9rem;
+    font-weight: 600;
+    color: #b8863b;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .sa-section-body { overflow-x: auto; }
+
+  /* tabela */
   .sa-table {
     width: 100%;
     border-collapse: collapse;
@@ -176,13 +162,39 @@
     letter-spacing: .5px;
     color: #888;
     border-bottom: 1px solid #222;
+    white-space: nowrap;
   }
   .sa-table td {
     padding: 12px 16px;
     font-size: .9rem;
     border-bottom: 1px solid #1a1a1a;
+    white-space: nowrap;
   }
+  .sa-table tbody tr:last-child td { border-bottom: none; }
   .sa-table tbody tr:hover { background: rgba(184,134,59,.05); }
+
+  /* atividade */
+  .sa-atividade { padding: 8px 0; }
+  .sa-atividade-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: .9rem;
+  }
+  .sa-atividade-row:last-child { border-bottom: none; }
+  .sa-atividade-data {
+    color: #888;
+    font-size: .8rem;
+    flex-shrink: 0;
+  }
+  .sa-atividade-nome { font-weight: 600; }
+  .sa-atividade-email { color: #888; }
+  .sa-atividade-papel {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
 
   /* badges */
   .badge {
@@ -193,15 +205,20 @@
     font-weight: 600;
     text-transform: uppercase;
   }
-  .badge-free { background: #2a2a2a; color: #888; }
-  .badge-basic { background: rgba(184,134,59,.15); color: #b8863b; }
-  .badge-pro { background: rgba(46,204,113,.15); color: #2ecc71; }
-  .badge-enterprise { background: rgba(155,89,182,.15); color: #9b59b6; }
-  .badge-active { background: rgba(46,204,113,.15); color: #2ecc71; }
-  .badge-inactive { background: rgba(231,76,60,.15); color: #e74c3c; }
   .badge-trial { background: rgba(184,134,59,.15); color: #b8863b; }
+  .badge-ativa { background: rgba(46,204,113,.15); color: #2ecc71; }
   .badge-cancelada { background: rgba(231,76,60,.15); color: #e74c3c; }
   .badge-nenhum { background: #2a2a2a; color: #888; }
+  .badge-admin { background: rgba(155,89,182,.15); color: #9b59b6; }
+  .badge-owner { background: rgba(52,152,219,.15); color: #3498db; }
+  .badge-dono { background: rgba(52,152,219,.15); color: #3498db; }
+  .badge-user { background: rgba(46,204,113,.15); color: #2ecc71; }
+
+  .sa-vazio {
+    color: #888;
+    text-align: center;
+    padding: 32px 0;
+  }
 
   /* responsive */
   @media (max-width: 768px) {
@@ -220,19 +237,15 @@
 <aside class="sa-sidebar">
   <div class="sa-sidebar-brand">Corte<span>Certo</span></div>
   <nav class="sa-sidebar-nav">
-    <a href="index.html" class="active">
+    <a href="index.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <span>Dashboard</span>
     </a>
-    <a href="relatorios.html">
+    <a href="relatorios.html" class="active">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       <span>Relatórios</span>
     </a>
-    <a href="suporte-sa.html">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-      <span>Suporte</span>
-    </a>
-    <a href="#lojas-section">
+    <a href="index.html#lojas-section">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span>Lojas</span>
     </a>
@@ -247,87 +260,94 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>Dashboard</h1>
+    <h1>Relatórios</h1>
+    <div class="sa-periodo">
+      <select id="sa-periodo">
+        <option value="d30">Últimos 30 dias</option>
+        <option value="d90">Últimos 90 dias</option>
+        <option value="d365">12 meses</option>
+      </select>
+    </div>
   </div>
 
   <div class="sa-stats-grid">
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Total Lojas</div>
-      <div class="sa-stat-value" id="stat-lojas">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Total Usuários</div>
-      <div class="sa-stat-value" id="stat-users">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Agendamentos Hoje</div>
-      <div class="sa-stat-value" id="stat-agendamentos">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Receita Total</div>
+      <div class="sa-stat-label">Receita no Período</div>
       <div class="sa-stat-value" id="stat-receita">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Lojas em Trial</div>
-      <div class="sa-stat-value" id="stat-trial">—</div>
+      <div class="sa-stat-label">Novas Lojas no Período</div>
+      <div class="sa-stat-value" id="stat-lojas">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Lojas Ativas</div>
-      <div class="sa-stat-value" id="stat-ativas">—</div>
+      <div class="sa-stat-label">Novos Usuários no Período</div>
+      <div class="sa-stat-value" id="stat-usuarios">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Conversão Trial → Ativa</div>
-      <div class="sa-stat-value" id="stat-conversao">—</div>
+      <div class="sa-stat-label">Agendamentos no Período</div>
+      <div class="sa-stat-value" id="stat-agendamentos">—</div>
     </div>
   </div>
 
-  <div id="lojas-section">
-    <h2 style="font-size:1.1rem; margin-bottom:16px;">Lojas</h2>
-    <div class="sa-busca">
-      <input type="text" id="input-busca" placeholder="Buscar por nome, cidade ou owner...">
-    </div>
-    <div class="sa-filtros">
-      <select id="filtro-status">
-        <option value="todas">Status: todas</option>
-        <option value="trial">Trial</option>
-        <option value="ativa">Ativa</option>
-        <option value="cancelada">Cancelada</option>
-        <option value="nenhum">Sem assinatura</option>
-      </select>
-      <select id="filtro-plano">
-        <option value="todos">Plano: todos</option>
-        <option value="Autonomo">Autonomo</option>
-        <option value="Salao">Salao</option>
-        <option value="Salao Pro">Salao Pro</option>
-        <option value="nenhum">Sem plano</option>
-      </select>
-    </div>
-    <div class="sa-table-wrap">
+  <!-- Assinaturas por Plano -->
+  <div class="sa-section">
+    <div class="sa-section-header">Assinaturas por Plano</div>
+    <div class="sa-section-body">
       <table class="sa-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Nome</th>
-            <th>Cidade</th>
             <th>Plano</th>
-            <th>Status</th>
-            <th>Profissionais</th>
-            <th>Agendamentos</th>
+            <th>Preço/Mês</th>
+            <th>Total</th>
+            <th>Ativas</th>
+            <th>Trial</th>
+            <th>Canceladas</th>
           </tr>
         </thead>
-        <tbody id="tbody-lojas">
-          <tr>
-            <td colspan="7" style="text-align:center; color:#888; padding:32px 0;">Carregando...</td>
-          </tr>
+        <tbody id="tbody-planos">
+          <tr><td colspan="6" class="sa-vazio">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
+
+  <!-- Top 10 Lojas por Receita -->
+  <div class="sa-section">
+    <div class="sa-section-header">Top 10 Lojas por Receita</div>
+    <div class="sa-section-body">
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Loja</th>
+            <th>Cidade</th>
+            <th>Plano</th>
+            <th>Receita</th>
+            <th>Agendamentos</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-top">
+          <tr><td colspan="6" class="sa-vazio">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Atividade Recente -->
+  <div class="sa-section">
+    <div class="sa-section-header">Atividade Recente</div>
+    <div class="sa-section-body">
+      <div class="sa-atividade" id="atividade-recente">
+        <div class="sa-vazio">Carregando...</div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script src="../shared/js/shared.js"></script>
 <script src="js/super-auth.js"></script>
-<script src="js/super-admin.js"></script>
+<script src="js/relatorios.js"></script>
 
 </body>
 </html>

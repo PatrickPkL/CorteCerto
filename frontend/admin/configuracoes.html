@@ -10,7 +10,6 @@
 <link rel="stylesheet" href="css/admin.css">
 </head>
 <body data-page="configuracoes">
-<div class="stripe"></div>
 <div id="sidebar-overlay" class="sidebar-overlay"></div>
 <button class="hamburger" id="hamburger" aria-label="Menu">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
@@ -53,6 +52,10 @@
       <li class="nav-item"><a href="profissionais.html">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="18" cy="7" r="2.2"/><path d="M15.5 14c2.6.3 4.5 2.2 4.5 5"/></svg>
         Profissionais
+      </a></li>
+      <li class="nav-item"><a href="horarios.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        Horários
       </a></li>
     </ul>
 
@@ -158,137 +161,6 @@
         </form>
       </div>
 
-      <div class="card" style="grid-column: 1 / -1;">
-        <h3 class="section-title">Horário de funcionamento</h3>
-
-        <div class="schedule-grid">
-          <div class="schedule-header">
-            <span></span>
-            <span>Dia</span>
-            <span>Funcionamento</span>
-            <span>Intervalo</span>
-            <span></span>
-          </div>
-
-          <div class="schedule-row" data-dia="1">
-            <label class="toggle"><input type="checkbox" checked data-toggle="seg"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Segunda</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="seg">
-              <span>às</span>
-              <input type="time" value="19:00" data-close="seg">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="seg">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="seg">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row" data-dia="2">
-            <label class="toggle"><input type="checkbox" checked data-toggle="ter"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Terça</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="ter">
-              <span>às</span>
-              <input type="time" value="19:00" data-close="ter">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="ter">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="ter">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row" data-dia="3">
-            <label class="toggle"><input type="checkbox" checked data-toggle="qua"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Quarta</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="qua">
-              <span>às</span>
-              <input type="time" value="19:00" data-close="qua">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="qua">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="qua">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row" data-dia="4">
-            <label class="toggle"><input type="checkbox" checked data-toggle="qui"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Quinta</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="qui">
-              <span>às</span>
-              <input type="time" value="19:00" data-close="qui">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="qui">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="qui">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row" data-dia="5">
-            <label class="toggle"><input type="checkbox" checked data-toggle="sex"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Sexta</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="sex">
-              <span>às</span>
-              <input type="time" value="19:00" data-close="sex">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="sex">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="sex">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row" data-dia="6">
-            <label class="toggle"><input type="checkbox" checked data-toggle="sab"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Sábado</span>
-            <div class="schedule-times">
-              <input type="time" value="09:00" data-open="sab">
-              <span>às</span>
-              <input type="time" value="14:00" data-close="sab">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="sab">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="sab">
-            </div>
-            <span class="badge badge-confirmado schedule-status">Aberto</span>
-          </div>
-
-          <div class="schedule-row schedule-folga" data-dia="0">
-            <label class="toggle"><input type="checkbox" data-toggle="dom"><span class="toggle-slider"></span></label>
-            <span class="schedule-day-name">Domingo</span>
-            <div class="schedule-times">
-              <input type="time" value="10:00" data-open="dom">
-              <span>às</span>
-              <input type="time" value="15:00" data-close="dom">
-            </div>
-            <div class="schedule-break">
-              <input type="time" value="12:00" data-lunch-ini="dom">
-              <span>às</span>
-              <input type="time" value="13:00" data-lunch-fim="dom">
-            </div>
-            <span class="badge badge-pendente schedule-status">Folga</span>
-          </div>
-        </div>
-
-        <div class="schedule-actions">
-          <button type="button" class="btn btn-outline" id="btn-aplicar-todos">Aplicar a todos</button>
-          <button type="submit" class="btn btn-brass" form="form-config-horario">Salvar</button>
-        </div>
-        <form id="form-config-horario" style="display:none;"></form>
-      </div>
     </div>
 
     <div class="card" style="margin-top:20px;">

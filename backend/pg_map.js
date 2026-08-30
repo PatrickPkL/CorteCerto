@@ -114,6 +114,7 @@ const MAP = [
       logo_url: b.logo_url, cover_url: b.cover_url,
       tags: knexArr(b.tags || []),
       rating_base: (b.ratingBase || 0), rating_count_base: (b.ratingCountBase || 0),
+      slot_interval_min: (b.slotIntervalMin || 15),
       created_at: toPgDate(b.created_at) || new Date(), updated_at: toPgDate(b.updated_at) || new Date()
     }),
     toMem: (r) => ({
@@ -123,6 +124,7 @@ const MAP = [
       lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng),
       logo_url: r.logo_url, cover_url: r.cover_url, tags: r.tags || [],
       ratingBase: Number(r.rating_base || 0), ratingCountBase: Number(r.rating_count_base || 0),
+      slotIntervalMin: Number(r.slot_interval_min || 15),
       created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
     })
   },
@@ -322,12 +324,13 @@ const MAP = [
     colecao: 'tickets', tabela: 'tickets', pk: 'id', dateOut: 'iso',
     toPg: (t) => ({
       id: t.id, salao_id: t.salao_id || null, user_id: t.user_id || null, subject: t.subject,
-      message: t.message, status: t.status || 'aberto',
+      message: t.message, status: t.status || 'aberto', resposta: t.resposta != null ? t.resposta : null,
       created_at: toPgDate(t.created_at) || new Date(), updated_at: toPgDate(t.updated_at) || new Date()
     }),
     toMem: (r) => ({
       id: r.id, salao_id: r.salao_id, user_id: r.user_id, subject: r.subject, message: r.message,
-      status: r.status, created_at: toMemDate(r.created_at, 'iso')
+      status: r.status, resposta: r.resposta != null ? r.resposta : null,
+      created_at: toMemDate(r.created_at, 'iso')
     })
   },
   {
@@ -366,7 +369,7 @@ const CASTS = {
   users: { role: 'usr_role', prefs: 'jsonb', consentimentos: 'jsonb[]', created_at: 'timestamptz', updated_at: 'timestamptz' },
   sessions: { user_id: 'uuid', expires_at: 'timestamptz', created_at: 'timestamptz' },
   sms_codes: { expires_at: 'timestamptz', next_allowed_at: 'timestamptz', created_at: 'timestamptz', payload: 'jsonb' },
-  barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', slot_interval_min: 'int', created_at: 'timestamptz', updated_at: 'timestamptz' },
   services: { barbershop_id: 'uuid', price: 'numeric', duration_min: 'int', sort_order: 'int', updated_at: 'timestamptz', created_at: 'timestamptz' },
   professionals: { barbershop_id: 'uuid', user_id: 'uuid', is_active: 'boolean', created_at: 'timestamptz', updated_at: 'timestamptz' },
   professional_services: { professional_id: 'uuid', service_id: 'uuid', price_override: 'numeric' },

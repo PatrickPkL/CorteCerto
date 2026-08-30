@@ -15,6 +15,10 @@ if (!DEMO_MODE) {
   });
 }
 
+function temEmailReal() {
+  return !DEMO_MODE;
+}
+
 function enviarEmailComTimeout(destino, tag) {
   if (DEMO_MODE) {
     console.log("========================================");
@@ -94,6 +98,23 @@ function enviarLinkMagico(email, token, nome) {
     subject: "Confirme seu e-mail — Corte Certo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "link-magico");
+}
+
+function enviarCodigoVerificacao(email, codigo) {
+  var conteudo =
+    '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá!</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Use o código abaixo para concluir seu cadastro no Corte Certo:</p>' +
+    '<div style="text-align:center;background-color:#f9f9f9;border-radius:8px;padding:24px;margin:16px 0;">' +
+      '<span style="display:inline-block;color:#b8863b;font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace;">' + String(codigo) + "</span>" +
+    "</div>" +
+    '<p style="color:#999999;font-size:12px;margin:16px 0 0 0;text-align:center;">Este código expira em 10 minutos.</p>';
+
+  return enviarEmailComTimeout({
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
+    to: email,
+    subject: "Seu código de verificação — Corte Certo",
+    html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
+  }, "codigo-verificacao");
 }
 
 function enviarConfirmacaoAgendamento(email, dados) {
@@ -194,6 +215,8 @@ function enviarLembrete(email, dados) {
 
 module.exports = {
   enviarLinkMagico: enviarLinkMagico,
+  enviarCodigoVerificacao: enviarCodigoVerificacao,
+  temEmailReal: temEmailReal,
   enviarConfirmacaoAgendamento: enviarConfirmacaoAgendamento,
   enviarNovoAgendamento: enviarNovoAgendamento,
   enviarBoasVindas: enviarBoasVindas,

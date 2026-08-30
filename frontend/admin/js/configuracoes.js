@@ -74,94 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = '';
   });
 
-  /* ---------- horários de funcionamento (DT-09) ---------- */
-  const DIAS_LABEL = { 0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado' };
-
-  function renderHorarios() {
-    let linhas = [];
-    try { linhas = API.horariosDaLoja(loja.id, true); } catch (e) { /* noop */ }
-
-    document.querySelectorAll('.schedule-row').forEach(row => {
-      const dow = Number(row.dataset.dia);
-      const h = linhas.find(w => w.day_of_week === dow);
-      if (!h) return;
-      row.querySelector('[data-toggle]').checked = !!h.is_open;
-      row.querySelector('[data-open]').value = h.start_time || '09:00';
-      row.querySelector('[data-close]').value = h.end_time || '18:00';
-      row.querySelector('[data-lunch-ini]').value = h.lunch_start || '';
-      row.querySelector('[data-lunch-fim]').value = h.lunch_end || '';
-      atualizarStatusRow(row, !!h.is_open);
-
-      const label = row.querySelector('.schedule-dia-label');
-      if (label) label.textContent = DIAS_LABEL[dow] || '';
-    });
-  }
-
-  function atualizarStatusRow(row, aberto) {
-    row.classList.toggle('schedule-folga', !aberto);
-    const st = row.querySelector('.schedule-status');
-    if (st) {
-      st.className = 'badge schedule-status ' + (aberto ? 'badge-confirmado' : 'badge-pendente');
-      st.textContent = aberto ? 'Aberto' : 'Fechado';
-    }
-  }
-
-  document.querySelectorAll('.schedule-row [data-toggle]').forEach(tgl => {
-    tgl.addEventListener('change', () => {
-      atualizarStatusRow(tgl.closest('.schedule-row'), tgl.checked);
-    });
-  });
-
-  document.getElementById('btn-aplicar-todos')?.addEventListener('click', () => {
-    const first = document.querySelector('.schedule-row');
-    if (!first) return;
-    const vals = {
-      open: first.querySelector('[data-open]').value,
-      close: first.querySelector('[data-close]').value,
-      li: first.querySelector('[data-lunch-ini]').value,
-      lf: first.querySelector('[data-lunch-fim]').value
-    };
-    document.querySelectorAll('.schedule-row').forEach(r => {
-      r.querySelector('[data-open]').value = vals.open;
-      r.querySelector('[data-close]').value = vals.close;
-      r.querySelector('[data-lunch-ini]').value = vals.li;
-      r.querySelector('[data-lunch-fim]').value = vals.lf;
-    });
-    showToast('Horários copiados para todos os dias — clique em Salvar.');
-  });
-
-  document.getElementById('form-config-horario')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const dias = [];
-    let erroAlmoco = null;
-    document.querySelectorAll('.schedule-row').forEach(row => {
-      const aberto = row.querySelector('[data-toggle]').checked;
-      const li = row.querySelector('[data-lunch-ini]').value;
-      const lf = row.querySelector('[data-lunch-fim]').value;
-      if (aberto && li && lf && li >= lf && !erroAlmoco) {
-        erroAlmoco = DIAS_LABEL[row.dataset.dia];
-      }
-      dias.push({
-        day_of_week: Number(row.dataset.dia),
-        is_open: aberto,
-        start_time: row.querySelector('[data-open]').value,
-        end_time: row.querySelector('[data-close]').value,
-        lunch_start: li || null,
-        lunch_end: lf || null
-      });
-    });
-    if (erroAlmoco) {
-      showToast('Início do almoço deve ser antes do fim (' + erroAlmoco + ').', 'error');
-      return;
-    }
-    try {
-      API.salvarHorariosLoja(dias);
-      showToast('Horários salvos! Já valem no agendamento público.');
-      renderHorarios();
-    } catch (err2) {
-      showToast(msgErro(err2), 'error');
-    }
-  });
 
   /* ---------- galeria ---------- */
   const galleryGrid = document.getElementById('gallery-grid');
@@ -293,6 +205,5 @@ document.addEventListener('DOMContentLoaded', () => {
   modalExcluir?.addEventListener('click', e => { if (e.target === modalExcluir) fecharModal(modalExcluir); });
 
   preencherDados();
-  renderHorarios();
   renderGaleria();
 });

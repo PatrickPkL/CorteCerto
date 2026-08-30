@@ -199,7 +199,7 @@ window.Auth = (function () {
       const nome = String(dados.name || '').trim();
       if (!nome) throw { status: 400, error: 'Informe seu nome.' };
       const email = String(dados.email || '').trim();
-      if (email && !email.includes('@')) throw { status: 400, error: 'E-mail inválido.' };
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw { status: 400, error: 'Informe um e-mail válido.' };
       const role = dados.role === 'dono' ? 'dono' : 'cliente';
       if (role === 'dono' && !String(dados.salon_name || '').trim()) {
         throw { status: 400, error: 'Informe o nome do salão.' };
@@ -247,6 +247,17 @@ window.Auth = (function () {
         .catch(function(e) { console.error('[sms] falha:', e); });
     }
 
+    /* envio do código de 6 dígitos por e-mail em todos os modos (RF-002, entrega real):
+       login/recuperar por e-mail usam a identidade (ident); recuperar por telefone e
+       registro usam o e-mail informado ou o e-mail já cadastrado do usuário. */
+    var emailCodigo = porEmail
+      ? ident
+      : (String(dados.email || '') || (existente && existente.email) || '').trim();
+    if (emailCodigo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCodigo)) {
+      Mailer.enviarCodigoVerificacao(emailCodigo, code)
+        .catch(function(e) { console.error('[mailer] falha ao enviar código de verificação:', e); });
+    }
+
     /* link mágico por e-mail (se usuário tem email) */
     var emailDestino = porEmail ? ident : (dados.email || '');
     if (!emailDestino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino)) {
@@ -283,13 +294,16 @@ window.Auth = (function () {
         .catch(function(e) { console.error('[mailer] falha:', e); });
     }
 
-    return {
+    var resposta = {
       ok: true,
       expires_in_seconds: 600,
-      cooldown_seconds: COOLDOWN_MS / 1000,
-      /* RNF-19: sem servidor de SMS real, a UI exibe o código (banner demo) */
-      demo_code: String(code)
+      cooldown_seconds: COOLDOWN_MS / 1000
     };
+    if (!Mailer.temEmailReal()) {
+      /* RNF-19: sem e-mail real, a UI exibe o código (banner demo) */
+      resposta.demo_code = String(code);
+    }
+    return resposta;
   }
 
   /** Reenvio usa a mesma validação de cooldown do request original. */
