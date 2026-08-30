@@ -9,22 +9,34 @@ var DEMO_MODE = !GMAIL_USER || !GMAIL_PASS;
 var transporter = null;
 var transporterPorta = null;
 
-/* Render/Neon bloqueiam certas portas no egress — experimenta as
-   portas SMTP do Gmail até uma conectar. 465 (SSL) primeiro e 587
-   (STARTTLS) como fallback. family:4 evita ENETUNREACH de IPv6. */
+/* Gmail aceita envio pelas portas 465 (SSL implícito) e 587 (STARTTLS).
+   O Render só tem rota IPv4 — por isso resolvemos o IPv4 do Gmail de forma
+   explícita e conectamos no IP (family:4 às vezes é ignorado/falha silenciosa). */
 var PORTAS_SMTP = [465, 587];
 
-function criarTransporter(porta) {
+var dns = require("dns");
+
+/* Obtém o primeiro endereço IPv4 de smtp.gmail.com. */
+function resolverIPv4() {
+  return new Promise(function (resolve, reject) {
+    dns.resolve4("smtp.gmail.com", function (err, enderecos) {
+      if (err || !enderecos || !enderecos.length) return reject(err || new Error("Sem IPv4 para smtp.gmail.com"));
+      resolve(enderecos[0]);
+    });
+  });
+}
+
+function criarTransporter(porta, ip) {
   var nodemailer = require("nodemailer");
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host: ip,
     port: porta,
     secure: porta === 465,
-    family: 4,
     requireTLS: porta !== 465,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
+    tls: { servername: "smtp.gmail.com" },
     auth: { user: GMAIL_USER, pass: GMAIL_PASS.replace(/\s/g, "") }
   });
 }
@@ -33,29 +45,32 @@ function criarTransporter(porta) {
    Testa as portas em paralelo e usa a que responder primeiro. */
 function garantirTransporter() {
   if (transporter) return Promise.resolve(transporter);
-  var tentativas = PORTAS_SMTP.map(function (porta) {
-    var t = criarTransporter(porta);
-    return t.verify()
-      .then(function () {
-        throw { porta: porta, t: t }; // sinaliza sucesso
-      })
-      .catch(function (e) {
-        return { porta: porta, t: t, erro: e };
-      });
-  });
-  return Promise.all(tentativas).then(function (resultados) {
-    var ok = resultados.find(function (r) { return r && r.t; });
-    if (!ok) { // nenhuma porta conectou — usa a primeira e deixa o envio falhar com erro real
-      ok = { porta: PORTAS_SMTP[0], t: criUltimo(PORTAS_SMTP[0]) };
-    }
-    transporter = ok.t;
-    transporterPorta = ok.porta;
-    console.log("[EMAIL] Conectado ao Gmail via porta " + ok.porta);
-    return transporter;
+  return resolverIPv4().then(function (ip) {
+    var tentativas = PORTAS_SMTP.map(function (porta) {
+      var t = criarTransporter(porta, ip);
+      return t.verify()
+        .then(function () {
+          return { porta: porta, t: t, ok: true };
+        })
+        .catch(function (e) {
+          return { porta: porta, t: t, ok: false, erro: e };
+        });
+    });
+    return Promise.all(tentativas).then(function (resultados) {
+      var ok = null;
+      for (var i = 0; i < resultados.length; i++) {
+        if (resultados[i].ok) { ok = resultados[i]; break; }
+      }
+      if (!ok) { // nenhuma porta conectou — usa a primeira e deixa o envio falhar com erro real
+        ok = { porta: PORTAS_SMTP[0], t: criarTransporter(PORTAS_SMTP[0], ip) };
+      }
+      transporter = ok.t;
+      transporterPorta = ok.porta;
+      console.log("[EMAIL] Conectado ao Gmail " + ip + " via porta " + ok.porta);
+      return transporter;
+    });
   });
 }
-
-function criUltimo(porta) { return criarTransporter(porta); }
 
 function temEmailReal() {
   return !DEMO_MODE;

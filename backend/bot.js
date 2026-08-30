@@ -1457,6 +1457,7 @@ function containerHTML(conteudo) {
 /* ---------------- envio de e-mails (real / demo) ---------------- */
 
 let _transporter = null;
+let _transporterIP = null;
 
 function enviarEmail(opts) {
   const remetente = gmailUser();
@@ -1475,12 +1476,29 @@ function enviarEmail(opts) {
 
   if (!_transporter) {
     const nodemailer = require('nodemailer');
-    _transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      family: 4,
-      auth: { user: remetente, pass: gmailPass().replace(/\s/g, '') }
+    const dns = require('dns');
+    _transporterIP = null;
+    _transporter = new Promise((resolve, reject) => {
+      dns.resolve4('smtp.gmail.com', (err, enderecos) => {
+        if (err || !enderecos || !enderecos.length) return reject(err || new Error('Sem IPv4 para smtp.gmail.com'));
+        _transporterIP = enderecos[0];
+        const fazer = porta => nodemailer.createTransport({
+          host: _transporterIP,
+          port: porta,
+          secure: porta === 465,
+          requireTLS: porta !== 465,
+          connectionTimeout: 15000,
+          greetingTimeout: 15000,
+          socketTimeout: 30000,
+          tls: { servername: 'smtp.gmail.com' },
+          auth: { user: remetente, pass: gmailPass().replace(/\s/g, '') }
+        });
+        const testar = porta => fazer(porta).verify().then(() => porta)
+          .catch(() => (porta === 465 ? testar(587) : Promise.reject(new Error('Sem porta SMTP Gmail disponível'))));
+        testar(465)
+          .then(porta => { console.log('[BOT][envio] Gmail ' + _transporterIP + ' via porta ' + porta); resolve(fazer(porta)); })
+          .catch(reject);
+      });
     });
   }
 
@@ -1497,7 +1515,8 @@ function enviarEmail(opts) {
   mailOptions.headers['X-Auto-Response-Suppress'] = 'All';
   mailOptions.headers['Precedence'] = 'bulk';
 
-  return _transporter.sendMail(mailOptions)
+  return Promise.resolve(_transporter)
+    .then(t => t.sendMail(mailOptions))
     .then(info => {
       console.log('[BOT][envio]', opts.tag, '->', opts.to);
       return { simulado: false, messageId: (info && info.messageId) || null };
