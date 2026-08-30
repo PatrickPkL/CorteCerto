@@ -113,6 +113,10 @@
       return rpc('reenviarCodigo', [phone, modo]);
     },
 
+    reenviarCodigoIdentidade(dados) {
+      return rpc('reenviarCodigoIdentidade', [dados]);
+    },
+
     verifyCode(phone, code) {
       const r = rpc('verifyCode', [phone, code]);
       if (r && r.token) {

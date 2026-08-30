@@ -268,7 +268,7 @@ function destinoPosLogin(usuario) {
   if (next) {
     const paginasAdmin = ['index.html', 'agendamentos.html', 'clientes.html',
       'servicos.html', 'profissionais.html', 'assinatura.html',
-      'configuracoes.html', 'suporte.html', 'bot.html'];
+      'configuracoes.html', 'suporte.html', 'bot.html', 'chats.html'];
     if (usuario.role === 'dono' && paginasAdmin.includes(next)) return next;
     if (usuario.role === 'cliente' && !paginasAdmin.includes(next)) {
       return '../public/' + next;

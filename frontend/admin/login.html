@@ -31,8 +31,8 @@
         <button type="button" class="role-btn" data-role="dono">Salão / Barbearia</button>
       </div>
 
-      <div class="demo-hint">
-        <strong>Demo:</strong> informe seu telefone com DDD e receba um código de verificação por SMS.
+      <div class="demo-hint" id="demo-hint-login">
+        <strong>Demo:</strong> informe seu e-mail e receba um código de verificação por e-mail.
         Em modo de demonstração o código aparece direto na tela.
       </div>
 
@@ -45,12 +45,8 @@
 
         <form id="form-cli-login">
           <div class="field">
-            <label for="cli-tel">Telefone (com DDD)</label>
-            <input type="tel" id="cli-tel" placeholder="(71) 99999-0000" required>
-          </div>
-          <div class="field">
-            <label for="cli-email-login">E-mail <span style="opacity:.5;font-size:.85em">(opcional — para receber link mágico)</span></label>
-            <input type="email" id="cli-email-login" placeholder="seu@email.com">
+            <label for="cli-email-login">E-mail</label>
+            <input type="email" id="cli-email-login" placeholder="seu@email.com" required>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
         </form>
@@ -65,8 +61,8 @@
             <input type="email" id="cli-email" placeholder="voce@email.com" required>
           </div>
           <div class="field">
-            <label for="cli-tel-cad">Telefone (com DDD)</label>
-            <input type="tel" id="cli-tel-cad" placeholder="(71) 99999-0000" required>
+            <label for="cli-tel-cad">Telefone (com DDD) <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
+            <input type="tel" id="cli-tel-cad" placeholder="(71) 99999-0000">
           </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">

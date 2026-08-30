@@ -1,7 +1,8 @@
 /* ============================================================
    Corte Certo – auth.js  (PRD v2 · Seção 3.1 / RNF-06 / RNF-10)
-   Autenticação SEM SENHA: telefone + código de 6 dígitos.
-   O código é exibido na UI (modo demonstração — RNF-19).
+   Autenticação SEM SENHA: e-mail + código de 6 dígitos (RF-002).
+   O código é enviado por e-mail e, sem Gmail configurado, exibido
+   na UI (modo demonstração — RNF-19).
    Sessão: token opaco de 256 bits, validade 7 dias.
    Chaves de compatibilidade: token / user / barbershop.
    Requer db.js carregado antes (fonte: PostgreSQL espelhado).
@@ -10,7 +11,6 @@
 window.Auth = (function () {
   'use strict';
 
-  var SMS = require('./sms');
   var Mailer = require('./mailer');
 
   const TOKEN_TTL_DIAS = 7;
@@ -171,7 +171,13 @@ window.Auth = (function () {
    */
   function requestCode(dados) {
     const db = DB._d();
-    const ident = normalizarIdentidade(dados && dados.phone);
+
+    /* Identidade: e-mail tem prioridade (login/cadastro por e-mail — RF-002).
+       Quando só o campo telefone veio preenchido, normalizamos (aceita e-mail). */
+    const tel = String((dados && dados.phone) || '').trim();
+    const em = String((dados && dados.email) || '').trim();
+    const emValido = !!em && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(em).toLowerCase());
+    const ident = normalizarIdentidade(emValido ? em : tel);
     const porEmail = ehEmail(ident);
 
     if (porEmail) {
@@ -190,15 +196,16 @@ window.Auth = (function () {
     if (dados.modo === 'login') {
       if (!existente) {
         throw { status: 404, error: porEmail
-          ? 'E-mail não cadastrado. Verifique o e-mail ou entre pelo telefone.'
+          ? 'E-mail não cadastrado. Verifique o e-mail ou crie uma conta.'
           : 'Número não cadastrado. Crie uma conta.' };
       }
     } else if (dados.modo === 'registro') {
-      if (porEmail) throw { status: 400, error: 'O cadastro é feito por telefone. Use a opção Entrar com e-mail.' };
-      if (existente) throw { status: 409, error: 'Número já cadastrado. Faça login.' };
+      if (existente) throw { status: 409, error: porEmail
+        ? 'E-mail já cadastrado. Faça login.'
+        : 'Número já cadastrado. Faça login.' };
       const nome = String(dados.name || '').trim();
       if (!nome) throw { status: 400, error: 'Informe seu nome.' };
-      const email = String(dados.email || '').trim();
+      const email = porEmail ? ident : String(dados.email || '').trim();
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw { status: 400, error: 'Informe um e-mail válido.' };
       const role = dados.role === 'dono' ? 'dono' : 'cliente';
       if (role === 'dono' && !String(dados.salon_name || '').trim()) {
@@ -217,7 +224,9 @@ window.Auth = (function () {
     const registro = {
       id: DB.proximoId(),
       ident,
-      phone: porEmail ? '' : ident,
+      phone: porEmail
+        ? String((dados && dados.phone) || '').replace(/\D/g, '')
+        : ident,
       code,
       expires_at: agoraMs() + CODIGO_TTL_MS,
       attempts: 0,
@@ -227,7 +236,10 @@ window.Auth = (function () {
         ? {
             modo: 'registro',
             name: String(dados.name || '').trim(),
-            email: String(dados.email || '').trim(),
+            email: porEmail ? ident : String(dados.email || '').trim(),
+            phone: porEmail
+              ? String((dados && dados.phone) || '').replace(/\D/g, '')
+              : (existente ? (existente.phone || '') : ''),
             role: dados.role === 'dono' ? 'dono' : 'cliente',
             salon_name: String(dados.salon_name || '').trim(),
             aceite_privacidade: !!(dados.aceite_privacidade || dados.aceiteTermos || dados.termosAceitos || dados.termsAccepted)
@@ -240,19 +252,20 @@ window.Auth = (function () {
 
     console.info('[Auth][DEMO] Código para ' + ident + ': ' + code);
 
-    /* envio de SMS (real ou demo) */
-    var phoneDigits = ident.replace(/\D/g, '');
-    if (!porEmail && phoneDigits.length >= 10) {
-      SMS.enviarSMS(phoneDigits, 'Seu código Corte Certo: ' + code)
-        .catch(function(e) { console.error('[sms] falha:', e); });
-    }
-
-    /* envio do código de 6 dígitos por e-mail em todos os modos (RF-002, entrega real):
-       login/recuperar por e-mail usam a identidade (ident); recuperar por telefone e
-       registro usam o e-mail informado ou o e-mail já cadastrado do usuário. */
+    /* RF-002: o código de verificação é entregue SEMPRE por e-mail (sem SMS).
+       login/cadastro por e-mail usam a identidade; recuperar por telefone e
+       o caso de telefone usam o e-mail informado ou o já cadastrado do usuário. */
     var emailCodigo = porEmail
       ? ident
       : (String(dados.email || '') || (existente && existente.email) || '').trim();
+    if (!emailCodigo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCodigo)) {
+      throw {
+        status: 400,
+        error: porEmail
+          ? 'Não foi possível enviar o código para esse e-mail.'
+          : 'Informe um e-mail válido (cadastro) ou o e-mail cadastrado (login). Não usamos mais SMS.'
+      };
+    }
     if (emailCodigo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCodigo)) {
       Mailer.enviarCodigoVerificacao(emailCodigo, code)
         .catch(function(e) { console.error('[mailer] falha ao enviar código de verificação:', e); });
@@ -311,6 +324,11 @@ window.Auth = (function () {
     return requestCode({ phone, modo });
   }
 
+  /** Reenvio com identidade completa (e-mail ou telefone). */
+  function reenviarCodigoIdentidade(dados) {
+    return requestCode(dados);
+  }
+
   /**
    * Etapa 2 — verificar código e abrir sessão (RF-004/RF-005).
    * Provisionamento atômico do dono: usuário + loja + horários + trial.
@@ -319,6 +337,7 @@ window.Auth = (function () {
     const db = DB._d();
     const ident = normalizarIdentidade(identBruto);
     const code = String(codeBruto || '').replace(/\D/g, '');
+    const porEmail = ehEmail(ident);
 
     const reg = codigoAtivo(ident);
     if (!reg) throw { status: 400, error: 'Nenhum código ativo. Solicite um novo código.' };
@@ -351,13 +370,13 @@ window.Auth = (function () {
       if (p.modo === 'registro' && !p.aceite_privacidade) {
         throw { status: 400, error: 'O aceite da Política de Privacidade e Termos de Uso é obrigatório. Envie o campo aceite_privacidade (ou aceiteTermos) como true no registro.' };
       }
-      // criação no verify (RF-004) — apenas por telefone
+      // criação no verify (RF-004) — identidade por e-mail ou telefone
       usuario = {
         id: DB.proximoId(),
         role: p.role === 'dono' ? 'dono' : 'cliente',
         name: p.name || 'Usuário',
-        email: p.email || '',
-        phone: ident,
+        email: p.email || (porEmail ? ident : ''),
+        phone: p.phone || (porEmail ? '' : ident),
         verified: 1,
         consentimentos: [{ tipo: 'privacidade', data: new Date().toISOString(), versao: '1.0' }],
         created_at: DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos()),
@@ -413,7 +432,10 @@ window.Auth = (function () {
       name: nomeSalao,
       description: '',
       slug,
-      phone: '(' + String(usuario.phone).slice(0, 2) + ') ' + String(usuario.phone).slice(2),
+      phone: (() => {
+        const d = String(usuario.phone || '').replace(/\D/g, '');
+        return d ? '(' + String(d).slice(0, 2) + ') ' + String(d).slice(2) : '';
+      })(),
       whatsapp: '', email: usuario.email || '', instagram: '',
       address: '', city: '', uf: '',
       lat: null, lng: null,
@@ -481,6 +503,7 @@ window.Auth = (function () {
     normalizarIdentidade,
     requestCode,
     reenviarCodigo,
+    reenviarCodigoIdentidade,
     verifyCode,
     usuarioAtual,
     publicUser,

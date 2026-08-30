@@ -32,7 +32,7 @@ const IMAP_TIMEOUT_MS = 15000;
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const GEMINI_TIMEOUT_MS = 20000;
-const GEMINI_MODELO_PADRAO = 'gemini-2.0-flash';
+const GEMINI_MODELO_PADRAO = 'gemini-3.6-flash';
 
 function geminiChave() { return String(process.env.GEMINI_API_KEY || '').trim(); }
 function geminiModelo() { return String(process.env.GEMINI_MODEL || '').trim() || GEMINI_MODELO_PADRAO; }
@@ -1372,6 +1372,70 @@ async function chatBuscar(threadId) {
   };
 }
 
+/* ---------------- painel de chats (admin) ---------------- */
+
+function _lojaDoDono() {
+  const Auth = (typeof window !== 'undefined' && window.Auth) ? window.Auth : null;
+  const u = Auth ? Auth.usuarioAtual() : null;
+  if (!u) throw { status: 401, error: 'Sessão expirada. Faça login novamente.' };
+  const loja = Auth.salaoDoUsuario(u);
+  if (!loja) throw { status: 403, error: 'Você não gerencia nenhum salão.' };
+  return loja;
+}
+
+/* Lista as conversas do chat do site do salão do dono logado. */
+async function botListarChats() {
+  await _garantirPronto();
+  const loja = _lojaDoDono();
+  const lista = Object.keys(_chats.threads || {})
+    .map(k => _chats.threads[k])
+    .filter(t => t.lojaId === loja.id)
+    .sort((a, b) => Date.parse(b.atualizadoEm || 0) - Date.parse(a.atualizadoEm || 0))
+    .map(t => ({
+      threadId: t.id,
+      estado: t.estado || 'novo',
+      criticidade: t.criticidade || null,
+      prazo: t.prazo || null,
+      contato: t.contato || { nome: null, telefone: null, email: null },
+      criadoEm: t.criadoEm || null,
+      atualizadoEm: t.atualizadoEm || t.criadoEm || null,
+      pagina: t.pagina || null,
+      totalMsgs: (t.msgs || []).length,
+      ultimaMsg: (t.msgs && t.msgs.length)
+        ? t.msgs[t.msgs.length - 1]
+        : null
+    }));
+  return { chatAtendente: _cfg.forwardTo || gmailUser() || null, chats: lista };
+}
+
+/* Responder pelo painel: adiciona mensagem do atendente e o widget do site
+   entrega ao cliente na mesma conversa (polling do chatBuscar). */
+async function botResponderChat(threadId, texto) {
+  await _garantirPronto();
+  const loja = _lojaDoDono();
+  const id = String(threadId || '').trim();
+  const t = _chats.threads[id];
+  if (!t || t.lojaId !== loja.id) {
+    throw { status: 404, error: 'Conversa não encontrada neste salão.' };
+  }
+  const msg = String(texto || '').trim();
+  if (!msg) throw { status: 400, error: 'Escreva sua resposta.' };
+  t.msgs = t.msgs || [];
+  t.msgs.push({ id: 'm' + (++_chatSeq), rem: 'atendente', texto: msg, ts: new Date().toISOString() });
+  if (t.msgs.length > THREAD_MSGS_MAX) t.msgs = t.msgs.slice(-THREAD_MSGS_MAX);
+  t.estado = 'respondido';
+  t.atualizadoEm = new Date().toISOString();
+  _marcarDirty(id);
+  await salvarChats();
+  return {
+    ok: true,
+    threadId: id,
+    estado: t.estado,
+    msgs: t.msgs,
+    respondidoEm: t.atualizadoEm
+  };
+}
+
 function cabecalhoHTML() {
   return '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background-color:#f4f4f4;font-family:system-ui,Roboto,sans-serif;">';
 }
@@ -1877,6 +1941,8 @@ module.exports = {
   verificarCaixaEntrada,
   chatEnviar,
   chatBuscar,
+  botListarChats,
+  botResponderChat,
   botConfig,
   botAtivar,
   botConfigurar,

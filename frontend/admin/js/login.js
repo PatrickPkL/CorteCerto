@@ -44,37 +44,13 @@ document.addEventListener('DOMContentLoaded', () => {
   ligarTabs('tab-cli', 'form-cli-login', 'form-cli-cadastro');
   ligarTabs('tab-dono', 'form-dono-login', 'form-dono-cadastro');
 
-  /* ---------- etapa do código SMS (compartilhada) ---------- */
+  /* ---------- etapa do código (compartilhada) ---------- */
   const etapaCodigo = document.getElementById('etapa-codigo');
   const bannerCodigo = document.getElementById('banner-codigo');
   const infoFone = document.getElementById('codigo-info');
   const inputCodigo = document.getElementById('input-codigo');
 
-  let fluxo = null; // {phone, payload}
-
-  function voltarAoInicio() {
-    if (etapaCodigo) etapaCodigo.style.display = 'none';
-    fluxo = null;
-    if (inputCodigo) inputCodigo.value = '';
-  }
-
-  function mostrarEtapaCodigo(res) {
-    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
-      f.style.display = 'none';
-    });
-    if (bannerCodigo) {
-      bannerCodigo.hidden = false;
-      bannerCodigo.innerHTML =
-        '<strong>Código enviado!</strong> ' +
-        'Verifique seu telefone ou e-mail para o código de verificação.';
-    }
-    if (infoFone) {
-      infoFone.textContent = 'Digite o código de 6 dígitos enviado para ' +
-        String(fluxo.phone || '').trim() + '.';
-    }
-    if (etapaCodigo) etapaCodigo.style.display = '';
-    if (inputCodigo) inputCodigo.focus();
-  }
+  let fluxo = null; // {phone, ident, payload}
 
   function voltarAoInicio() {
     if (etapaCodigo) etapaCodigo.style.display = 'none';
@@ -122,7 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function pedirCodigo(payload) {
     try {
       const res = Auth.requestCode(payload);
-      fluxo = { phone: payload.phone, payload };
+      fluxo = {
+        phone: payload.email || payload.phone,
+        ident: payload.email || payload.phone,
+        payload
+      };
       mostrarEtapaCodigo(res);
     } catch (e) {
       showToast(msgErro(e), 'error');
@@ -132,13 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
   /* entrada */
   document.getElementById('form-cli-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    var payload = {
-      phone: document.getElementById('cli-tel').value,
+    pedirCodigo({
+      email: document.getElementById('cli-email-login').value,
       modo: 'login'
-    };
-    var emailCli = document.getElementById('cli-email-login');
-    if (emailCli && emailCli.value.trim()) payload.email = emailCli.value.trim();
-    pedirCodigo(payload);
+    });
   });
 
   document.getElementById('form-cli-cadastro')?.addEventListener('submit', (e) => {

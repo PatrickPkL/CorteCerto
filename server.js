@@ -111,6 +111,7 @@ const _authRequired = new Set([
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
   'botConfig', 'botAtivar', 'botConfigurar', 'botHistorico',
   'botLimparHistorico', 'botTestar', 'botVerificarAgora',
+  'botListarChats', 'botResponderChat',
   'logout'
 ]);
 
@@ -127,7 +128,7 @@ const _RPC_BLOQUEADOS = new Set([
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
-  'requestCode', 'reenviarCodigo', 'verifyCode', 'logout'
+  'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode', 'logout'
 ]);
 const _RPC_API = new Set();
 Object.keys(API).forEach(nome => {
@@ -261,33 +262,43 @@ function handleRpc(req, res) {
       /* função assíncrona: resolve a resposta fora daqui — sem isso,
          uma Promise rejeitada seria serializada como {} com status 200 */
       if (dados && typeof dados.then === 'function') {
-        return void dados.then(
-          valor => {
-            if (metodo === 'verifyCode') _failedAuth.delete(ip);
-            json(res, 200, { ok: true, data: valor === undefined ? null : valor });
-          },
-          e => {
-            const st = (e && e.status) || 500;
-            if (metodo === 'verifyCode' && st >= 400 && st < 500) {
-              const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
-              prev.count++;
-              if (prev.count >= AUTH_FAIL_MAX) {
-                prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+        return void dados
+          .then(
+            valor => {
+              if (metodo === 'verifyCode') _failedAuth.delete(ip);
+              json(res, 200, { ok: true, data: valor === undefined ? null : valor });
+            },
+            e => {
+              const st = (e && e.status) || 500;
+              if (metodo === 'verifyCode' && st >= 400 && st < 500) {
+                const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
+                prev.count++;
+                if (prev.count >= AUTH_FAIL_MAX) {
+                  prev.blockedUntil = Date.now() + AUTH_BLOCK_MS;
+                }
+                prev.windowStart = prev.windowStart || Date.now();
+                if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
+                  prev.count = 1;
+                  prev.windowStart = Date.now();
+                  prev.blockedUntil = 0;
+                }
+                _failedAuth.set(ip, prev);
               }
-              prev.windowStart = prev.windowStart || Date.now();
-              if (Date.now() - prev.windowStart > AUTH_FAIL_WINDOW_MS) {
-                prev.count = 1;
-                prev.windowStart = Date.now();
-                prev.blockedUntil = 0;
-              }
-              _failedAuth.set(ip, prev);
-            }
-            if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
-            json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
+              if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
+              json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
+            })
+          .finally(() => {
+            /* limpa o contexto HTTP somente depois de a Promise resolver —
+               funções async chamam Auth.usuarioAtual() internamente. */
+            delete global.__CC_REQUEST_TOKEN;
+            delete global.__CC_HTTP;
           });
       }
       if (metodo === 'verifyCode') _failedAuth.delete(ip);
-      return json(res, 200, { ok: true, data: dados === undefined ? null : dados });
+      const saida = json(res, 200, { ok: true, data: dados === undefined ? null : dados });
+      delete global.__CC_REQUEST_TOKEN;
+      delete global.__CC_HTTP;
+      return saida;
     } catch (e) {
       const status = (e && e.status) || 500;
       if (metodo === 'verifyCode' && status >= 400 && status < 500) {
@@ -305,10 +316,10 @@ function handleRpc(req, res) {
         _failedAuth.set(ip, prev);
       }
       if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
-      return json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
-    } finally {
+      const saida = json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
+      return saida;
     }
   });
 }
@@ -640,7 +651,7 @@ function bancoRemoto() {
     console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
     console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
     console.log('  Banco de dados   : PostgreSQL (cortecerto)');
-    console.log('  Códigos SMS demo aparecem no terminal e na tela de login.');
+    console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
     console.log(process.env.ABACATEPAY_API_KEY
       ? '  Pagamentos PIX   : AbacatePay (' +
         (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
