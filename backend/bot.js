@@ -1479,6 +1479,7 @@ function enviarEmail(opts) {
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
+      family: 4,
       auth: { user: remetente, pass: gmailPass().replace(/\s/g, '') }
     });
   }
