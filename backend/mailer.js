@@ -11,17 +11,78 @@ var transporterPorta = null;
 
 /* Gmail aceita envio pelas portas 465 (SSL implícito) e 587 (STARTTLS).
    O Render só tem rota IPv4 — por isso resolvemos o IPv4 do Gmail de forma
-   explícita e conectamos no IP (family:4 às vezes é ignorado/falha silenciosa). */
+   explícita e conectamos no IP (family:4 às vezes é ignorado/falha silenciosa).
+
+   Importante: o DNS do Render pode devolver IPs errados/lixo para o Gmail
+   (ex.: 192.179.26.109), travando a conexao. Por isso os IPs reais sao
+   buscados via DNS-over-HTTPS (porta 443, sempre aberta) com fallback para
+   o DNS do sistema. */
 var PORTAS_SMTP = [465, 587];
 
 var dns = require("dns");
+var https = require("https");
 
-/* Obtém o primeiro endereço IPv4 de smtp.gmail.com. */
+/* Lista de enderecos "reservados" conhecidamente errados que o DNS de alguns
+   provedores (Render) devolve para smtp.gmail.com. */
+var IPsLixo = {
+  "192.179.26.109": true,
+  "192.179.27.109": true
+};
+
+function normalizarIPs(lista) {
+  var vistos = {};
+  var saida = [];
+  (lista || []).forEach(function (ip) {
+    var s = String(ip || "").trim();
+    if (!s || !/^\d+\.\d+\.\d+\.\d+$/.test(s)) return;
+    if (IPsLixo[s]) return;
+    if (vistos[s]) return;
+    vistos[s] = true;
+    saida.push(s);
+  });
+  return saida;
+}
+
+/* Busca os enderecos IPv4 de smtp.gmail.com via DNS-over-HTTPS (dns.google). */
+function resolverDoH() {
+  return new Promise(function (resolve) {
+    var req = https.get("https://dns.google/resolve?name=smtp.gmail.com&type=A", function (res) {
+      var dados = "";
+      res.on("data", function (c) { dados += c; });
+      res.on("end", function () {
+        try {
+          var j = JSON.parse(dados);
+          var ips = (j.Answer || []).filter(function (a) { return a && a.type === 1; }).map(function (a) { return a.data; });
+          resolve(normalizarIPs(ips));
+        } catch (e) {
+          resolve([]);
+        }
+      });
+    });
+    req.setTimeout(8000, function () { req.destroy(); resolve([]); });
+    req.on("error", function () { resolve([]); });
+  });
+}
+
+/* Obtém a lista de IPs reais: DoH primeiro, depois DNS do sistema como fallback. */
 function resolverIPv4() {
-  return new Promise(function (resolve, reject) {
-    dns.resolve4("smtp.gmail.com", function (err, enderecos) {
-      if (err || !enderecos || !enderecos.length) return reject(err || new Error("Sem IPv4 para smtp.gmail.com"));
-      resolve(enderecos[0]);
+  return resolverDoH().then(function (ipsDoH) {
+    return new Promise(function (resolve) {
+      dns.resolve4("smtp.gmail.com", function (err, enderecos) {
+        var ipsSistema = normalizarIPs(enderecos);
+        var todos = [];
+        (ipsDoH.concat(ipsSistema)).forEach(function (ip) {
+          if (todos.indexOf(ip) === -1) todos.push(ip);
+        });
+        if (/^172\.217\./.test(todos.join(",")) && todos.length > 1) {
+          todos.unshift(todos.splice(todos.findIndex(function (i) { return /^172\.217\./.test(i); }), 1)[0]);
+        }
+        resolve(todos);
+      });
+      if (!ipsDoH.length && typeof enderecos === "undefined") { /* noop */ }
+    }).then(function (lista) {
+      if (!lista.length) throw new Error("Sem IPs validos para smtp.gmail.com");
+      return lista;
     });
   });
 }
@@ -33,40 +94,43 @@ function criarTransporter(porta, ip) {
     port: porta,
     secure: porta === 465,
     requireTLS: porta !== 465,
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 30000,
+    connectionTimeout: 12000,
+    greetingTimeout: 12000,
+    socketTimeout: 25000,
     tls: { servername: "smtp.gmail.com" },
     auth: { user: GMAIL_USER, pass: GMAIL_PASS.replace(/\s/g, "") }
   });
 }
 
 /* Monta o transporter na primeira porta que verificar a conexão.
-   Testa as portas em paralelo e usa a que responder primeiro. */
+   Testa todas as combinações IP × porta em paralelo e usa a que responder primeiro. */
 function garantirTransporter() {
   if (transporter) return Promise.resolve(transporter);
-  return resolverIPv4().then(function (ip) {
-    var tentativas = PORTAS_SMTP.map(function (porta) {
-      var t = criarTransporter(porta, ip);
-      return t.verify()
-        .then(function () {
-          return { porta: porta, t: t, ok: true };
-        })
-        .catch(function (e) {
-          return { porta: porta, t: t, ok: false, erro: e };
-        });
+  return resolverIPv4().then(function (ips) {
+    var tentativas = [];
+    ips.forEach(function (ip) {
+      PORTAS_SMTP.forEach(function (porta) {
+        var t = criarTransporter(porta, ip);
+        tentativas.push(t.verify()
+          .then(function () {
+            return { porta: porta, ip: ip, t: t, ok: true };
+          })
+          .catch(function (e) {
+            return { porta: porta, ip: ip, t: t, ok: false, erro: e };
+          }));
+      });
     });
     return Promise.all(tentativas).then(function (resultados) {
       var ok = null;
       for (var i = 0; i < resultados.length; i++) {
-        if (resultados[i].ok) { ok = resultados[i]; break; }
+        if (resultados[i] && resultados[i].ok) { ok = resultados[i]; break; }
       }
-      if (!ok) { // nenhuma porta conectou — usa a primeira e deixa o envio falhar com erro real
-        ok = { porta: PORTAS_SMTP[0], t: criarTransporter(PORTAS_SMTP[0], ip) };
+      if (!ok) {
+        ok = { porta: PORTAS_SMTP[0], ip: (ips && ips[0]) || "smtp.gmail.com", t: criarTransporter(PORTAS_SMTP[0], (ips && ips[0]) || "smtp.gmail.com") };
       }
       transporter = ok.t;
       transporterPorta = ok.porta;
-      console.log("[EMAIL] Conectado ao Gmail " + ip + " via porta " + ok.porta);
+      console.log("[EMAIL] Conectado ao Gmail " + ok.ip + " via porta " + ok.porta);
       return transporter;
     });
   });
@@ -284,5 +348,7 @@ module.exports = {
   enviarConfirmacaoAgendamento: enviarConfirmacaoAgendamento,
   enviarNovoAgendamento: enviarNovoAgendamento,
   enviarBoasVindas: enviarBoasVindas,
-  enviarLembrete: enviarLembrete
+  enviarLembrete: enviarLembrete,
+  criarTransporterEmail: criarTransporter,
+  resolverIPsGmail: resolverIPv4
 };

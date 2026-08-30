@@ -1476,30 +1476,17 @@ function enviarEmail(opts) {
 
   if (!_transporter) {
     const nodemailer = require('nodemailer');
-    const dns = require('dns');
+    const _mailer = require('./mailer');
     _transporterIP = null;
-    _transporter = new Promise((resolve, reject) => {
-      dns.resolve4('smtp.gmail.com', (err, enderecos) => {
-        if (err || !enderecos || !enderecos.length) return reject(err || new Error('Sem IPv4 para smtp.gmail.com'));
-        _transporterIP = enderecos[0];
-        const fazer = porta => nodemailer.createTransport({
-          host: _transporterIP,
-          port: porta,
-          secure: porta === 465,
-          requireTLS: porta !== 465,
-          connectionTimeout: 15000,
-          greetingTimeout: 15000,
-          socketTimeout: 30000,
-          tls: { servername: 'smtp.gmail.com' },
-          auth: { user: remetente, pass: gmailPass().replace(/\s/g, '') }
-        });
+    _transporter = _mailer.resolverIPsGmail()
+      .then(ips => {
+        _transporterIP = (ips && ips[0]) || 'smtp.gmail.com';
+        const fazer = porta => _mailer.criarTransporterEmail(porta, _transporterIP);
         const testar = porta => fazer(porta).verify().then(() => porta)
           .catch(() => (porta === 465 ? testar(587) : Promise.reject(new Error('Sem porta SMTP Gmail disponível'))));
-        testar(465)
-          .then(porta => { console.log('[BOT][envio] Gmail ' + _transporterIP + ' via porta ' + porta); resolve(fazer(porta)); })
-          .catch(reject);
+        return testar(465)
+          .then(porta => { console.log('[BOT][envio] Gmail ' + _transporterIP + ' via porta ' + porta); return fazer(porta); });
       });
-    });
   }
 
   const mailOptions = {
