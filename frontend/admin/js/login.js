@@ -64,10 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (bannerCodigo) {
       bannerCodigo.hidden = false;
-      const demo = (res && res.demo_code) ? '<span class="mono codigo-demo">' + esc(res.demo_code) + '</span>' : '';
-      bannerCodigo.innerHTML = demo
-        ? '<strong>Modo demonstração</strong> — seu código de verificação é: ' + demo
-        : '<strong>Verifique seu e-mail/telefone</strong> — você recebeu um código de 6 dígitos.';
+      bannerCodigo.innerHTML = '<strong>Verifique seu e-mail</strong> — você recebeu um código de 6 dígitos.';
     }
     if (infoFone) {
       const destinoRegistro = (fluxo && fluxo.payload && fluxo.payload.modo === 'registro' && fluxo.payload.email)

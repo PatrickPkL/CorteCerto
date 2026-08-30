@@ -250,7 +250,13 @@ window.Auth = (function () {
     db.sms_codes.push(registro);
     DB.salvar();
 
-    console.info('[Auth][DEMO] Código para ' + ident + ': ' + code);
+    if (!Mailer.temEmailReal()) {
+      throw {
+        status: 500,
+        error: 'E-mail não configurado no servidor (GMAIL_USER/GMAIL_PASS). Não é possível enviar o código.'
+      };
+    }
+    console.info('[Auth] Código de verificação gerado para ' + ident + '.');
 
     /* RF-002: o código de verificação é entregue SEMPRE por e-mail (sem SMS).
        login/cadastro por e-mail usam a identidade; recuperar por telefone e
@@ -312,10 +318,6 @@ window.Auth = (function () {
       expires_in_seconds: 600,
       cooldown_seconds: COOLDOWN_MS / 1000
     };
-    if (!Mailer.temEmailReal()) {
-      /* RNF-19: sem e-mail real, a UI exibe o código (banner demo) */
-      resposta.demo_code = String(code);
-    }
     return resposta;
   }
 
