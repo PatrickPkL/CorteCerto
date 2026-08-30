@@ -1476,7 +1476,9 @@ function enviarEmail(opts) {
   if (!_transporter) {
     const nodemailer = require('nodemailer');
     _transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: { user: remetente, pass: gmailPass().replace(/\s/g, '') }
     });
   }

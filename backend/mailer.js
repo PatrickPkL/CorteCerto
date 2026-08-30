@@ -10,7 +10,9 @@ var transporter = null;
 if (!DEMO_MODE) {
   var nodemailer = require("nodemailer");
   transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: { user: GMAIL_USER, pass: GMAIL_PASS.replace(/\s/g, "") }
   });
 }

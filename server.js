@@ -15,6 +15,10 @@ const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
 
+/* Render/Neon não têm rota IPv6 — sem isso o envio de e-mail (Gmail)
+   falha com "connect ENETUNREACH <ipv6>". Obriga IPv4 primeiro no DNS. */
+try { require('dns').setDefaultResultOrder('ipv4first'); } catch (e) { /* Node antigo */ }
+
 /* Carrega o .env da raiz (KEY=VALUE por linha) antes do boot —
    sem sobrescrever variáveis já definidas no ambiente */
 (function carregarDotEnv() {
