@@ -16,9 +16,28 @@ const MIGRATION_URL =
   process.env.DATABASE_URL ||
   'postgres://postgres:SUA_SENHA@127.0.0.1:5432/cortecerto';
 
+/* Hosts gerenciados (Render/Neon) pedem SSL self-signed; o pg moderno
+   trata "sslmode=require/ssl=true" como verify-full e exige cert válido.
+   Parseamos a URL nós mesmos e repassamos ssl com rejectUnauthorized:false
+   para não depender da versão do pg-connection-string no servidor. */
+const TEM_SSL = /(ssl=true|sslmode)/i.test(MIGRATION_URL);
+const CONN = TEM_SSL
+  ? (function () {
+      const p = new URL(MIGRATION_URL);
+      return {
+        host: p.hostname,
+        port: Number(p.port || 5432),
+        database: (p.pathname || '').replace(/^\//, ''),
+        user: decodeURIComponent(p.username || ''),
+        password: decodeURIComponent(p.password || ''),
+        ssl: { rejectUnauthorized: false }
+      };
+    })()
+  : MIGRATION_URL;
+
 const base = {
   client: 'pg',
-  connection: MIGRATION_URL,
+  connection: CONN,
   pool: { min: 0, max: 10 },
   migrations: {
     directory: path.join(__dirname, 'database', 'migrations'),

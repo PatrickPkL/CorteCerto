@@ -595,19 +595,35 @@ function iniciarPostgresLocal() {
   });
 }
 
-(async function iniciar() {
-  let bancoOk = await portaAberta(5432);
-  if (!bancoOk) {
-    await iniciarPostgresLocal();
-    for (let i = 0; i < 24 && !bancoOk; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      bancoOk = await portaAberta(5432);
-    }
+/* Banco é remoto (Render/Neon etc.) quando DATABASE_URL existe e aponta
+   para um host diferente de localhost. Nesse caso NÃO checamos a porta
+   local 5432 — a conexão é do pool e o boot decide por ela. */
+function bancoRemoto() {
+  const url = process.env.DATABASE_URL || '';
+  if (!url) return false;
+  try {
+    const h = new URL(url).hostname;
+    return !(h === '127.0.0.1' || h === 'localhost' || h === '::1');
+  } catch (e) {
+    return false;
   }
-  if (!bancoOk) {
-    console.error('[boot] PostgreSQL não está rodando na porta 5432.');
-    console.error('[boot] Instale/aloque um PostgreSQL local ou rode `npm run db:start` (se usou o banco portátil de .pg/).');
-    process.exit(1);
+}
+
+(async function iniciar() {
+  if (!bancoRemoto()) {
+    let bancoOk = await portaAberta(5432);
+    if (!bancoOk) {
+      await iniciarPostgresLocal();
+      for (let i = 0; i < 24 && !bancoOk; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        bancoOk = await portaAberta(5432);
+      }
+    }
+    if (!bancoOk) {
+      console.error('[boot] PostgreSQL não está rodando na porta 5432.');
+      console.error('[boot] Instale/aloque um PostgreSQL local ou rode `npm run db:start` (se usou o banco portátil de .pg/).');
+      process.exit(1);
+    }
   }
 
   try {
