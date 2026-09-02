@@ -132,7 +132,8 @@ const _RPC_BLOQUEADOS = new Set([
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
-  'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode', 'logout'
+  'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
+  'recuperarAcesso', 'logout'
 ]);
 const _RPC_API = new Set();
 Object.keys(API).forEach(nome => {
@@ -204,7 +205,7 @@ function handleRpc(req, res) {
     if (!metodo) {
       return json(res, 400, { ok: false, error: 'Requisição inválida.' });
     }
-    /* Allowlist estrita: só métodos próprios e aprovados. Métodos
+/* Allowlist estrita: só métodos próprios e aprovados. Métodos
        inexistentes/não permitidos respondem 401 idêntico ao de sessão
        inválida — impede enumeração de métodos pelo erro. A allowlist
        cobre API, métodos públicos de Auth e o Bot (chat + painel). */
@@ -215,9 +216,6 @@ function handleRpc(req, res) {
       fn = Auth[metodo];
     } else if (_RPC_BOT.has(metodo) && typeof Bot[metodo] === 'function') {
       fn = Bot[metodo];
-    }
-    if (!fn) {
-      return json(res, 401, { ok: false, status: 401, error: 'Não autorizado.' });
     }
 
     /* argumentos: apenas array; qualquer outra forma é rejeitada.

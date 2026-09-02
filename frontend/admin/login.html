@@ -48,6 +48,9 @@
             <input type="email" id="cli-email-login" placeholder="seu@email.com" required>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <p style="text-align:center; margin-top:12px; font-size:13.5px;">
+            Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
+          </p>
         </form>
 
         <form id="form-cli-cadastro" style="display:none;">
@@ -85,6 +88,9 @@
             <input type="text" id="dono-tel" placeholder="(71) 99999-0000 · voce@email.com" required>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <p style="text-align:center; margin-top:12px; font-size:13.5px;">
+            Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
+          </p>
         </form>
 
         <form id="form-dono-cadastro" style="display:none;">
@@ -129,6 +135,24 @@
           <p style="text-align:center; margin-top:14px; font-size:13.5px;">
             <a href="#" id="btn-reenviar" style="color:var(--brass);">Reenviar código</a> ·
             <a href="#" id="btn-voltar-login" style="color:var(--brass);">Voltar</a>
+          </p>
+        </form>
+      </div>
+
+      <!-- RECUPERAÇÃO DE ACESSO POR E-MAIL -->
+      <div id="etapa-recuperar" style="display:none;">
+        <h3 class="section-title" style="margin-bottom:12px;">Recuperar acesso</h3>
+        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
+          Informe o e-mail cadastrado na sua conta. Enviamos um link de acesso para o seu e-mail.</p>
+        <form id="form-recuperar">
+          <div class="field">
+            <label for="input-rec-email">E-mail cadastrado</label>
+            <input type="email" id="input-rec-email" placeholder="voce@email.com" required autocomplete="email">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+            Enviar link por e-mail</button>
+          <p style="text-align:center; margin-top:14px; font-size:13.5px;">
+            Voltou? <a href="#" id="btn-voltar-recuperar" style="color:var(--brass);">Voltar ao login</a>
           </p>
         </form>
       </div>

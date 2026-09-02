@@ -57,10 +57,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------- cards de planos ---------- */
+  function opcoesParcelas(plano) {
+    const total = Math.round(plano.price_monthly * 12 * 100) / 100;
+    const opcoes = [1, 2, 3, 6, 12].map(n => {
+      const valor = Math.round((total / n) * 100) / 100;
+      const rotulo = n === 1 ? ' (à vista)'
+        : n === 12 ? ' (valor mensal)'
+        : '';
+      return '<option value="' + n + '">' + n + '× de ' + DB.fmtBRL(valor) + rotulo + '</option>';
+    });
+    return opcoes.join('');
+  }
+
+  let periodoGlobal = 'mensal';
+
+  function aplicarPeriodoGlobal() {
+    const anual = periodoGlobal === 'anual';
+    document.querySelectorAll('#lista-planos .plan-card').forEach(card => {
+      const plano = planos.find(p => String(p.id) === card.dataset.plano);
+      if (!plano) return;
+      const valorEl = card.querySelector('.plan-preco-valor');
+      const unidEl = card.querySelector('.plan-preco-unidade');
+      const nota = card.querySelector('.plan-anual-nota');
+      const parc = card.querySelector('.plan-parcelas');
+      valorEl.textContent = anual ? DB.fmtBRL(plano.price_monthly * 12) : DB.fmtBRL(plano.price_monthly);
+      unidEl.textContent = anual ? '/ano' : '/mês';
+      if (nota) nota.hidden = !anual;
+      if (parc) parc.hidden = !anual;
+    });
+  }
+
   function renderPlanos(subAtual) {
     const box = document.getElementById('lista-planos');
     if (!box) return;
 
+    const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plan && subAtual.plan.id === p.id;
       const limite = p.max_professionals == null
@@ -70,7 +101,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '">' +
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
-        '<div class="plan-preco mono">' + DB.fmtBRL(p.price_monthly) + '<small>/mês</small></div>' +
+        '<div class="plan-preco mono">' +
+          '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? p.price_monthly * 12 : p.price_monthly) + '</span>' +
+          '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
+        '</div>' +
+        '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · mesmo valor mensal (' +
+          DB.fmtBRL(p.price_monthly) + '/mês)</div>' +
+        '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
+          '<label>Parcelar em</label>' +
+          '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
+        '</div>' +
         '<ul class="plan-feats"><li>' + limite + '</li>' + feats + '</ul>' +
         '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
           (atual ? 'Renovar' : 'Assinar via PIX') + '</button>' +
@@ -80,7 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
     box.querySelectorAll('.btn-assinar').forEach(btn => {
       btn.addEventListener('click', () => {
         const plano = planos.find(p => String(p.id) === btn.dataset.id);
-        if (plano) abrirPagamento(plano);
+        const parcelas = periodoGlobal === 'anual'
+          ? Number(btn.closest('.plan-card').querySelector('.plan-parcelas-sel').value) || 12
+          : 1;
+        if (plano) abrirPagamento(plano, periodoGlobal, parcelas);
       });
     });
   }
@@ -141,7 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function mostrarCobranca(c, plano) {
     cobrancaId = c.id;
-    setText('pg-plano', 'Plano ' + c.plan_name + ' · 30 dias');
+    const anual = c.billing_period === 365;
+    let rotulo = 'Plano ' + c.plan_name + ' · ' + (anual ? 'anual' : '30 dias');
+    if (anual && c.installments > 1) rotulo += ' · ' + c.installments + '×';
+    if (anual && c.installments === 1) rotulo += ' · à vista';
+    setText('pg-plano', rotulo);
     setText('pg-valor', DB.fmtBRL(c.amount_cents / 100));
 
     const qr = document.getElementById('pg-qrcode');
@@ -182,9 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
     abrirModal(modalPg);
   }
 
-  function abrirPagamento(plano) {
+  function abrirPagamento(plano, periodo, parcelas) {
     let c;
-    try { c = API.criarCobrancaPlano(plano.id); }
+    try { c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1); }
     catch (e) { showToast(msgErro(e), 'error'); return; }
     mostrarCobranca(c, plano);
   }
@@ -246,10 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     cobrancas.forEach(c => {
       const [bCls, bTxt] = badgeDe(c.status);
+      const anual = c.billing_period === 365;
+      let desc = 'Plano ' + esc(c.plan_name) + (anual ? ' — anual' : ' — mensalidade');
+      if (anual && c.installments > 1) desc += ' em ' + c.installments + '×';
+      if (c.provider === 'demo') desc += ' <small>(teste)</small>';
       linhas.push(
         '<tr><td class="mono">' + DB.fmtDataBR(String(c.created_at).slice(0, 10)) + '</td>' +
-        '<td>Plano ' + esc(c.plan_name) + ' — mensalidade' +
-          (c.provider === 'demo' ? ' <small>(teste)</small>' : '') + '</td>' +
+        '<td>' + desc + '</td>' +
         '<td class="mono">' + DB.fmtBRL(c.amount_cents / 100) + '</td>' +
         '<td><span class="badge ' + bCls + '">' + bTxt + '</span></td></tr>');
     });
@@ -268,6 +318,18 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err2) {
       showToast(msgErro(err2), 'error');
     }
+  });
+
+  /* ---------- seletor global Mensal/Anual ---------- */
+  document.querySelectorAll('.plan-tgl-global .plan-tgl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const per = btn.dataset.per;
+      document.querySelectorAll('.plan-tgl-global .plan-tgl-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.per === per);
+      });
+      periodoGlobal = per;
+      aplicarPeriodoGlobal();
+    });
   });
 
   render();

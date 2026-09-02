@@ -1,48 +1,50 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --ink: #1C1F26;
-  --ink-soft: #2A2E38;
-  --paper: #EDE7DA;
-  --paper-soft: #F5F1E7;
-  --heading: #1C1F26;
-  --text: #22252B;
-  --text-muted: #6B6558;
+  --ink: #171A20;
+  --ink-soft: #232730;
+  --paper: #EDE4D2;
+  --paper-soft: #F7F2E6;
+  --heading: #14161B;
+  --text: #1A1D23;
+  --text-muted: #5A5346;
   --field-bg: #FFFFFF;
-  --tag-bg: rgba(28,31,38,0.06);
-  --warn-text: #8a611f;
-  --brass: #B8863B;
-  --brass-soft: #D9B87A;
+  --tag-bg: rgba(28,31,38,0.09);
+  --warn-text: #8A5A00;
+  --brass: #9C6A1C;
+  --brass-soft: #C89B3C;
   --stripe-red: #8C2F2F;
-  --line: #DCD4C2;
-  --success: #4C7A5E;
-  --danger: #A1433C;
+  --line: #C6BBA1;
+  --success: #35704B;
+  --danger: #B03A33;
   --radius: 6px;
   --sidebar-w: 236px;
-  --shadow-sm: 0 1px 3px rgba(28,31,38,0.06);
-  --shadow-md: 0 4px 12px rgba(28,31,38,0.08);
-  --shadow-lg: 0 8px 24px rgba(28,31,38,0.12);
+  --shadow-sm: 0 1px 3px rgba(28,31,38,0.08);
+  --shadow-md: 0 4px 12px rgba(28,31,38,0.12);
+  --shadow-lg: 0 8px 24px rgba(28,31,38,0.18);
 }
 
 /* Tema escuro suavizado: cinzas escuros no lugar do preto absoluto,
    com textos de alto contraste para leitura confortável */
 :root[data-theme="dark"] {
-  --ink: #17191F;
-  --ink-soft: #1F222A;
-  --paper: #1B1E24;
-  --paper-soft: #242830;
-  --heading: #F4F0E6;
-  --text: #E6E2D8;
-  --text-muted: #B0A996;
-  --field-bg: #2C313C;
-  --tag-bg: rgba(237,231,218,0.09);
-  --warn-text: #D9B87A;
-  --line: #3A3F4C;
-  --success: #74AE89;
-  --danger: #CE7067;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.35);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  --ink: #14161B;
+  --ink-soft: #1C2026;
+  --paper: #16191E;
+  --paper-soft: #222730;
+  --heading: #FFFFFF;
+  --text: #F2EEE4;
+  --text-muted: #C1BAA7;
+  --field-bg: #333A47;
+  --tag-bg: rgba(237,231,218,0.12);
+  --warn-text: #E6C67F;
+  --brass: #DCA94E;
+  --brass-soft: #EDCD8E;
+  --line: #4C5463;
+  --success: #82C096;
+  --danger: #E07A70;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.45);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
 }
 
 * { box-sizing: border-box; }

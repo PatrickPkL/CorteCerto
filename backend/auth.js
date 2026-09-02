@@ -16,7 +16,7 @@ window.Auth = (function () {
   const TOKEN_TTL_DIAS = 7;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
   const MAX_TENTATIVAS = 5;               // RNF-10
-  const COOLDOWN_MS = 5 * 60 * 1000;     // 5 minutos entre pedidos de código
+  const COOLDOWN_MS = 30 * 1000;         // 30 segundos entre pedidos de código
 
   /* ---------------- utilidades ---------------- */
 
@@ -326,9 +326,59 @@ window.Auth = (function () {
     return requestCode({ phone, modo });
   }
 
-  /** Reenvio com identidade completa (e-mail ou telefone). */
+/** Reenvio com identidade completa (e-mail ou telefone). */
   function reenviarCodigoIdentidade(dados) {
     return requestCode(dados);
+  }
+
+  /* Cooldown de 30s para pedidos de recuperação de acesso (em memória,
+     sem tocar no banco) — evita spam de e-mails de recuperação. */
+  var _recoverCooldown = new Map();
+  var RECOVER_COOLDOWN_MS = 30 * 1000;
+
+  /**
+   * Recuperação de acesso ("esqueci minha senha").
+   * Envia por e-mail (Gmail via Mailer) um link mágico que entra
+   * na conta direto — o app é sem senha (telefone + código).
+   * Não revela se o e-mail está cadastrado (anti-enumeração).
+   */
+  function recuperarAcesso(email) {
+    const db = DB._d();
+    const ident = normalizarIdentidade(email);
+    if (!ehEmail(ident) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ident)) {
+      throw { status: 400, error: 'Informe um e-mail válido.' };
+    }
+
+    const agora = Date.now();
+    const ultimo = _recoverCooldown.get(ident) || 0;
+    if (agora - ultimo < RECOVER_COOLDOWN_MS) {
+      const rest = Math.ceil((RECOVER_COOLDOWN_MS - (agora - ultimo)) / 1000);
+      throw { status: 429, error: 'Aguarde ' + rest + 's para solicitar novamente.' };
+    }
+    _recoverCooldown.set(ident, agora);
+
+    const usuario = usuarioPorIdentidade(db, ident);
+    if (!usuario) return { ok: true, expires_in_seconds: 900 };
+
+    /* limpa tokens mágicos anteriores do usuário (sem stack) e insere um novo */
+    db.magic_tokens = (db.magic_tokens || []).filter(t => t.user_id !== usuario.id);
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expira = new Date(agora + 15 * 60 * 1000);
+    db.magic_tokens.push({
+      id: DB.proximoId(),
+      token: token,
+      user_id: usuario.id,
+      email: ident,
+      expires_at: expira.toISOString(),
+      used: 0,
+      created_at: new Date(agora).toISOString()
+    });
+    DB.salvar();
+
+    Mailer.enviarRecuperacao(ident, token, usuario.name)
+      .catch(function(e) { console.error('[auth][recuperacao] falha:', e); });
+
+    return { ok: true, expires_in_seconds: 900 };
   }
 
   /**
@@ -506,6 +556,7 @@ window.Auth = (function () {
     requestCode,
     reenviarCodigo,
     reenviarCodigoIdentidade,
+    recuperarAcesso,
     verifyCode,
     usuarioAtual,
     publicUser,

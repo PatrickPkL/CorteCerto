@@ -14,30 +14,30 @@
 .btn:active { transform: scale(0.98); }
 
 .btn-primary { background: var(--ink); color: #fff; }
-.btn-primary:hover { background: var(--ink-soft); box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--ink-soft); box-shadow: var(--shadow-md); }
 
-.btn-brass { background: var(--brass); color: var(--ink); }
-.btn-brass:hover { background: var(--brass-soft); box-shadow: var(--shadow-sm); }
+.btn-brass { background: var(--brass); color: var(--ink); box-shadow: var(--shadow-sm); }
+.btn-brass:hover { background: var(--brass-soft); box-shadow: var(--shadow-md); }
 
 .btn-outline {
   background: transparent;
   border-color: var(--line);
   color: var(--text);
 }
-.btn-outline:hover { background: var(--paper-soft); border-color: var(--brass-soft); }
+.btn-outline:hover { background: var(--paper-soft); border-color: var(--brass); color: var(--heading); }
 
 .btn-danger { background: transparent; border-color: var(--danger); color: var(--danger); }
-.btn-danger:hover { background: rgba(161,67,60,0.08); }
+.btn-danger:hover { background: rgba(161,67,60,0.14); color: var(--danger); border-color: var(--danger); }
 
 .card {
   background: var(--paper-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 22px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
-.card:hover { box-shadow: var(--shadow-md); }
+.card:hover { box-shadow: var(--shadow-lg); border-color: var(--brass-soft); }
 
 .card-row { display: grid; gap: 20px; margin-bottom: 20px; }
 .cols-2 { grid-template-columns: 1.4fr 1fr; }
@@ -86,19 +86,19 @@ tbody td {
   font-size: 14.5px;
   transition: background 0.1s ease;
 }
-tbody tr:hover { background: rgba(184,134,59,0.06); }
+tbody tr:hover { background: rgba(184,134,59,0.12); }
 
 .badge {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.badge-confirmado { background: rgba(76,122,94,0.14); color: var(--success); }
-.badge-pendente { background: rgba(184,134,59,0.16); color: var(--warn-text); }
-.badge-cancelado { background: rgba(161,67,60,0.12); color: var(--danger); }
+.badge-confirmado { background: rgba(76,122,94,0.18); color: var(--success); }
+.badge-pendente { background: rgba(184,134,59,0.22); color: var(--warn-text); }
+.badge-cancelado { background: rgba(161,67,60,0.16); color: var(--danger); }
 
 label {
   display: block;
@@ -127,7 +127,7 @@ select option { background: var(--field-bg); color: var(--text); }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--brass);
-  box-shadow: 0 0 0 3px rgba(184,134,59,0.15);
+  box-shadow: 0 0 0 3px rgba(184,134,59,0.28);
 }
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
@@ -153,7 +153,7 @@ input:focus, select:focus, textarea:focus {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(28,31,38,0.5);
+  background: rgba(10,12,16,0.62);
   align-items: center;
   justify-content: center;
   z-index: 150;
@@ -525,6 +525,47 @@ input:focus, select:focus, textarea:focus {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* toggle Mensal/Anual dos planos (v3) */
+.plan-tgl {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.plan-tgl-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.plan-tgl-btn.active {
+  background: var(--brass);
+  color: var(--ink);
+}
+.plan-anual-nota {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -4px 0 10px;
+}
+.plan-parcelas:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.plan-parcelas label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.plan-parcelas select { width: auto; padding: 6px 10px; font-size: 13px; }
 
 /* ---------- chip gen�rico ---------- */
 .chip {

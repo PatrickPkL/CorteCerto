@@ -180,6 +180,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* ---------- recuperar acesso por e-mail ---------- */
+  const etapaRecuperar = document.getElementById('etapa-recuperar');
+  const formRecuperar = document.getElementById('form-recuperar');
+  const btnVoltarRec = document.getElementById('btn-voltar-recuperar');
+
+  function mostrarRecuperar() {
+    voltarAoInicio();
+    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
+      f.style.display = 'none';
+    });
+    if (etapaRecuperar) etapaRecuperar.style.display = '';
+    const inp = document.getElementById('input-rec-email');
+    if (inp) inp.focus();
+  }
+
+  document.querySelectorAll('.recuperar-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      mostrarRecuperar();
+    });
+  });
+
+  btnVoltarRec?.addEventListener('click', e => {
+    e.preventDefault();
+    voltarAoInicio();
+    roleBtns.forEach(b => {
+      if (b.classList.contains('active')) mostrarPapel(b.dataset.role);
+    });
+  });
+
+  formRecuperar?.addEventListener('submit', e => {
+    e.preventDefault();
+    const email = document.getElementById('input-rec-email').value.trim();
+    try {
+      API.recuperarAcesso(email);
+      showToast('Se o e-mail estiver cadastrado, você recebeu um link de acesso no seu e-mail.', 'success');
+      formRecuperar.reset();
+      btnVoltarRec?.click();
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
+    }
+  });
+
   /* magic link: se URL tem ?token=, verificar automaticamente */
   (function() {
     var params = new URLSearchParams(window.location.search);

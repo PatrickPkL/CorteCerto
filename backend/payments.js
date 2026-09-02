@@ -14,10 +14,11 @@
    2. Webhook — server.js recebe POST /webhooks/abacatepay,
       valida o secret/assinatura e chama processarEventoWebhook().
 
-   Ao confirmar: subscription.status='ativa', plan_id do plano
-   pago e current_period_end estendido em +30 dias (a partir do
-   fim do período vigente, preservando trial em andamento).
-   ============================================================ */
+Ao confirmar: subscription.status='ativa', plan_id do plano
+    pago e current_period_end estendido em +30 dias (mensal) ou
+    +365 dias (anual), a partir do fim do período vigente,
+    preservando trial em andamento.
+    ============================================================ */
 
 (function () {
   const DB = window.DB;
@@ -51,6 +52,8 @@
     return {
       id: pag.id,
       plan_name: plano ? plano.name : '—',
+      billing_period: pag.billing_period || 30,
+      installments: pag.installments || 1,
       amount_cents: pag.amount_cents,
       status: pag.status,
       provider: pag.provider,
@@ -76,11 +79,13 @@
 
     let sub = db.subscriptions.find(s => s.barbershop_id === pag.barbershop_id);
     const hoje = DB.hojeISO();
+    const dias = Number(pag.billing_period || 30);
     if (!sub) {
       sub = {
         id: DB.proximoId(), barbershop_id: pag.barbershop_id,
         plan_id: pag.plan_id, status: 'ativa', trial_ends_at: null,
-        current_period_end: DB.addDiasISO(30),
+        billing_period: dias,
+        current_period_end: DB.addDiasISO(dias),
         created_at: agoraISO(), updated_at: agoraISO()
       };
       db.subscriptions.push(sub);
@@ -89,7 +94,8 @@
         ? sub.current_period_end : hoje;
       sub.plan_id = pag.plan_id;
       sub.status = 'ativa';
-      sub.current_period_end = DB.addDiasISO(30, base);
+      sub.billing_period = dias;
+      sub.current_period_end = DB.addDiasISO(dias, base);
       sub.updated_at = agoraISO();
     }
     DB.salvar();
@@ -110,7 +116,8 @@
         data: {
           amount: pag.amount_cents,
           expiresIn: EXPIRA_EM_SEG,
-          description: 'Corte Certo — Plano ' + plano.name + ' (30 dias)',
+          description: 'Corte Certo — Plano ' + plano.name + ' (' +
+            ((pag.billing_period || 30) === 365 ? 'anual' : '30 dias') + ')',
           externalId: 'cc_pay_' + pag.id,
           metadata: { payment_db_id: String(pag.id), barbershop_id: String(pag.barbershop_id), plan_id: String(pag.plan_id) }
         }
@@ -131,19 +138,32 @@
 
   /**
    * Gera o PIX para assinar/renovar um plano. Reaproveita uma
-   * cobrança pendente ainda válida da mesma loja+plano.
+   * cobrança pendente ainda válida da mesma loja+plano+período.
+   *
+   * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias,
+   * cobrança de 12× o valor mensal). A opção de parcelar só é
+   * aceita no período anual (parcelas de 1 a 12).
    */
-  async function criarCobrancaPlano(planId) {
+  async function criarCobrancaPlano(planId, periodo, parcelas) {
     const { shop } = exigirDonoLocal();
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err400('Plano não encontrado.');
 
+    const anual = String(periodo || '').toLowerCase() === 'anual';
+    const dias = anual ? 365 : 30;
+    const nParc = anual
+      ? Math.min(12, Math.max(1, parseInt(parcelas, 10) || 12))
+      : 1;
+    const quantidade = anual ? 12 : 1;
+    const totalCents = Math.round(Number(plano.price_monthly || 0) * quantidade * 100);
+
     /* pendente reutilizável? */
     const agora = agoraMsISO();
     const existente = db.payments.find(p =>
       p.barbershop_id === shop.id && p.plan_id === plano.id &&
+      p.billing_period === dias && (p.installments || 1) === nParc &&
       p.status === 'pending' && p.expires_at > agora);
     if (existente) return pagamentoPublico(existente);
 
@@ -151,7 +171,9 @@
       id: DB.proximoId(),
       barbershop_id: shop.id,
       plan_id: plano.id,
-      amount_cents: Math.round(Number(plano.price_monthly || 0) * 100),
+      billing_period: dias,
+      installments: nParc,
+      amount_cents: totalCents,
       status: 'pending',
       provider: chaveApi() ? 'abacatepay' : 'demo',
       abacate_id: null,
