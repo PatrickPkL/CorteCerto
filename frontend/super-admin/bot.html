@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atendente automático · Super Admin · Corte Certo</title>
+<script src="../shared/js/tema-inicio.js"></script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #f0f0f0;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* sidebar */
+  .sa-sidebar {
+    width: 220px;
+    background: #161616;
+    border-right: 1px solid #222;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+  .sa-sidebar-brand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #222;
+    margin-bottom: 8px;
+  }
+  .sa-sidebar-brand span { color: #b8863b; }
+  .sa-sidebar-nav { flex: 1; padding: 8px 0; }
+  .sa-sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    color: #888;
+    text-decoration: none;
+    font-size: .9rem;
+    transition: color .2s, background .2s;
+  }
+  .sa-sidebar-nav a:hover,
+  .sa-sidebar-nav a.active {
+    color: #f0f0f0;
+    background: rgba(184,134,59,.1);
+  }
+  .sa-sidebar-nav a.active { border-right: 3px solid #b8863b; }
+  .sa-sidebar-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #222;
+  }
+  .sa-sidebar-footer a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #888;
+    text-decoration: none;
+    font-size: .85rem;
+    padding: 8px 0;
+    transition: color .2s;
+  }
+  .sa-sidebar-footer a:hover { color: #e74c3c; }
+
+  /* main */
+  .sa-main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  .sa-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .sa-header h1 { font-size: 1.4rem; font-weight: 600; }
+  .sa-header-extra {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sa-count {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: .85rem;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sa-count strong { color: #b8863b; font-size: 1rem; }
+
+  .sa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .sa-card {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .sa-card h3 { font-size: .95rem; margin-bottom: 14px; }
+  .sa-stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .sa-stat-cell .lbl {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .sa-stat-cell .val { font-size: 1.3rem; font-weight: 700; color: #b8863b; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-ativo { background: rgba(46,204,113,.15); color: #2ecc71; }
+  .badge-inativo { background: #2a2a2a; color: #888; }
+  .badge-neutro { background: rgba(52,152,219,.15); color: #3498db; }
+  .badge-ia { background: rgba(155,89,182,.15); color: #9b59b6; }
+
+  .sa-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 600;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .sa-btn:hover { opacity: .88; }
+  .sa-btn-brass { background: #b8863b; color: #0c0c0c; }
+  .sa-btn-ghost { background: transparent; border: 1px solid #333; color: #888; }
+  .sa-btn-danger { background: transparent; border: 1px solid rgba(231,76,60,.5); color: #e74c3c; }
+  .sa-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .sa-toggle {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+  }
+  .sa-toggle input { opacity: 0; width: 0; height: 0; }
+  .sa-toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #2a2a2a;
+    border-radius: 26px;
+    transition: background .2s;
+  }
+  .sa-toggle .slider:before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    top: 3px;
+    background: #888;
+    border-radius: 50%;
+    transition: transform .2s, background .2s;
+  }
+  .sa-toggle input:checked + .slider { background: #b8863b; }
+  .sa-toggle input:checked + .slider:before { transform: translateX(20px); background: #0c0c0c; }
+
+  .sa-field { margin-bottom: 14px; }
+  .sa-field .lbl {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+  .sa-field input,
+  .sa-field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: .9rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    outline: none;
+  }
+  .sa-field input:focus,
+  .sa-field textarea:focus { border-color: #b8863b; }
+  .sa-field textarea { min-height: 90px; resize: vertical; }
+  .sa-hint { color: #777; font-size: .8rem; margin: 0 0 14px; line-height: 1.5; }
+
+  .sa-table-wrap {
+    background: #161616;
+    border: 1px solid #222;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin-top: 8px;
+  }
+  .sa-table { width: 100%; border-collapse: collapse; }
+  .sa-table th {
+    text-align: left;
+    padding: 14px 16px;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #888;
+    border-bottom: 1px solid #222;
+    white-space: nowrap;
+  }
+  .sa-table td {
+    padding: 12px 16px;
+    font-size: .9rem;
+    border-bottom: 1px solid #1a1a1a;
+    vertical-align: top;
+  }
+  .sa-table tbody tr:last-child td { border-bottom: none; }
+  .sa-table tbody tr:hover { background: rgba(184,134,59,.05); }
+  .sa-msg-trunc {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ccc;
+  }
+  .sa-data { color: #888; white-space: nowrap; font-size: .82rem; }
+  .sa-vazio { color: #888; text-align: center; padding: 32px 0; }
+
+  .sa-resultado-teste {
+    background: #0c0c0c;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 14px;
+    font-size: .85rem;
+    line-height: 1.6;
+    color: #ccc;
+    white-space: pre-wrap;
+  }
+  .sa-resultado-teste strong { color: #b8863b; }
+
+  .sa-quick {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #888;
+    font-size: .8rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    margin: 0 8px 8px 0;
+    transition: border-color .2s, color .2s;
+  }
+  .sa-quick:hover { color: #f0f0f0; border-color: #b8863b; }
+
+  .sa-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .sa-card-head h3 { margin-bottom: 0; }
+
+  .sa-mutado { margin: 0; color: var(--text-muted, #888); }
+
+  @media (max-width: 768px) {
+    .sa-sidebar { width: 60px; }
+    .sa-sidebar-brand,
+    .sa-sidebar-nav a span,
+    .sa-sidebar-footer a span { display: none; }
+    .sa-sidebar-nav a { justify-content: center; padding: 12px 0; }
+    .sa-main { margin-left: 60px; padding: 20px 16px; }
+    .sa-stat-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sa-sidebar">
+  <div class="sa-sidebar-brand">Corte<span>Certo</span></div>
+  <nav class="sa-sidebar-nav">
+    <a href="index.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="relatorios.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Relatórios</span>
+    </a>
+    <a href="suporte-sa.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+      <span>Suporte</span>
+    </a>
+    <a href="bot.html" class="active">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="20" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="16" cy="13" r="1"/><path d="M9 17h6"/></svg>
+      <span>Atendente</span>
+    </a>
+    <a href="chats.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>
+      <span>Chats</span>
+    </a>
+    <a href="index.html#lojas-section">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Lojas</span>
+    </a>
+  </nav>
+  <div class="sa-sidebar-footer">
+    <a href="#" id="btn-sair">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>Sair</span>
+    </a>
+  </div>
+</aside>
+
+<main class="sa-main">
+  <div class="sa-header">
+    <div>
+      <h1>Atendente automático</h1>
+      <p class="sa-mutado" style="margin-top:4px;">Bot responde e-mails do salão e redireciona o restante para atendimento humano.</p>
+    </div>
+    <div class="sa-header-extra">
+      <span id="bot-modo" class="badge badge-neutro">Modo…</span>
+      <span id="bot-ia" class="badge badge-ia" title="Motor de decisão do bot">IA…</span>
+      <span id="bot-estado" class="badge badge-inativo">Inativo</span>
+      <button class="sa-btn sa-btn-ghost" id="btn-verificar" type="button">Verificar inbox agora</button>
+      <button class="sa-btn sa-btn-danger" id="btn-limpar" type="button">Limpar histórico</button>
+    </div>
+  </div>
+
+  <div class="sa-grid">
+    <div class="sa-card">
+      <div class="sa-card-head">
+        <h3>Ativação do bot</h3>
+        <label class="sa-toggle" title="Ativar / desativar">
+          <input type="checkbox" id="bot-switch">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <p class="sa-hint">Quando ativo, o bot verifica a caixa do Gmail da empresa periodicamente e age em cada mensagem nova.</p>
+      <div class="sa-stat-row">
+        <div class="sa-stat-cell">
+          <div class="lbl">Processadas</div>
+          <div class="val" id="stat-total">0</div>
+        </div>
+        <div class="sa-stat-cell">
+          <div class="lbl">Respondidas</div>
+          <div class="val" id="stat-resp">0</div>
+        </div>
+        <div class="sa-stat-cell">
+          <div class="lbl">Redirecionadas</div>
+          <div class="val" id="stat-enc">0</div>
+        </div>
+      </div>
+      <p class="sa-hint" id="bot-gmail"></p>
+    </div>
+
+    <div class="sa-card">
+      <h3>Configuração</h3>
+      <form id="form-config">
+        <div class="sa-field">
+          <div class="lbl">Encaminhar para (e-mail do atendente)</div>
+          <input id="cfg-forward" type="email" placeholder="atendimento@suaempresa.com">
+        </div>
+        <div class="sa-field">
+          <div class="lbl">Nome do assistente (assinatura)</div>
+          <input id="cfg-nome" type="text" maxlength="60" placeholder="Equipe Corte Certo">
+        </div>
+        <div class="sa-field">
+          <div class="lbl">Frequência de verificação (segundos)</div>
+          <input id="cfg-segundos" type="number" min="10" max="3600" step="5">
+        </div>
+        <button type="submit" class="sa-btn sa-btn-brass" id="btn-salvar-config">Salvar configuração</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="sa-card" style="margin-bottom:20px;">
+    <h3>Simular e-mail recebido</h3>
+    <p class="sa-hint">Veja o que o bot faria com esta mensagem — sem enviar nada de verdade.</p>
+    <form id="form-teste">
+      <div class="sa-grid">
+        <div class="sa-field">
+          <div class="lbl">Remetente</div>
+          <input id="test-from" type="email" value="cliente@exemplo.com" required>
+        </div>
+        <div class="sa-field">
+          <div class="lbl">Assunto</div>
+          <input id="test-subject" type="text">
+        </div>
+      </div>
+      <div class="sa-field">
+        <div class="lbl">Mensagem</div>
+        <textarea id="test-text" rows="4" placeholder="Ex.: Quanto custa um corte de cabelo?" required></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <button type="button" class="sa-quick" data-quick="preco">Ex.: quanto custa um corte?</button>
+        <button type="button" class="sa-quick" data-quick="horario">Ex.: horário de funcionamento</button>
+        <button type="button" class="sa-quick" data-quick="agendar">Ex.: quero marcar amanhã</button>
+      </div>
+      <button type="submit" class="sa-btn sa-btn-brass">Processar mensagem</button>
+    </form>
+    <div id="result-teste" class="sa-resultado-teste" hidden></div>
+  </div>
+
+  <div class="sa-card">
+    <div class="sa-card-head">
+      <h3>Histórico</h3>
+      <button class="sa-btn sa-btn-ghost" id="btn-refresh" type="button">Atualizar</button>
+    </div>
+    <div class="sa-table-wrap">
+      <table class="sa-table">
+        <thead>
+          <tr><th>Quando</th><th>De</th><th>Assunto</th><th>Decisão</th><th>Detalhe</th></tr>
+        </thead>
+        <tbody id="tb-historico">
+          <tr><td colspan="5" class="sa-vazio">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="../shared/js/shared.js"></script>
+<script src="js/super-auth.js"></script>
+<script src="js/bot-sa.js"></script>
+</body>
+</html>

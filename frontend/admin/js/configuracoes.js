@@ -174,10 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnGerar?.addEventListener('click', () => {
     try {
-      API.gerarCodigoExclusao();
+      const r = API.gerarCodigoExclusao();
       step1.style.display = 'none';
       step2.style.display = 'block';
-      showToast('Código gerado. Verifique e digite abaixo.');
+      showToast(r && r.hint ? r.hint : 'Código enviado por e-mail. Digite abaixo.');
       if (inputCodigo) inputCodigo.focus();
     } catch (err2) {
       showToast(msgErro(err2), 'error');

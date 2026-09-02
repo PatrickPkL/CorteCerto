@@ -33,6 +33,21 @@ try { require('dns').setDefaultResultOrder('ipv4first'); } catch (e) { /* Node a
   } catch (e) { /* projeto sem .env — ok */ }
 })();
 
+/* ---- Segurança (fail-closed): sem DB_ENCRYPT_KEY o servidor NÃO sobe.
+   A ausência da chave faria o crypt.js persistir PII (e-mails/telefones)
+   em texto puro silenciosamente. Desative a proteção apenas em ambientes
+   de demonstração com CC_CRYPT_INSECURE_PLAINTEXT=1 (default inseguro). ---- */
+if (!String(process.env.DB_ENCRYPT_KEY || '').trim() &&
+    !String(process.env.CC_CRYPT_INSECURE_PLAINTEXT || '').trim()) {
+  console.error(
+    '[SEGURANÇA][BOOT] DB_ENCRYPT_KEY não configurado. ' +
+    'Sem a chave a aplicação falha fechada (não sobe) para nunca gravar ' +
+    'dados sensíveis em claro. Defina DB_ENCRYPT_KEY no .env ' +
+    'ou, APENAS em demo, CC_CRYPT_INSECURE_PLAINTEXT=1.'
+  );
+  process.exit(1);
+}
+
 const { API, Auth, Bot } = require('./backend/boot');
 
 const PORTA = Number(process.env.PORT || 3000);
@@ -107,15 +122,17 @@ const _authRequired = new Set([
   'mePerfil', 'atualizarMe', 'atualizarPreferencias', 'excluirMinhaConta',
   'exportarMeusDados', 'revogarConsentimento', 'solicitarExclusao',
   'enviarSolicitacaoLGPD', 'meusLogsDeAcesso', 'logoutTodosDispositivos',
+  'gerarCodigoExclusao', 'confirmarExclusao',
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
   'definirLogo', 'definirCapa',
   'galeriaDaLoja', 'adicionarGaleria', 'removerGaleria',
   'servicosDaLoja', 'profissionaisDaLoja', 'horariosDaLoja',
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
-  'botConfig', 'botAtivar', 'botConfigurar', 'botHistorico',
-  'botLimparHistorico', 'botTestar', 'botVerificarAgora',
-  'botListarChats', 'botResponderChat',
+  'ativarTrial',
+  'criarCobrancaPlano', 'statusCobranca', 'listarMinhasCobrancas',
+  'confirmarCobrancaDemo', 'simularCobranca',
+  'criarReview', 'minhasReviews',
   'logout'
 ]);
 
@@ -129,7 +146,8 @@ const _RPC_BLOQUEADOS = new Set([
   'err', '_auditLog', 'processarEventoWebhook',
   'superAdminLogin', 'superAdminAuth', 'superAdminLogout',
   'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
-  'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios'
+  'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
+  'saTickets', 'saResponderTicket'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -144,15 +162,23 @@ Object.keys(API).forEach(nome => {
   _RPC_API.add(nome);
 });
 
+/* ---- Invariante de segurança (fail-closed): nenhum método
+   administrativo/super-admin pode vazar para o RPC público. Se isso
+   acontecer, o servidor NÃO sobe — impede regressões silenciosas. ---- */
+for (const nome of _RPC_API) {
+  if (/^sa[A-Z]/.test(nome) || /^superAdmin[A-Z]/.test(nome)) {
+    throw new Error(
+      '[SEGURANÇA][BOOT] Método restrito exposto no RPC público: ' + nome +
+      '. Adicione-o a _RPC_BLOQUEADOS ou remova da exportação do API.'
+    );
+  }
+}
+
 /* Métodos públicos do Bot (atendente + chat do site) expostos via RPC.
-   Mesmo critério da allowlist de API: nenhum `_`-prefixo, nenhum interno. */
-const _RPC_BOT = new Set();
-Object.keys(Bot).forEach(nome => {
-  if (nome.charCodeAt(0) === 95) return;
-  if (!Object.prototype.hasOwnProperty.call(Bot, nome)) return;
-  if (typeof Bot[nome] !== 'function') return;
-  _RPC_BOT.add(nome);
-});
+   Mesmo critério da allowlist de API: nenhum `_`-prefixo, nenhum interno.
+   Bot atendente e chats do painel saíram do RPC: são super-admin agora
+   (rotas REST /api/super-admin/*). Só restam os 2 públicos do widget. */
+const _RPC_BOT = new Set(['chatEnviar', 'chatBuscar']);
 
 /* Rejeita chaves perigosas em payloads aninhados (defesa em
    profundidade contra prototype pollution via dados mesclados). */
@@ -216,6 +242,12 @@ function handleRpc(req, res) {
       fn = Auth[metodo];
     } else if (_RPC_BOT.has(metodo) && typeof Bot[metodo] === 'function') {
       fn = Bot[metodo];
+    }
+
+    /* método inexistente/não permitido: responde 401 idêntico ao de
+       sessão inválida — sem enumeração e sem vazar dados (fail-closed) */
+    if (!fn) {
+      return json(res, 401, { ok: false, error: 'Sessão expirada. Faça login novamente.' });
     }
 
     /* argumentos: apenas array; qualquer outra forma é rejeitada.
@@ -437,6 +469,70 @@ function handleSuperAdmin(req, res, pathname, url) {
   if (rota === 'ticket' && idParam && req.method === 'PUT') {
     return readBody().then(dados => {
       const r = API.saResponderTicket(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* ---------------- bot atendente + chats (super-admin) ---------------- */
+
+  /* GET /api/super-admin/bot — config atual */
+  if (rota === 'bot' && !idParam && req.method === 'GET') {
+    try { const r = Bot.saBotConfig(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/bot — salva config */
+  if (rota === 'bot' && !idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = Bot.saBotSalvar(dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* POST /api/super-admin/bot/verificar — testa a config (sem salvar) */
+  if (rota === 'bot' && idParam === 'verificar' && req.method === 'POST') {
+    return readBody().then(dados => {
+      const r = Bot.saBotVerificar(dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* POST /api/super-admin/bot/testar — dispara processamento manual */
+  if (rota === 'bot' && idParam === 'testar' && req.method === 'POST') {
+    return readBody().then(dados => {
+      const r = Bot.saBotTestar(dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/bot/historico */
+  if (rota === 'bot' && idParam === 'historico' && req.method === 'GET') {
+    try {
+      const r = Bot.saBotHistorico();
+      json(res, 200, { ok: true, data: r });
+    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* DELETE /api/super-admin/bot/historico */
+  if (rota === 'bot' && idParam === 'historico' && req.method === 'DELETE') {
+    try { const r = Bot.saBotLimparHistorico(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/chats */
+  if (rota === 'chats' && !idParam && req.method === 'GET') {
+    try { const r = Bot.saChatsListar(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* POST /api/super-admin/chats/:id/responder */
+  if (rota === 'chats' && idParam && parts[2] === 'responder' && req.method === 'POST') {
+    return readBody().then(dados => {
+      const r = Bot.saChatsResponder(idParam, dados.texto);
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
   }

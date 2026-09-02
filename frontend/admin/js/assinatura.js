@@ -34,9 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const [cls, label] = STATUS_LABEL[sub.status] || ['', sub.status];
-    setText('st-plano', sub.plan ? sub.plan.name : '—');
     setHTML('st-status', '<span class="badge ' + cls + '">' + label + '</span>');
-    setText('st-preco', sub.plan ? DB.fmtBRL(sub.plan.price_monthly) + '/mês' : '—');
+    setText('st-plano', sub.plano_efetivo ? sub.plano_efetivo.name : (sub.plan ? sub.plan.name : '—'));
+    setText('st-preco', sub.plano_efetivo ? DB.fmtBRL(sub.plano_efetivo.price_monthly) + '/mês' : '—');
+
+    const ofertaTrial = document.getElementById('box-trial-oferta');
+    if (ofertaTrial) ofertaTrial.hidden = !!sub.on_trial || !!sub.trial_usado;
 
     if (sub.on_trial) {
       setText('st-cobranca', DB.fmtDataBR(sub.trial_ends_at));
@@ -93,11 +96,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
-      const atual = subAtual.plan && subAtual.plan.id === p.id;
+      const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;
       const limite = p.max_professionals == null
         ? 'Profissionais ilimitados'
         : 'Até ' + p.max_professionals + ' profissional(is)';
       const feats = (p.features || []).map(f => '<li>' + esc(f) + '</li>').join('');
+      const botao = p.is_free
+        ? '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
+            (atual ? 'Plano atual' : 'Plano base') + '</button>'
+        : '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
+            (atual ? 'Renovar' : 'Assinar agora') + '</button>';
       return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '">' +
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
@@ -112,8 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
         '</div>' +
         '<ul class="plan-feats"><li>' + limite + '</li>' + feats + '</ul>' +
-        '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
-          (atual ? 'Renovar' : 'Assinar via PIX') + '</button>' +
+        botao +
       '</div>';
     }).join('');
 
@@ -140,13 +147,54 @@ document.addEventListener('DOMContentLoaded', () => {
     timerPoll = timerRelogio = null;
   }
 
-  function fecharPagamento() {
+function fecharPagamento() {
     pararTimers();
     cobrancaId = null;
+    ['pg-card-numero', 'pg-card-titular', 'pg-card-validade', 'pg-card-cvv'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const marca = document.getElementById('pg-card-marca');
+    if (marca) marca.textContent = '';
     fecharModal(modalPg);
     render();
-    montarShellAdmin();
   }
+
+  function metodoSelecionado() {
+    const ativo = modalPg?.querySelector('.plan-metodo-tgl .plan-tgl-btn.active');
+    return ativo ? ativo.dataset.metodo : 'pix';
+  }
+
+  /* troca de método dentro do modal */
+  modalPg?.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modalPg.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const m = btn.dataset.metodo;
+      const titulo = document.getElementById('pg-titulo');
+      if (titulo) titulo.textContent = m === 'cartao' ? 'Pagar com Cartão' : 'Pagar com PIX';
+      const pixBox = document.getElementById('pg-pix-box');
+      const cartaoBox = document.getElementById('pg-cartao-box');
+      if (pixBox) pixBox.style.display = m === 'pix' ? 'block' : 'none';
+      if (cartaoBox) cartaoBox.style.display = m === 'cartao' ? 'block' : 'none';
+      const st = document.getElementById('pg-status');
+      if (st) { st.textContent = 'Escolha o método e confirme.'; st.style.color = 'var(--text-muted)'; }
+    });
+  });
+
+  /* máscaras do formulário de cartão */
+  const inpNumero = document.getElementById('pg-card-numero');
+  inpNumero?.addEventListener('input', () => {
+    inpNumero.value = (inpNumero.value.replace(/\D/g, '').slice(0, 16).match(/.{1,4}/g) || []).join(' ');
+  });
+  const inpVal = document.getElementById('pg-card-validade');
+  inpVal?.addEventListener('input', () => {
+    let v = inpVal.value.replace(/\D/g, '').slice(0, 4);
+    if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
+    inpVal.value = v;
+  });
+  const inpCvv = document.getElementById('pg-card-cvv');
+  inpCvv?.addEventListener('input', () => { inpCvv.value = inpCvv.value.replace(/\D/g, '').slice(0, 4); });
 
   function statusTexto(c) {
     if (c.status === 'paid') return 'Pagamento confirmado!';
@@ -188,8 +236,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let rotulo = 'Plano ' + c.plan_name + ' · ' + (anual ? 'anual' : '30 dias');
     if (anual && c.installments > 1) rotulo += ' · ' + c.installments + '×';
     if (anual && c.installments === 1) rotulo += ' · à vista';
+    const titulo = document.getElementById('pg-titulo');
+    if (titulo) titulo.textContent = c.metodo === 'cartao' ? 'Pagar com Cartão' : 'Pagar com PIX';
     setText('pg-plano', rotulo);
     setText('pg-valor', DB.fmtBRL(c.amount_cents / 100));
+
+    const pixBox = document.getElementById('pg-pix-box');
+    const cartaoBox = document.getElementById('pg-cartao-box');
+    if (pixBox) pixBox.style.display = c.metodo === 'cartao' ? 'none' : 'block';
+    if (cartaoBox) cartaoBox.style.display = c.metodo === 'cartao' ? 'block' : 'none';
+
+    if (c.metodo === 'cartao') {
+      const marca = document.getElementById('pg-card-marca');
+      if (marca) {
+        marca.textContent = c.card_brand
+          ? 'Cartão ' + c.card_brand + (c.card_last4 ? ' •••• ' + c.card_last4 : '')
+          : '';
+      }
+      document.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.metodo === 'cartao'));
+    }
 
     const qr = document.getElementById('pg-qrcode');
     const semqr = document.getElementById('pg-semqr');
@@ -230,9 +296,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function abrirPagamento(plano, periodo, parcelas) {
+    const metodo = metodoSelecionado();
     let c;
-    try { c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1); }
-    catch (e) { showToast(msgErro(e), 'error'); return; }
+    try {
+      if (metodo === 'cartao') {
+        const cardData = {
+          numero: document.getElementById('pg-card-numero').value.replace(/\s/g, ''),
+          titular: document.getElementById('pg-card-titular').value.trim(),
+          validade: document.getElementById('pg-card-validade').value.trim(),
+          cvv: document.getElementById('pg-card-cvv').value.trim()
+        };
+        c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'cartao', cardData);
+      } else {
+        c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'pix');
+      }
+    } catch (e) { showToast(msgErro(e), 'error'); return; }
     mostrarCobranca(c, plano);
   }
 
@@ -317,6 +395,20 @@ document.addEventListener('DOMContentLoaded', () => {
       render();
     } catch (err2) {
       showToast(msgErro(err2), 'error');
+    }
+  });
+
+  /* ---------- trial opcional (10 dias) ---------- */
+  document.getElementById('btn-ativar-trial')?.addEventListener('click', () => {
+    if (!confirm('Ativar o trial de 10 dias do plano Salão? Válido uma única vez por loja.')) return;
+    try {
+      API.ativarTrial();
+      showToast('Trial ativado! Plano Salão liberado por 10 dias.', 'success');
+      render();
+      montarShellAdmin();
+    } catch (err3) {
+      showToast(msgErro(err3), 'error');
+      render();
     }
   });
 

@@ -8,5 +8,5 @@
   var params = new URLSearchParams(location.search);
   var tk = params.get('token');
   if (tk) { localStorage.setItem('cc_magic_token', tk); }
-  location.href = '../admin/';
+  location.href = '../admin/login.html';
 })();

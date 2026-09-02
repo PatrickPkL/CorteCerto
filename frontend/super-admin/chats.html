@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Suporte · Super Admin · Corte Certo</title>
+<title>Chats · Super Admin · Corte Certo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -88,11 +88,7 @@
     margin-bottom: 28px;
   }
   .sa-header h1 { font-size: 1.4rem; font-weight: 600; }
-  .sa-header-extra {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
+  .sa-header-extra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .sa-count {
     background: #161616;
     border: 1px solid #222;
@@ -105,8 +101,8 @@
     gap: 8px;
   }
   .sa-count strong { color: #b8863b; font-size: 1rem; }
+  .sa-mutado { margin: 0; color: var(--text-muted, #888); }
 
-  /* filtros */
   .sa-filtros {
     display: flex;
     gap: 8px;
@@ -132,17 +128,13 @@
     font-weight: 600;
   }
 
-  /* tabela */
   .sa-table-wrap {
     background: #161616;
     border: 1px solid #222;
     border-radius: 10px;
     overflow-x: auto;
   }
-  .sa-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
+  .sa-table { width: 100%; border-collapse: collapse; }
   .sa-table th {
     text-align: left;
     padding: 14px 16px;
@@ -162,15 +154,15 @@
   .sa-table tbody tr:last-child td { border-bottom: none; }
   .sa-table tbody tr:hover { background: rgba(184,134,59,.05); }
   .sa-msg-trunc {
-    max-width: 300px;
+    max-width: 280px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     color: #ccc;
   }
   .sa-data { color: #888; white-space: nowrap; font-size: .82rem; }
+  .sa-vazio { color: #888; text-align: center; padding: 32px 0; }
 
-  /* badges status */
   .badge {
     display: inline-block;
     padding: 3px 10px;
@@ -179,13 +171,12 @@
     font-weight: 600;
     text-transform: uppercase;
   }
-  .badge-aberto { background: rgba(241,196,15,.15); color: #f1c40f; }
-  .badge-respondido { background: rgba(52,152,219,.15); color: #3498db; }
-  .badge-resolvido { background: rgba(46,204,113,.15); color: #2ecc71; }
-  .badge-fechado { background: #2a2a2a; color: #888; }
-  .badge-em_andamento { background: rgba(155,89,182,.15); color: #9b59b6; }
+  .badge-novo { background: rgba(241,196,15,.15); color: #f1c40f; }
+  .badge-humano { background: rgba(155,89,182,.15); color: #9b59b6; }
+  .badge-respondido { background: rgba(46,204,113,.15); color: #2ecc71; }
+  .badge-critico { background: rgba(231,76,60,.15); color: #e74c3c; }
+  .badge-media { background: rgba(241,196,15,.15); color: #f1c40f; }
 
-  /* ação */
   .sa-btn {
     padding: 8px 16px;
     border: none;
@@ -197,14 +188,9 @@
     transition: opacity .2s;
   }
   .sa-btn:hover { opacity: .88; }
+  .sa-btn:disabled { opacity: .5; cursor: not-allowed; }
   .sa-btn-brass { background: #b8863b; color: #0c0c0c; }
   .sa-btn-ghost { background: transparent; border: 1px solid #333; color: #888; }
-
-  .sa-vazio {
-    color: #888;
-    text-align: center;
-    padding: 32px 0;
-  }
 
   /* modal */
   .sa-modal {
@@ -223,33 +209,50 @@
     border: 1px solid #222;
     border-radius: 12px;
     padding: 24px;
-    max-width: 560px;
+    max-width: 640px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
   }
-  .sa-modal-box h3 { font-size: 1.05rem; margin-bottom: 16px; }
+  .sa-modal-box h3 { font-size: 1.05rem; margin-bottom: 6px; }
   .sa-modal-meta {
     font-size: .85rem;
     color: #888;
     margin-bottom: 16px;
     line-height: 1.6;
   }
-  .sa-modal-block {
-    background: #0c0c0c;
-    border: 1px solid #222;
-    border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 16px;
+  .sa-chat-thread { margin-bottom: 16px; }
+  .sa-bubble {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: .9rem;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    word-break: break-word;
   }
-  .sa-modal-block .lbl {
-    font-size: .75rem;
+  .sa-bubble .sa-b-tag {
+    display: block;
+    font-size: .7rem;
+    opacity: .7;
+    margin-bottom: 2px;
     text-transform: uppercase;
-    letter-spacing: .5px;
-    color: #888;
-    margin-bottom: 6px;
+    letter-spacing: .4px;
   }
-  .sa-modal-block .txt { color: #f0f0f0; font-size: .9rem; white-space: pre-wrap; word-break: break-word; }
+  .sa-bubble.cliente {
+    background: #0c0c0c;
+    border: 1px solid #333;
+    border-top-left-radius: 4px;
+    align-self: flex-start;
+  }
+  .sa-bubble.atendente {
+    background: rgba(184,134,59,.18);
+    border: 1px solid rgba(184,134,59,.4);
+    border-top-right-radius: 4px;
+    margin-left: auto;
+  }
+  .sa-bubble .ts { display: block; font-size: .72rem; opacity: .6; margin-top: 4px; }
+
   .sa-modal-field { margin-bottom: 16px; }
   .sa-modal-field .lbl {
     font-size: .75rem;
@@ -258,7 +261,6 @@
     color: #888;
     margin-bottom: 6px;
   }
-  .sa-modal-field select,
   .sa-modal-field textarea {
     width: 100%;
     padding: 10px 12px;
@@ -269,10 +271,10 @@
     font-size: .9rem;
     font-family: system-ui, -apple-system, sans-serif;
     outline: none;
+    min-height: 90px;
+    resize: vertical;
   }
-  .sa-modal-field select:focus,
   .sa-modal-field textarea:focus { border-color: #b8863b; }
-  .sa-modal-field textarea { min-height: 90px; resize: vertical; }
   .sa-modal-actions {
     display: flex;
     gap: 8px;
@@ -280,7 +282,6 @@
     margin-top: 4px;
   }
 
-  /* responsive */
   @media (max-width: 768px) {
     .sa-sidebar { width: 60px; }
     .sa-sidebar-brand,
@@ -304,7 +305,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       <span>Relatórios</span>
     </a>
-    <a href="suporte-sa.html" class="active">
+    <a href="suporte-sa.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
       <span>Suporte</span>
     </a>
@@ -312,7 +313,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="20" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="16" cy="13" r="1"/><path d="M9 17h6"/></svg>
       <span>Atendente</span>
     </a>
-    <a href="chats.html">
+    <a href="chats.html" class="active">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>
       <span>Chats</span>
     </a>
@@ -331,76 +332,63 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>Suporte</h1>
+    <div>
+      <h1>Chats</h1>
+      <p class="sa-mutado" style="margin-top:4px;" id="lbl-atendente">Conversas do chat do site.</p>
+    </div>
     <div class="sa-header-extra">
-      <div class="sa-count">Tickets abertos: <strong id="sa-total-abertos">0</strong></div>
+      <div class="sa-count">Conversas: <strong id="sa-total-chats">0</strong></div>
+      <button class="sa-btn sa-btn-ghost" id="btn-atualizar" type="button">Atualizar</button>
     </div>
   </div>
 
   <div class="sa-filtros" id="sa-filtros">
-    <button class="sa-filtro-btn active" data-status="todos">Todos</button>
-    <button class="sa-filtro-btn" data-status="aberto">Aberto</button>
-    <button class="sa-filtro-btn" data-status="respondido">Respondido</button>
-    <button class="sa-filtro-btn" data-status="resolvido">Resolvido</button>
+    <button class="sa-filtro-btn active" data-estado="todos">Todos</button>
+    <button class="sa-filtro-btn" data-estado="novo">Novos</button>
+    <button class="sa-filtro-btn" data-estado="humano">Necessitam humano</button>
+    <button class="sa-filtro-btn" data-estado="respondido">Respondidos</button>
   </div>
 
   <div class="sa-table-wrap">
     <table class="sa-table">
       <thead>
         <tr>
-          <th>Data</th>
+          <th>Atualizado</th>
           <th>Loja</th>
-          <th>Cidade</th>
-          <th>Assunto</th>
-          <th>Mensagem</th>
-          <th>Status</th>
+          <th>Contato</th>
+          <th>Estado</th>
+          <th>Mensagens</th>
+          <th>Última</th>
           <th>Ações</th>
         </tr>
       </thead>
-      <tbody id="tbody-tickets">
+      <tbody id="tbody-chats">
         <tr><td colspan="7" class="sa-vazio">Carregando...</td></tr>
       </tbody>
     </table>
   </div>
 </main>
 
-<!-- modal -->
+<!-- modal de conversa -->
 <div class="sa-modal" id="sa-modal">
   <div class="sa-modal-box">
-    <h3 id="sa-modal-titulo">Responder Ticket</h3>
+    <h3 id="sa-modal-titulo">Conversa</h3>
     <div class="sa-modal-meta" id="sa-modal-meta"></div>
-    <div class="sa-modal-block">
-      <div class="lbl">Assunto</div>
-      <div class="txt" id="sa-modal-assunto"></div>
-    </div>
-    <div class="sa-modal-block">
-      <div class="lbl">Mensagem</div>
-      <div class="txt" id="sa-modal-mensagem"></div>
-    </div>
-    <input type="hidden" id="sa-modal-ticket-id">
+    <div class="sa-chat-thread" id="sa-chat-thread"></div>
+    <input type="hidden" id="sa-chat-thread-id">
     <div class="sa-modal-field">
-      <div class="lbl">Status</div>
-      <select id="sa-modal-status">
-        <option value="respondido">Marcado como Respondido</option>
-        <option value="resolvido">Marcado como Resolvido</option>
-        <option value="aberto">Manter Aberto</option>
-        <option value="fechado">Fechar</option>
-      </select>
-    </div>
-    <div class="sa-modal-field">
-      <div class="lbl">Resposta (opcional)</div>
-      <textarea id="sa-modal-resposta" placeholder="Digite a resposta que será exibida ao dono da loja..."></textarea>
+      <div class="lbl">Resposta</div>
+      <textarea id="sa-chat-resposta" placeholder="Escreva sua resposta..."></textarea>
     </div>
     <div class="sa-modal-actions">
-      <button class="sa-btn sa-btn-ghost" id="sa-modal-cancel">Cancelar</button>
-      <button class="sa-btn sa-btn-brass" id="sa-modal-salvar">Salvar</button>
+      <button class="sa-btn sa-btn-ghost" id="sa-modal-cancel">Fechar</button>
+      <button class="sa-btn sa-btn-brass" id="sa-modal-responder">Enviar</button>
     </div>
   </div>
 </div>
 
 <script src="../shared/js/shared.js"></script>
 <script src="js/super-auth.js"></script>
-<script src="js/suporte-sa.js"></script>
-
+<script src="js/chats-sa.js"></script>
 </body>
 </html>

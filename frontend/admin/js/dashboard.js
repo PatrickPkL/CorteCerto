@@ -66,9 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   selPeriodo?.addEventListener('change', renderStats);
 
-  /* RF-049 — exportar CSV do período exibido */
-  document.getElementById('btn-exportar-csv')?.addEventListener('click', () => {
-    if (!statsAtual) return;
+/* RF-049 — exportar CSV do período exibido */
+document.getElementById('btn-exportar-csv')?.addEventListener('click', () => {
+  if (!statsAtual) return;
+  if (!CC.temFunc('exportar_csv')) {
+    showToast('Exportar CSV está bloqueado no seu plano. Faça upgrade na aba Assinatura.', 'error');
+    return;
+  }
     try {
       const statuses = Array.from(document.querySelectorAll('.csv-status:checked')).map(cb => cb.value);
       const csv = API.exportarCSV(statsAtual.start_date, statsAtual.end_date, statuses);

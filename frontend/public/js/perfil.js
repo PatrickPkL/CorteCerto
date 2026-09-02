@@ -409,10 +409,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnGerarCli?.addEventListener('click', () => {
     try {
-      API.gerarCodigoExclusao();
+      const r = API.gerarCodigoExclusao();
       stepCli1.style.display = 'none';
       stepCli2.style.display = 'block';
-      showToast('Código gerado. Verifique e digite abaixo.');
+      showToast(r && r.hint ? r.hint : 'Código enviado por e-mail. Digite abaixo.');
       if (inputCodigoCli) inputCodigoCli.focus();
     } catch (err2) {
       showToast(msgErro(err2), 'error');

@@ -81,19 +81,53 @@ window.API = (function () {
   }
 
   /**
-   * Assinatura em dia? Trial vigente ou período pago corrente.
-   * Implementação vive em payments.js; sem backend de pagamentos
-   * (modo local puro no navegador) tudo permanece liberado.
+   * Travamento por funcionalidade (planos v3).
+   *
+   * O plano EFETIVO de uma loja é o da assinatura vigente (trial em
+   * andamento ou período pago corrente). Fora isso (sem assinatura,
+   * expirada ou cancelada) a loja cai automaticamente no plano Free —
+   * leituras continuam liberadas, escritas exigem a permissão do plano.
    */
-  function assinaturaLiberada(shopId) {
-    return typeof window.API.acessoLiberado === 'function'
-      ? window.API.acessoLiberado(shopId)
-      : true;
+  function planoFree() {
+    const db = DB._d();
+    return db.plans.find(p => p.is_free) ||
+      db.plans.find(p => String(p.name || '').toLowerCase() === 'free') || null;
   }
 
-  function exigirAssinaturaAtiva(shopId) {
-    if (!assinaturaLiberada(shopId)) {
-      err(403, 'Assinatura expirada — renove o plano na aba Assinatura para continuar.');
+  function planoEfetivo(shopId) {
+    const db = DB._d();
+    const sub = db.subscriptions.find(s => s.barbershop_id == shopId);
+    let liberado = false;
+    try {
+      liberado = typeof window.API.acessoLiberado === 'function'
+        ? window.API.acessoLiberado(shopId)
+        : false;
+    } catch (e) { liberado = false; }
+    if (sub && liberado) {
+      const plano = db.plans.find(p => p.id === sub.plan_id);
+      if (plano) return { sub, plano };
+    }
+    return { sub: sub || null, plano: planoFree() };
+  }
+
+  function funcionalidadesDe(shopId) {
+    const { plano } = planoEfetivo(shopId);
+    return (plano && plano.permissions) || [];
+  }
+
+  function temFuncionalidade(shopId, chave) {
+    return (funcionalidadesDe(shopId) || []).includes(chave);
+  }
+
+  function exigirFuncionalidade(shopId, chave, descricao) {
+    if (!temFuncionalidade(shopId, chave)) {
+      const { plano } = planoEfetivo(shopId);
+      const alvo = (plano && plano.name) || 'um plano pago';
+      throw {
+        status: 403,
+        error: (descricao || chave) + ' está bloqueado no seu plano (' + alvo +
+          '). Assine ou faça upgrade na aba Assinatura para liberar.'
+      };
     }
   }
 
@@ -669,7 +703,7 @@ window.API = (function () {
 
   function criarServico(dados) {
     const { shop } = exigirDono();
-    exigirAssinaturaAtiva(shop.id);
+    exigirFuncionalidade(shop.id, 'servicos', 'Gerenciar serviços');
     validarServico(dados, false);
     const svc = {
       id: DB.proximoId(),
@@ -691,6 +725,7 @@ window.API = (function () {
 
   function atualizarServico(id, patch) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'servicos', 'Editar serviços');
     const svc = DB._d().services.find(s => s.id == id && s.barbershop_id === shop.id);
     if (!svc) err(404, 'Serviço não encontrado.');
     validarServico(patch, true);
@@ -783,7 +818,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function criarProfissional(dados) {
     const { shop } = exigirDono();
-    exigirAssinaturaAtiva(shop.id);
+    exigirFuncionalidade(shop.id, 'profissionais', 'Criar profissionais');
     const db = DB._d();
 
     const nome = String(dados.name || '').trim();
@@ -876,6 +911,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function atualizarProfissional(id, patch) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'profissionais', 'Editar profissionais');
     const db = DB._d();
     const prof = db.professionals.find(p => p.id == id && p.barbershop_id === shop.id);
     if (!prof) err(404, 'Profissional não encontrado.');
@@ -927,6 +963,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /** Upsert POR DIA da loja (preserva horários dos profissionais — DT-09). */
   function salvarHorariosLoja(dias) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'horarios', 'Editar horários de funcionamento');
     const db = DB._d();
     if (!Array.isArray(dias)) err(400, 'Envie a grade de horários.');
 
@@ -970,6 +1007,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function atualizarLinhaHorario(rowId, patch) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'horarios', 'Editar horários de funcionamento');
     const w = DB._d().working_hours.find(x => x.id == rowId && x.barbershop_id === shop.id);
     if (!w) err(404, 'Linha de horário não encontrada.');
     ['start_time', 'end_time', 'lunch_start', 'lunch_end'].forEach(c => {
@@ -989,6 +1027,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function criarExcecao(dados) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'horarios', 'Criar folgas');
     if (!dados.starts_at) err(400, 'Informe a data inicial da folga.');
     const TIPOS_EXC = ['folga', 'fechamento', 'feriado', 'evento'];
     const type = TIPOS_EXC.indexOf(dados.type) >= 0 ? dados.type : 'folga';
@@ -1008,6 +1047,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function excluirExcecao(id) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'horarios', 'Excluir folgas');
     const db = DB._d();
     const x = db.schedule_exceptions.find(e => e.id == id && e.barbershop_id === shop.id);
     if (!x) err(404, 'Exceção não encontrada.');
@@ -1084,6 +1124,48 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   /**
+   * Funde intervalos [[ini, fim], ...] (em minutos) em faixas contínuas
+   * e devolve em HH:MM. `agoraMin` (opcional) corta o início de hoje.
+   */
+  function mergeRanges(intervalos, agoraMin) {
+    const mais = intervalos.slice().sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    mais.forEach(([ini, fim]) => {
+      if (agoraMin != null && fim <= agoraMin) return;
+      if (agoraMin != null && ini < agoraMin) ini = agoraMin;
+      if (ini >= fim) return;
+      const ultimo = merged[merged.length - 1];
+      if (ultimo && ini <= ultimo[1]) { ultimo[1] = Math.max(ultimo[1], fim); return; }
+      merged.push([ini, fim]);
+    });
+    return merged.map(r => ({ start: DB.minToHHMM(r[0]), end: DB.minToHHMM(r[1]) }));
+  }
+
+  /**
+   * Faixas contínuas de tempo livre (resolução de 1 minuto).
+   * O cliente pode escolher QUALQUER horário dentro de uma faixa —
+   * não apenas os "cliques" de 15 em 15 minutos dos slots.
+   * `durMin` é a duração que cada horário deve caber dentro da faixa.
+   */
+  function rangesLivres(periodos, durMin, bloqueios) {
+    const livres = [];
+    periodos.forEach(([pIni, pFim]) => {
+      for (let t = pIni; t + durMin <= pFim; t++) {
+        const conflita = bloqueios.some(([bIni, bFim]) => t < bFim && bIni < t + durMin);
+        if (!conflita) livres.push(t);
+      }
+    });
+    /* funde minutos consecutivos em faixas [ini, fim] (fim exclusivo) */
+    const ranges = [];
+    livres.forEach(t => {
+      const ult = ranges[ranges.length - 1];
+      if (ult && t === ult[1]) { ult[1] = t + 1; return; }
+      ranges.push([t, t + 1]);
+    });
+    return ranges.map(r => ({ start: DB.minToHHMM(r[0]), end: DB.minToHHMM(r[1]) }));
+  }
+
+  /**
    * RF-032 — GET availability.
    * Retorna mapa per_professional + união ordenada.
    * Sem profissionais cadastrados: valida contra o expediente da LOJA
@@ -1104,7 +1186,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const respostaBase = {
       date: dateISO, duration_min: dur,
       is_open: !!(linhaLoja && linhaLoja.is_open),
-      per_professional: [], union: [], available_slots: []
+      per_professional: [], union: [], available_slots: [], free_ranges: []
     };
     if (!respostaBase.is_open) return respostaBase;
 
@@ -1130,10 +1212,14 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       respostaBase.union = slots;
       respostaBase.available_slots = slots;
       respostaBase.shop_only = true;
+      respostaBase.free_ranges = mergeRanges(
+        rangesLivres(periodosLoja, dur, bloqueios).map(r => [DB.hhmmToMin(r.start), DB.hhmmToMin(r.end)]),
+        ehHoje ? agoraMin : null);
       return respostaBase;
     }
 
     const uniaoSet = new Set();
+    const todasRanges = [];
     profsAtivos.forEach(p => {
       const linha = db.working_hours.find(w =>
         w.barbershop_id == shop.id && w.professional_id === p.id && w.day_of_week === dow);
@@ -1141,14 +1227,18 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       if (!periodos.length) periodos.push(...periodosLoja); // fallback ao expediente da loja
       const slots = slotsLivres(periodos, dur, bloqueiosDoDia(db, shop.id, p.id, dateISO), slotInterval)
         .filter(h => !passou(DB.hhmmToMin(h)));
+      const ranges = rangesLivres(periodos, dur, bloqueiosDoDia(db, shop.id, p.id, dateISO));
       respostaBase.per_professional.push({
-        professional_id: p.id, professional_name: p.name, color: p.color, slots
+        professional_id: p.id, professional_name: p.name, color: p.color, slots, free_ranges: ranges
       });
       slots.forEach(h => uniaoSet.add(h));
+      ranges.forEach(r => todasRanges.push([DB.hhmmToMin(r.start), DB.hhmmToMin(r.end)]));
     });
 
     respostaBase.union = Array.from(uniaoSet).sort();
     respostaBase.available_slots = respostaBase.union;
+    /* união das faixas livres de todos os profissionais (fundidas) */
+    respostaBase.free_ranges = mergeRanges(todasRanges, ehHoje ? agoraMin : null);
     return respostaBase;
   }
 
@@ -1170,6 +1260,46 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     ).forEach(a => { contagem[a.professional_id] = (contagem[a.professional_id] || 0) + 1; });
     aptos.sort((a, b) => (contagem[a.professional_id] || 0) - (contagem[b.professional_id] || 0));
     return { professional_id: aptos[0].professional_id, professional_name: aptos[0].professional_name };
+  }
+
+  /**
+   * DT-04 — horário livre: valida QUALQUER minuto (não só os "clicks" de
+   * STEP_MIN) contra o expediente + conflitos do(s) profissional(is).
+   * Retorna os profissionais que conseguem atender naquele horário e, se
+   * o horário estiver ocupado, as faixas livres para orientar o cliente.
+   */
+  function verificarHorarioLivre(barbershopId, dateISO, hora, durMin) {
+    const db = DB._d();
+    const shop = db.barbershops.find(b => b.id == barbershopId);
+    if (!shop) err(404, 'Salão não encontrado.');
+    if (!dateISO || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) err(400, 'Informe uma data válida (AAAA-MM-DD).');
+    if (!/^\d{2}:\d{2}$/.test(hora)) err(400, 'Horário inválido (use HH:MM).');
+    const dur = clampInt(durMin, 5, 600, 30);
+    const iniMin = DB.hhmmToMin(hora);
+
+    let profs = db.professionals.filter(p => p.barbershop_id == shop.id && p.is_active);
+    const candidatos = [];
+    profs.forEach(p => {
+      if (verificarSlot(db, shop.id, p.id, dateISO, iniMin, dur).ok) {
+        candidatos.push({ professional_id: p.id, professional_name: p.name, color: p.color });
+      }
+    });
+    /* sem profissionais: valida contra o expediente/horários da loja */
+    const servicoLoja = profs.length === 0 && verificarSlot(db, shop.id, null, dateISO, iniMin, dur).ok;
+
+    if (candidatos.length || servicoLoja) {
+      return {
+        ok: true, date: dateISO, hora, duration_min: dur,
+        professionals: candidatos, shop_only: servicoLoja && profs.length === 0
+      };
+    }
+
+    const disp = disponibilidade(barbershopId, dateISO, dur);
+    return {
+      ok: false, date: dateISO, hora, duration_min: dur,
+      motivo: 'ocupado',
+      free_ranges: disp.free_ranges || []
+    };
   }
 
   /* ================= AGENDAMENTOS (RF-037..043, DT-07) ================= */
@@ -1283,7 +1413,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     /* assinatura em dia é exigida só do painel — o agendamento
        público do catálogo não pune o cliente final (RF-039) */
     if ((payload.origin || 'online') !== 'online') {
-      exigirAssinaturaAtiva(shop.id);
+      exigirFuncionalidade(shop.id, 'agendar', 'Criar agendamentos pelo painel');
     }
 
     const date = String(payload.date || '');
@@ -1511,6 +1641,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     );
     const ehCliente = ag.user_id === user.id;
     if (!ehEquipe && !ehCliente) err(403, 'Você não tem permissão sobre este agendamento.');
+    if (ehEquipe) exigirFuncionalidade(ag.barbershop_id, 'agendar', 'Editar agendamentos pelo painel');
 
     /* cliente só cancela ou reagenda o próprio (RF-041 + self-service) */
     if (!ehEquipe) {
@@ -1616,6 +1747,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function excluirAgendamento(id) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'agendar', 'Excluir agendamentos');
     const db = DB._d();
     const ag = db.appointments.find(a => a.id == id && a.barbershop_id === shop.id);
     if (!ag) err(404, 'Agendamento não encontrado.');
@@ -1674,7 +1806,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function criarCliente(dados) {
     const { shop } = exigirDono();
-    exigirAssinaturaAtiva(shop.id);
+    exigirFuncionalidade(shop.id, 'clientes', 'Cadastrar clientes');
     const nome = String(dados.name || '').trim();
     if (!nome) err(400, 'Nome é obrigatório.');
     const tel = String(dados.phone || '').replace(/\D/g, '');
@@ -1699,6 +1831,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function atualizarCliente(id, patch) {
     const { shop } = exigirEquipe();
+    exigirFuncionalidade(shop.id, 'clientes', 'Editar clientes');
     const c = DB._d().clients.find(x => x.id == id && x.barbershop_id === shop.id);
     if (!c) err(404, 'Cliente não encontrado.');
     if (patch.name !== undefined) {
@@ -1825,6 +1958,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /** RF-049 — CSV com BOM UTF-8 e escaping de aspas. */
   function exportarCSV(inicio, fim, statuses) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'exportar_csv', 'Exportar CSV');
     const db = DB._d();
     const statusSet = Array.isArray(statuses) && statuses.length
       ? new Set(statuses) : null;
@@ -2019,16 +2153,33 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       .map(p => ({ ...p }));
   }
 
+  function bonusPlano(plano) {
+    return plano ? {
+      id: plano.id, name: plano.name, price_monthly: plano.price_monthly,
+      max_professionals: plano.max_professionals, features: plano.features,
+      permissions: plano.permissions || [], is_free: !!plano.is_free
+    } : null;
+  }
+
   function assinaturaPublica(sub) {
     const db = DB._d();
-    const plano = db.plans.find(p => p.id === sub.plan_id);
     const hoje = DB.hojeISO();
+    const plano = db.plans.find(p => p.id === (sub && sub.plan_id));
+    let liberado = false;
+    try {
+      liberado = typeof window.API.acessoLiberado === 'function'
+        ? window.API.acessoLiberado(sub.barbershop_id)
+        : false;
+    } catch (e) { liberado = false; }
+    const efetivo = (liberado && plano) ? plano : planoFree();
     return {
       id: sub.id,
-      plan: plano ? { id: plano.id, name: plano.name, price_monthly: plano.price_monthly, max_professionals: plano.max_professionals, features: plano.features } : null,
+      plan: bonusPlano(plano),
+      plano_efetivo: bonusPlano(efetivo),
       status: sub.status,
       trial_ends_at: sub.trial_ends_at,
       current_period_end: sub.current_period_end,
+      trial_usado: !!sub.trial_usado,
       on_trial: sub.status === 'trial' && sub.trial_ends_at >= hoje,
       days_left_in_trial: sub.trial_ends_at
         ? Math.max(0, Math.round((DB.parseISO(sub.trial_ends_at) - DB.parseISO(hoje)) / 86400000))
@@ -2038,8 +2189,50 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function minhaAssinatura() {
     const { shop } = exigirDono();
-    const sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
-    if (!sub) err(404, 'Nenhuma assinatura encontrada.');
+    let sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
+    if (!sub) {
+      sub = {
+        id: DB.proximoId(), barbershop_id: shop.id, plan_id: planoFree().id,
+        status: 'ativa', trial_ends_at: null, current_period_end: null,
+        trial_usado: false, created_at: agoraISO(), updated_at: agoraISO()
+      };
+      DB._d().subscriptions.push(sub);
+      DB.salvar();
+    }
+    return assinaturaPublica(sub);
+  }
+
+  /**
+   * RF-059 — trial opcional "10 dias grátis" (uma única vez por loja).
+   * Só vale para lojas sem trial ativo e que ainda não usaram o benefício.
+   */
+  function ativarTrial() {
+    const { shop } = exigirDono();
+    const db = DB._d();
+    const salaopro = db.plans.find(p => String(p.name || '').toLowerCase() === 'salao');
+    if (!salaopro) err(500, 'Plano Salão não encontrado.');
+    const hoje = DB.hojeISO();
+
+    const idx = db.subscriptions.findIndex(s => s.barbershop_id === shop.id);
+    const existe = idx >= 0;
+    const subAtual = existe ? db.subscriptions[idx] : null;
+    if (subAtual && subAtual.status === 'trial' && subAtual.trial_ends_at >= hoje) {
+      err(400, 'Você já está no período de trial.');
+    }
+    if (subAtual && subAtual.trial_usado) {
+      err(409, 'O trial de 10 dias já foi utilizado por esta loja.');
+    }
+
+    const sub = {
+      id: subAtual ? subAtual.id : DB.proximoId(),
+      barbershop_id: shop.id, plan_id: salaopro.id,
+      status: 'trial', trial_ends_at: DB.addDiasISO(10),
+      current_period_end: null, trial_usado: true,
+      created_at: subAtual ? subAtual.created_at : agoraISO(), updated_at: agoraISO()
+    };
+    if (existe) db.subscriptions[idx] = sub;
+    else db.subscriptions.push(sub);
+    DB.salvar();
     return assinaturaPublica(sub);
   }
 
@@ -2052,6 +2245,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const db = DB._d();
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err(404, 'Plano não encontrado.');
+    if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
 
     let sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
     if (!sub) {
@@ -2059,11 +2253,12 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
         id: DB.proximoId(), barbershop_id: shop.id, plan_id: plano.id,
         status: 'ativa', trial_ends_at: null,
         current_period_end: DB.addDiasISO(30),
-        created_at: agoraISO(), updated_at: agoraISO()
+        trial_usado: true, created_at: agoraISO(), updated_at: agoraISO()
       };
       db.subscriptions.push(sub);
     } else {
       sub.plan_id = plano.id;
+      sub.trial_usado = true;
       if (sub.status === 'trial' && sub.trial_ends_at >= DB.hojeISO()) {
         /* mantém trial original — sem loop infinito de graça */
       } else {
@@ -2125,6 +2320,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /** Escrita restrita ao dono — corrige DT-08. */
   function adicionarGaleria(dataUrls) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'galeria', 'Gerenciar galeria de fotos');
     const db = DB._d();
     const criadas = (Array.isArray(dataUrls) ? dataUrls : [dataUrls]).map(url => {
       const g = {
@@ -2141,6 +2337,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function removerGaleria(imageId) {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'galeria', 'Gerenciar galeria de fotos');
     const db = DB._d();
     const g = db.gallery_images.find(g2 => g2.id == imageId && g2.barbershop_id === shop.id);
     if (!g) err(404, 'Imagem não encontrada.');
@@ -2219,6 +2416,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
    */
   function gerarLembretesPendentes() {
     const { shop } = exigirDono();
+    exigirFuncionalidade(shop.id, 'notificacoes', 'Lembretes automáticos');
     const db = DB._d();
     const amanha = DB.addDiasISO(1);
     let criados = 0;
@@ -2300,12 +2498,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /** RF-010 — exclusão de conta com cascata completa. */
   function gerarCodigoExclusao() {
     const user = sessao();
+    if (user.email == null) err(400, 'Sua conta não possui e-mail cadastrado — entre em contato com o suporte.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(user.email))) {
+      err(400, 'E-mail inválido na sua conta — entre em contato com o suporte.');
+    }
     const db = DB._d();
     const code = String(Math.floor(1000 + Math.random() * 9000));
     db._delete_codes = (db._delete_codes || []).filter(c => c.user_id !== user.id);
-    db._delete_codes.push({ user_id: user.id, code: code, expires_at: Date.now() + 300000 });
+    db._delete_codes.push({ user_id: user.id, code: code, attempts: 0, expires_at: Date.now() + 300000 });
     DB.salvar();
-    return { ok: true, hint: 'Código enviado (use nos próximos 5 minutos).' };
+    /* envia por e-mail (em modo demo o Mailer loga no console) */
+    try {
+      Mailer.enviarCodigoExclusao(String(user.email), code).catch(function () {});
+    } catch (e) { /* best-effort — o código continua válido no servidor */ }
+    const mascarado = String(user.email).replace(/^(.)(.*)(@.*)$/, (m, a, b, d) => a + '****' + d);
+    return { ok: true, hint: 'Código enviado para ' + mascarado + '. Use nos próximos 5 minutos.' };
   }
 
   function confirmarExclusao(code) {
@@ -2313,7 +2520,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const db = DB._d();
     const codes = (db._delete_codes || []).filter(c => c.user_id === user.id);
     const match = codes.find(c => c.code === code && Date.now() < c.expires_at);
-    if (!match) err(400, 'Código inválido ou expirado. Solicite um novo.');
+    if (!match) {
+      codes.forEach(c => { c.attempts = (c.attempts || 0) + 1; });
+      const alvo = codes.find(c => c.attempts >= 5);
+      if (alvo) db._delete_codes = db._delete_codes.filter(c => c !== alvo);
+      DB.salvar();
+      err(400, 'Código inválido ou expirado. Solicite um novo.');
+    }
     db._delete_codes = db._delete_codes.filter(c => c.user_id !== user.id);
     DB.salvar();
     return excluirMinhaConta();
@@ -2579,7 +2792,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     listarExcecoes, criarExcecao, excluirExcecao,
 
     // disponibilidade
-    disponibilidade, profissionalParaSlot,
+    disponibilidade, profissionalParaSlot, verificarHorarioLivre,
 
     // agendamentos
     criarAgendamento, listarAgendamentos, atualizarAgendamento,
@@ -2611,7 +2824,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     reviewsDaLoja, criarReview, minhasReviews,
 
     // assinatura
-    listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura,
+    listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura, ativarTrial,
 
     // uploads / galeria
     definirLogo, definirCapa,
@@ -2627,6 +2840,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // LGPD
     exportarMeusDados, revogarConsentimento, solicitarExclusao,
     enviarSolicitacaoLGPD, meusLogsDeAcesso, logoutTodosDispositivos,
+    gerarCodigoExclusao, confirmarExclusao,
     _auditLog,
 
     // favoritos

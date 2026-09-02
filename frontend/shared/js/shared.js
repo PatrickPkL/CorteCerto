@@ -93,6 +93,21 @@ const CC = {
   },
   alternarTema() {
     this.aplicarTema(this.temaAtual() === 'dark' ? 'light' : 'dark');
+  },
+  /* Plano EFETIVO da loja (pago/trial vigente ou Free) via RPC */
+  plano() {
+    try {
+      const sub = API.minhaAssinatura();
+      return sub.plano_efetivo || sub.plan || null;
+    } catch (e) { return null; }
+  },
+  /* A loja tem a funcionalidade? (leitura é sempre livre) */
+  temFunc(chave) {
+    if (!chave) return true;
+    const p = this.plano();
+    if (!p) return false;
+    if (Array.isArray(p.permissions) && p.permissions.length) return p.permissions.includes(chave);
+    return !!Number(p.price_monthly);
   }
 };
 
@@ -268,7 +283,7 @@ function destinoPosLogin(usuario) {
   if (next) {
     const paginasAdmin = ['index.html', 'agendamentos.html', 'clientes.html',
       'servicos.html', 'profissionais.html', 'assinatura.html',
-'configuracoes.html', 'suporte.html', 'bot.html', 'chats.html'];
+      'configuracoes.html', 'suporte.html'];
     if (usuario.role === 'dono' && paginasAdmin.includes(next)) return next;
     if (usuario.role === 'cliente' && !paginasAdmin.includes(next)) {
       return '../public/' + next;
@@ -397,27 +412,50 @@ function montarNotificacoes() {
 
 /* ---------------- SHELL DO PAINEL ADMIN (sidebar comum) ---------------- */
 
-/* Aviso persistente de assinatura expirada (dono) — criação bloqueada,
-   consulta liberada; some sozinho quando o acesso volta a valer */
-function aplicarAvisoAssinatura(u, loja) {
-  const existente = document.getElementById('aviso-assinatura');
-  if (u.role !== 'dono' || !loja) { existente?.remove(); return; }
-  let liberado = true;
-  try { liberado = API.acessoLiberado(loja.id); } catch (e) { liberado = true; }
-  if (liberado) { existente?.remove(); return; }
+/* Banner de upgrade: páginas com body[data-required-feature] bloqueiam o
+   uso quando o plano efetivo não inclui a funcionalidade. Consultas
+   continuam livres; as escritas são barradas também no backend. */
+function aplicarBannerPlano() {
+  const bodyEl = document.body;
+  const req = bodyEl && bodyEl.getAttribute('data-required-feature');
+  const u = Auth.usuarioAtual();
+  if (!req || !u || u.role !== 'dono') return;
+  if (CC.temFunc(req)) return;
+
+  const existente = document.getElementById('banner-upgrade-plano');
   if (existente || !document.querySelector('.main')) return;
 
+  const plano = CC.plano();
+  const nomePlano = (plano && plano.name) || 'Free';
   const av = document.createElement('div');
-  av.id = 'aviso-assinatura';
+  av.id = 'banner-upgrade-plano';
   av.className = 'card';
   av.style.cssText = 'border-color:var(--warn-text);margin-bottom:18px;display:flex;gap:12px;' +
     'align-items:center;flex-wrap:wrap;';
   av.innerHTML =
-    '<strong style="color:var(--warn-text);">Assinatura expirada.</strong>' +
+    '<strong style="color:var(--warn-text);">Funcionalidade bloqueada no plano ' + esc(nomePlano) + '.</strong>' +
     '<span style="color:var(--text-muted);font-size:14px;">' +
-    'Consultas continuam liberadas, mas criar agendamentos, clientes, serviços e profissionais está bloqueado.</span>' +
-    '<a href="assinatura.html" class="btn btn-brass" style="margin-left:auto;">Renovar plano</a>';
+    'Você pode consultar tudo aqui, mas para criar e editar é preciso um dos planos pagos.</span>' +
+    '<a href="assinatura.html" class="btn btn-brass" style="margin-left:auto;">Ver planos</a>';
   document.querySelector('.main').prepend(av);
+}
+
+/* Elementos interativos com [data-feature] ficam desabilitados se a loja
+   não tem a funcionalidade (complemento visual do gate de backend) */
+function aplicarGatesDeFuncionalidade() {
+  const u = Auth.usuarioAtual();
+  if (!u || u.role !== 'dono') return;
+  const plano = CC.plano();
+  if (!plano) return;
+  const perms = plano.permissions || [];
+  document.querySelectorAll('[data-feature]').forEach(el => {
+    const chave = el.getAttribute('data-feature');
+    if (chave && !perms.includes(chave)) {
+      el.classList.add('cc-bloqueado');
+      el.disabled = true;
+      if (!el.title) el.title = 'Plano ' + plano.name + ' — assine para liberar.';
+    }
+  });
 }
 
 function montarShellAdmin() {
@@ -438,11 +476,13 @@ function montarShellAdmin() {
     if (planoEl) {
       try {
         const sub = API.minhaAssinatura();
-        planoEl.textContent = 'Plano ' + (sub.plan ? sub.plan.name : '—') +
+        const p = sub.plano_efetivo || sub.plan;
+        planoEl.textContent = 'Plano ' + (p ? p.name : '—') +
           (sub.on_trial ? ' · trial' : '');
       } catch (e) { planoEl.textContent = ''; }
     }
-    aplicarAvisoAssinatura(u, loja);
+    aplicarBannerPlano();
+    aplicarGatesDeFuncionalidade();
   }
 
   const btnSair = document.getElementById('btn-sair');

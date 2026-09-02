@@ -77,8 +77,12 @@
           <div class="slot-dates" id="slot-dates"></div>
         </div>
         <div class="field" id="field-horarios" style="display:none;">
-          <label>Horários disponíveis</label>
+          <label>Horários disponíveis <small style="font-weight:400;">(toque para selecionar)</small></label>
           <div class="slot-times" id="slot-times"></div>
+          <p id="slot-faixas" style="color:var(--text-muted); font-size:12.5px; margin:8px 0 0;"></p>
+          <label for="ac-horario-livre" style="margin-top:12px;">Ou escolha outro horário</label>
+          <input type="time" id="ac-horario-livre" style="width:130px;">
+          <p id="ac-horario-livre-status" style="font-size:12.5px; color:var(--text-muted); margin:6px 0 0;"></p>
           <p id="prof-info" style="color:var(--brass); font-size:13.5px; margin-top:8px;"></p>
         </div>
         <div class="field" id="field-dados" style="display:none;">

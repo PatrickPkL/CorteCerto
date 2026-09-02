@@ -526,15 +526,17 @@ window.Auth = (function () {
       });
     });
 
-    /* assinatura trial do plano Salao por 10 dias (RF-058) */
-    const planoSalao = db.plans.find(p => p.name === 'Salao');
+    /* assinatura base Free (RF-058 v3): novo cadastro começa sem
+       benefícios; trial de 10 dias é opcional (API.ativarTrial) */
+    const planoFree = db.plans.find(p => p.is_free);
     db.subscriptions.push({
       id: DB.proximoId(),
       barbershop_id: loja.id,
-      plan_id: planoSalao ? planoSalao.id : 2,
-      status: 'trial',
-      trial_ends_at: DB.addDiasISO(10),
-      current_period_end: DB.addDiasISO(10),
+      plan_id: planoFree ? planoFree.id : (db.plans.find(p => p.name === 'Free') || { is_free: true, id: null }).id,
+      status: 'ativa',
+      trial_ends_at: null,
+      current_period_end: null,
+      trial_usado: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });

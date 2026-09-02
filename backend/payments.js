@@ -1,12 +1,19 @@
 'use strict';
 /* ============================================================
    Corte Certo – payments.js
-   Cobrança mensal dos planos via AbacatePay (PIX).
+   Cobrança dos planos via AbacatePay.
 
-   • Com ABACATEPAY_API_KEY no .env → PIX real pela API v2
-     (chave de Dev mode = transações simuladas no sandbox deles)
-   • Sem chave → modo simulado local: gera um "PIX fake" e
-     libera confirmarCobrancaDemo() para testar o fluxo inteiro
+   Métodos de pagamento:
+   • PIX (padrão) — QR Code + código copia-e-cola via transpare
+     AbacatePay (real na versão v2). Sem chave → PIX fake (demo).
+   • Cartão (débito/crédito) com parcelamento 1..12 — o checkout
+     transparente da AbacatePay NÃO aceita cartão (só PIX/Boleto);
+     o cartão é, portanto, processado em modo local/simulado até
+     haver integração com o checkout hospedado deles.
+
+   • Com ABACATEPAY_API_KEY no .env → PIX real (Dev mode = sandbox)
+   • Sem chave → modo simulado local: gera um "PIX fake" e libera
+     confirmarCobrancaDemo() para testar o fluxo inteiro.
 
    Confirmação do pagamento:
    1. Polling — statusCobranca() consulta a AbacatePay (ou o
@@ -17,7 +24,8 @@
 Ao confirmar: subscription.status='ativa', plan_id do plano
     pago e current_period_end estendido em +30 dias (mensal) ou
     +365 dias (anual), a partir do fim do período vigente,
-    preservando trial em andamento.
+    preservando trial em andamento. O total anual é SEMPRE
+    12× o valor mensal (sem desconto).
     ============================================================ */
 
 (function () {
@@ -26,6 +34,39 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
 
   const URL_API = 'https://api.abacatepay.com/v2';
   const EXPIRA_EM_SEG = 3600; // QR Code PIX válido por 1h
+
+  /* ---------- cartão: regras de cartão brasileiro (RF-064) ---------- */
+
+  function soDigitos(v) { return String(v || '').replace(/\D/g, ''); }
+
+  function marcaDoCartao(num) {
+    const n = soDigitos(num);
+    if (/^4/.test(n)) return 'Visa';
+    if (/^5[1-5]/.test(n) || /^(2|6)[2-7]/.test(n)) return 'Mastercard';
+    if (/^3[47]/.test(n)) return 'Amex';
+    if (/^3(0|6|8)/.test(n)) return 'Diners';
+    if (/^(4[0-9]{12}|(4011|4312|4389)[0-9])/.test(n)) return 'Elo';
+    if (/^6/.test(n)) return 'Hipercard';
+    return '—';
+  }
+
+  function validarCartao(d) {
+    const num = soDigitos(d && d.numero);
+    if (num.length < 13 || num.length > 19) throw { status: 400, error: 'Número do cartão inválido.' };
+    const nome = String((d && d.titular) || '').trim();
+    if (nome.length < 3) throw { status: 400, error: 'Informe o nome impresso no cartão.' };
+    const val = String((d && d.validade) || '').replace(/\s/g, '');
+    const mM = /^(\d{2})[/]?(\d{2})$/.exec(val);
+    if (!mM) throw { status: 400, error: 'Validade inválida (use MM/AA).' };
+    const mes = Number(mM[1]); const ano = 2000 + Number(mM[2]);
+    if (mes < 1 || mes > 12) throw { status: 400, error: 'Mês da validade inválido.' };
+    const agora = new Date();
+    const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+    if (fimMes < agora) throw { status: 400, error: 'Cartão vencido.' };
+    const cvv = soDigitos(d && d.cvv);
+    if (cvv.length < 3 || cvv.length > 5) throw { status: 400, error: 'CVV inválido.' };
+    return { numero: num, nome, mes, ano, cvv };
+  }
 
   function agoraISO() { return new Date().toISOString().slice(0, 16); }
   function agoraMsISO() { return new Date().toISOString(); }
@@ -55,6 +96,9 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       billing_period: pag.billing_period || 30,
       installments: pag.installments || 1,
       amount_cents: pag.amount_cents,
+      metodo: pag.metodo || 'pix',
+      card_brand: pag.card_brand || null,
+      card_last4: pag.card_last4 || null,
       status: pag.status,
       provider: pag.provider,
       br_code: pag.br_code || '',
@@ -86,7 +130,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
         plan_id: pag.plan_id, status: 'ativa', trial_ends_at: null,
         billing_period: dias,
         current_period_end: DB.addDiasISO(dias),
-        created_at: agoraISO(), updated_at: agoraISO()
+        trial_usado: true, created_at: agoraISO(), updated_at: agoraISO()
       };
       db.subscriptions.push(sub);
     } else {
@@ -95,6 +139,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       sub.plan_id = pag.plan_id;
       sub.status = 'ativa';
       sub.billing_period = dias;
+      sub.trial_usado = true;
       sub.current_period_end = DB.addDiasISO(dias, base);
       sub.updated_at = agoraISO();
     }
@@ -144,26 +189,42 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * cobrança de 12× o valor mensal). A opção de parcelar só é
    * aceita no período anual (parcelas de 1 a 12).
    */
-  async function criarCobrancaPlano(planId, periodo, parcelas) {
+  async function criarCobrancaPlano(planId, periodo, parcelas, metodo, cardData) {
     const { shop } = exigirDonoLocal();
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err400('Plano não encontrado.');
+    if (plano.is_free) err400('O plano Free não pode ser assinado — é o plano base gratuito.');
+
+    const mtd = String(metodo || 'pix').toLowerCase();
+    if (mtd !== 'pix' && mtd !== 'cartao') err400('Método de pagamento inválido.');
+
+    /* cartão: valida dados e marca a bandeira (nunca guarda o PAN) */
+    let cartao = null;
+    if (mtd === 'cartao') {
+      cartao = validarCartao(cardData || {});
+    }
 
     const anual = String(periodo || '').toLowerCase() === 'anual';
     const dias = anual ? 365 : 30;
     const nParc = anual
       ? Math.min(12, Math.max(1, parseInt(parcelas, 10) || 12))
       : 1;
+    /* cartão à vista (1×) é aceito em qualquer período */
+    const nParcFinal = mtd === 'cartao' && !anual
+      ? Math.min(12, Math.max(1, parseInt(parcelas, 10) || 1))
+      : nParc;
     const quantidade = anual ? 12 : 1;
+    /* Sem desconto: o plano anual custa exatamente 12× o valor mensal. */
     const totalCents = Math.round(Number(plano.price_monthly || 0) * quantidade * 100);
 
     /* pendente reutilizável? */
     const agora = agoraMsISO();
     const existente = db.payments.find(p =>
       p.barbershop_id === shop.id && p.plan_id === plano.id &&
-      p.billing_period === dias && (p.installments || 1) === nParc &&
+      p.billing_period === dias && (p.installments || 1) === nParcFinal &&
+      (p.metodo || 'pix') === mtd &&
       p.status === 'pending' && p.expires_at > agora);
     if (existente) return pagamentoPublico(existente);
 
@@ -172,8 +233,11 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       barbershop_id: shop.id,
       plan_id: plano.id,
       billing_period: dias,
-      installments: nParc,
+      installments: nParcFinal,
       amount_cents: totalCents,
+      metodo: mtd,
+      card_brand: cartao ? marcaDoCartao(cartao.numero) : null,
+      card_last4: cartao ? cartao.numero.slice(-4) : null,
       status: 'pending',
       provider: chaveApi() ? 'abacatepay' : 'demo',
       abacate_id: null,
@@ -183,7 +247,13 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       expires_at: new Date(Date.now() + EXPIRA_EM_SEG * 1000).toISOString()
     };
 
-    if (pag.provider === 'abacatepay') {
+    if (mtd === 'cartao') {
+      /* cartão NÃO é suportado pelo checkout transparente da AbacatePay;
+         processamos localmente em modo teste (demo) até integrarmos o
+         checkout hospedado. Sufixo da cobrança guarda apenas os 4 últimos. */
+      pag.provider = 'demo';
+      pag.dev_mode = true;
+    } else if (pag.provider === 'abacatepay') {
       const d = await criarCobrancaAbacate(pag, plano);
       pag.abacate_id = d.id;
       pag.br_code = d.brCode || '';
@@ -341,14 +411,17 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
   function err400(msg) { throw { status: 400, error: msg }; }
 
   /**
-   * A loja pode criar conteúdo? Liberada com trial vigente ou
-   * período pago corrente (inclusive cancelada dentro do prazo —
-   * acesso encerra ao fim do período, como promete a UI).
+   * A loja pode acessar o painel? O plano Free é sempre liberado
+   * (leituras + edição do perfil da loja). Planos pagos exigem
+   * trial vigente ou período pago corrente (inclusive cancelada
+   * dentro do prazo — acesso encerra ao fim do período).
    */
   function acessoLiberado(shopId) {
     const db = DB._d();
     const hoje = DB.hojeISO();
     const sub = db.subscriptions.find(s => s.barbershop_id == shopId);
+    const plano = sub && db.plans.find(p => p.id === sub.plan_id);
+    if (plano && plano.is_free) return true;
     if (!sub) return false;
     if (sub.status === 'trial') return !!sub.trial_ends_at && sub.trial_ends_at >= hoje;
     return !!sub.current_period_end && sub.current_period_end >= hoje;

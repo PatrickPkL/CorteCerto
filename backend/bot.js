@@ -1943,6 +1943,193 @@ async function botVerificarAgora() {
   return verificarCaixaEntrada();
 }
 
+/* ---------------- super-admin: bot atendente + chats ----------------
+   Versões sem sessão de dono — acessadas exclusivamente pelas rotas
+   REST /api/super-admin/* (server.js), já autenticadas via saAuth. */
+
+async function saBotConfig() {
+  await _garantirPronto();
+  const totalRespondidas = _historico.filter(h => h.decisao === 'responder').length;
+  const totalEncaminhadas = _historico.filter(h => h.decisao === 'encaminhar').length;
+  return {
+    enabled: _cfg.enabled,
+    mode: modo(),
+    engine: geminiDisponivel() ? 'gemini' : 'palavras-chave',
+    gemini: {
+      configurado: geminiDisponivel(),
+      modelo: geminiDisponivel() ? geminiModelo() : null
+    },
+    forwardTo: _cfg.forwardTo ||
+      String(process.env.BOT_FORWARD_TO || process.env.GMAIL_USER || '').trim() ||
+      'não definido',
+    assistantName: _cfg.assistantName,
+    seconds: _cfg.seconds,
+    barbershopId: _cfg.barbershopId || null,
+    gmailUser: gmailUser() || 'não configurado',
+    ultimaVerificacao: _ultimaVerificacao,
+    totalProcessadas: _historico.length,
+    totalRespondidas,
+    totalEncaminhadas
+  };
+}
+
+async function saBotSalvar(dados) {
+  await _garantirPronto();
+  const d = dados || {};
+  const fwd = String(d.forwardTo || '').trim().toLowerCase();
+  if (fwd && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fwd)) {
+    throw { status: 400, error: 'E-mail do atendente inválido.' };
+  }
+  const nome = String(d.assistantName || '').trim();
+  if (nome && nome.length > 60) {
+    throw { status: 400, error: 'Nome do atendente muito longo (máx. 60).' };
+  }
+  const secs = parseInt(d.seconds, 10);
+  if (!isNaN(secs) && (secs < 10 || secs > 3600)) {
+    throw { status: 400, error: 'Intervalo deve ficar entre 10 e 3600 segundos.' };
+  }
+  if (d.enabled !== undefined) _cfg.enabled = !!d.enabled;
+  if (fwd) _cfg.forwardTo = fwd;
+  if (nome) _cfg.assistantName = nome;
+  if (!isNaN(secs)) _cfg.seconds = secs;
+  await salvarConfig();
+  if (_cfg.enabled) start();
+  else stop();
+  return { ok: true, config: await saBotConfig() };
+}
+
+async function saBotVerificar() {
+  await _garantirPronto();
+  return verificarCaixaEntrada();
+}
+
+async function saBotTestar(dados) {
+  await _garantirPronto();
+  const de = String((dados && dados.from) || '').trim();
+  const assunto = String((dados && dados.subject) || '').trim();
+  const texto = String((dados && dados.text) || '').trim();
+  if (!de || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(de)) {
+    throw { status: 400, error: 'Informe um e-mail de remetente válido para o teste.' };
+  }
+  if (!texto) {
+    throw { status: 400, error: 'Escreva o conteúdo da mensagem para testar.' };
+  }
+  const loja = _loja();
+
+  const entrada = await processarMensagem({
+    from: de,
+    nome: String((dados && dados.nome) || '').trim() || nomeDoRemetente(texto),
+    subject: assunto,
+    text: texto,
+    messageId: '<bot-teste-' + Date.now() + '@cortecerto>',
+    references: null,
+    recibidoEm: new Date().toLocaleString('pt-BR')
+  });
+  const avisoHtml = entrada.decisao === 'encaminhar'
+    ? montarAvuseRedirecionamento(loja, dados.nome || nomeDoRemetente(texto))
+    : null;
+  return {
+    decisao: entrada.decisao,
+    motivo: entrada.motivo,
+    categorias: entrada.categorias,
+    motor: entrada.motor || 'palavras-chave',
+    simulado: entrada.simulado,
+    erro: entrada.erro,
+    destino: entrada.destino,
+    respostaHtml: entrada.respostaHtml || null,
+    avisoHtml,
+    envioDemo: entrada.simulado ? {
+      para: entrada.de,
+      assuntoResposta: 'Re: ' + String(dados.subject || '').trim()
+    } : null
+  };
+}
+
+async function saBotHistorico(limite) {
+  await _garantirPronto();
+  const n = Math.max(1, Math.min(200, parseInt(limite, 10) || 50));
+  return _historico.slice(0, n).map(h => ({
+    id: h.id,
+    ts: h.ts,
+    de: h.de,
+    nome: h.nome,
+    assunto: h.assunto,
+    texto: h.texto,
+    decisao: h.decisao,
+    motivo: h.motivo,
+    categorias: h.categorias,
+    motor: h.motor || 'palavras-chave',
+    destino: h.destino,
+    simulado: h.simulado,
+    erro: h.erro
+  }));
+}
+
+async function saBotLimparHistorico() {
+  await _garantirPronto();
+  _historico = [];
+  try {
+    await pool.asAdmin(trx => trx('bot_history').del());
+  } catch (e) {
+    console.error('[bot][limpar][ERR]', e && e.message ? e.message : e);
+  }
+  return { ok: true };
+}
+
+async function saChatsListar() {
+  await _garantirPronto();
+  const lista = Object.keys(_chats.threads || {})
+    .map(k => _chats.threads[k])
+    .sort((a, b) => Date.parse(b.atualizadoEm || 0) - Date.parse(a.atualizadoEm || 0))
+    .map(t => ({
+      threadId: t.id,
+      lojaId: t.lojaId,
+      estado: t.estado || 'novo',
+      criticidade: t.criticidade || null,
+      prazo: t.prazo || null,
+      contato: t.contato || { nome: null, telefone: null, email: null },
+      criadoEm: t.criadoEm || null,
+      atualizadoEm: t.atualizadoEm || t.criadoEm || null,
+      pagina: t.pagina || null,
+      msgs: (t.msgs || []).slice(-THREAD_MSGS_MAX),
+      totalMsgs: (t.msgs || []).length,
+      ultimaMsg: (t.msgs && t.msgs.length) ? t.msgs[t.msgs.length - 1] : null
+    }));
+  const d = _db();
+  const lojas = {};
+  if (d && d.barbershops) d.barbershops.forEach(b => { lojas[b.id] = b.name; });
+  return {
+    chatAtendente: _cfg.forwardTo || gmailUser() || null,
+    lojas,
+    chats: lista
+  };
+}
+
+async function saChatsResponder(threadId, texto) {
+  await _garantirPronto();
+  const id = String(threadId || '').trim();
+  const t = _chats.threads[id];
+  if (!t) {
+    throw { status: 404, error: 'Conversa não encontrada.' };
+  }
+  const msg = String(texto || '').trim();
+  if (!msg) throw { status: 400, error: 'Escreva sua resposta.' };
+  t.msgs = t.msgs || [];
+  t.msgs.push({ id: 'm' + (++_chatSeq), rem: 'atendente', texto: msg, ts: new Date().toISOString() });
+  if (t.msgs.length > THREAD_MSGS_MAX) t.msgs = t.msgs.slice(-THREAD_MSGS_MAX);
+  t.estado = 'respondido';
+  t.atualizadoEm = new Date().toISOString();
+  _marcarDirty(id);
+  await salvarChats();
+  return {
+    ok: true,
+    threadId: id,
+    estado: t.estado,
+    msgs: t.msgs,
+    respondidoEm: t.atualizadoEm
+  };
+}
+
 module.exports = {
   start,
   stop,
@@ -1950,13 +2137,12 @@ module.exports = {
   verificarCaixaEntrada,
   chatEnviar,
   chatBuscar,
-  botListarChats,
-  botResponderChat,
-  botConfig,
-  botAtivar,
-  botConfigurar,
-  botHistorico,
-  botLimparHistorico,
-  botTestar,
-  botVerificarAgora
+  saBotConfig,
+  saBotSalvar,
+  saBotVerificar,
+  saBotTestar,
+  saBotHistorico,
+  saBotLimparHistorico,
+  saChatsListar,
+  saChatsResponder
 };

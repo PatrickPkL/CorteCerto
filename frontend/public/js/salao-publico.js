@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let dataEscolhida = null;
   let horaEscolhida = null;
   let profResolvido = null;
+  let hrLivreOk = false;
 
   /* Tarefa 3: agendar exige conta. Sem sessão → login com retorno
      para esta mesma página do salão (?next= é honrado pós-login). */
@@ -296,6 +297,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const faixasEl = document.getElementById('slot-faixas');
+    if (faixasEl) {
+      const range = disp.free_ranges || [];
+      faixasEl.textContent = range.length
+        ? 'Horários livres: ' + range.map(r => r.start + ' às ' + r.end).join(' · ')
+        : 'Sem horário livre neste dia.';
+    }
+
+    /* clique num slot pré-computado (passo de 15 min) */
     disp.available_slots.forEach(hora => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -304,26 +314,93 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         slotTimes.querySelectorAll('.slot-time').forEach(x => x.classList.remove('active'));
         btn.classList.add('active');
-        horaEscolhida = hora;
-
-        /* DT-04: quem pode atender este slot na união? */
-        profResolvido = null;
-        if (profInfo) profInfo.textContent = 'Carregando profissional…';
-        try {
-          profResolvido = API.profissionalParaSlot(loja.id, dataEscolhida, hora, duracaoAtual());
-        } catch (e) { profResolvido = null; }
-        if (profInfo) {
-          profInfo.textContent = profResolvido
-            ? 'Atendimento com ' + profResolvido.professional_name + '.'
-            : 'Atendimento pelo horário geral do salão.';
-        }
-
-        btnConfirmar.disabled = false;
-        fieldDados.style.display = '';
-        fieldTelefone.style.display = ehClienteLogado && logado.phone ? 'none' : '';
+        selecionarHorario(hora);
       });
       slotTimes.appendChild(btn);
     });
+
+    /* horário livre: qualquer minuto, validado pela engine (DT-04) */
+    const livre = document.getElementById('ac-horario-livre');
+    if (livre) {
+      livre.value = '';
+      livre.addEventListener('input', () => {
+        if (!dataEscolhida) return;
+        const h = String(livre.value || '').trim();
+        const st = document.getElementById('ac-horario-livre-status');
+        if (!h) {
+          if (st) { st.textContent = ''; }
+          return;
+        }
+        if (!/^\d{2}:\d{2}$/.test(h)) { if (st) { st.textContent = 'Horário inválido.'; } return; }
+        let ok = false;
+        try {
+          const res = API.verificarHorarioLivre(loja.id, dataEscolhida, h, duracaoAtual());
+          ok = !!res.ok;
+          if (ok) {
+            const sel = res.professionals && res.professionals.length
+              ? function (hora) {
+                  selecionarHorarioLivre(hora,
+                    'Atendimento com ' + res.professionals[0].professional_name +
+                    (res.professionals[1] ? ' (ou ' + res.professionals[1].professional_name + ').' : '.'),
+                    '', res.professionals[0]);
+                }
+              : (res.shop_only ? function (hora) {
+                  selecionarHorarioLivre(hora, 'Atendimento pelo horário geral do salão.', '', null);
+                } : null);
+            if (sel) sel(h);
+            else {
+              ok = false;
+              if (st) { st.style.color = 'var(--stripe-red)'; st.textContent = 'Horário ocupado.'; }
+            }
+          } else {
+            const free = (res.free_ranges || []).map(r => r.start + '–' + r.end).join(', ');
+            if (st) {
+              st.style.color = 'var(--stripe-red)';
+              st.textContent = 'Horário ocupado.' + (free ? ' Livre: ' + free : '');
+            }
+          }
+        } catch (e) {
+          if (st) { st.style.color = 'var(--stripe-red)'; st.textContent = msgErro(e); }
+        }
+        hrLivreOk = ok;
+      });
+    }
+
+    function selecionarHorario(hora) {
+      slotTimes.querySelectorAll('.slot-time').forEach(function (x) { x.classList.remove('active'); });
+      horaEscolhida = hora;
+      profResolvido = null;
+      if (profInfo) profInfo.textContent = 'Carregando profissional…';
+      try {
+        profResolvido = API.profissionalParaSlot(loja.id, dataEscolhida, hora, duracaoAtual());
+      } catch (e) { profResolvido = null; }
+      if (profInfo) {
+        profInfo.textContent = profResolvido
+          ? 'Atendimento com ' + profResolvido.professional_name + '.'
+          : 'Atendimento pelo horário geral do salão.';
+      }
+      hrLivreOk = false;
+      btnConfirmar.disabled = false;
+      fieldDados.style.display = '';
+      fieldTelefone.style.display = ehClienteLogado && logado.phone ? 'none' : '';
+    }
+
+    function selecionarHorarioLivre(hora, nota, erro, cand) {
+      slotTimes.querySelectorAll('.slot-time').forEach(function (x) { x.classList.remove('active'); });
+      horaEscolhida = hora;
+      profResolvido = cand || null;
+      const st = document.getElementById('ac-horario-livre-status');
+      if (erro) {
+        if (st) { st.style.color = 'var(--stripe-red)'; st.textContent = erro; }
+        btnConfirmar.disabled = true;
+        return;
+      }
+      if (profInfo) profInfo.textContent = nota || '';
+      if (st) { st.style.color = 'var(--success)'; st.textContent = 'Horário livre!'; }
+      btnConfirmar.disabled = false;
+      fieldDados.style.display = '';
+      fieldTelefone.style.display = ehClienteLogado && logado.phone ? 'none' : '';
+    }
   }
 
   document.querySelectorAll('.btn-agendar').forEach(btn => {
