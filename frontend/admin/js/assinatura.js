@@ -61,7 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ---------- cards de planos ---------- */
   function opcoesParcelas(plano) {
-    const total = Math.round(plano.price_monthly * 12 * 100) / 100;
+    const total = Math.round(
+      ((plano.price_annual != null && Number(plano.price_annual) > 0
+        ? Number(plano.price_annual)
+        : Number(plano.price_monthly) * 12) * 100)
+    ) / 100;
     const opcoes = [1, 2, 3, 6, 12].map(n => {
       const valor = Math.round((total / n) * 100) / 100;
       const rotulo = n === 1 ? ' (à vista)'
@@ -83,7 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const unidEl = card.querySelector('.plan-preco-unidade');
       const nota = card.querySelector('.plan-anual-nota');
       const parc = card.querySelector('.plan-parcelas');
-      valorEl.textContent = anual ? DB.fmtBRL(plano.price_monthly * 12) : DB.fmtBRL(plano.price_monthly);
+      valorEl.textContent = anual ? DB.fmtBRL(plano.price_annual != null && Number(plano.price_annual) > 0
+        ? plano.price_annual : plano.price_monthly * 12) : DB.fmtBRL(plano.price_monthly);
       unidEl.textContent = anual ? '/ano' : '/mês';
       if (nota) nota.hidden = !anual;
       if (parc) parc.hidden = !anual;
@@ -97,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;
+      const anualBase = p.price_annual != null && Number(p.price_annual) > 0
+        ? Number(p.price_annual)
+        : Number(p.price_monthly) * 12;
       const limite = p.max_professionals == null
         ? 'Profissionais ilimitados'
         : 'Até ' + p.max_professionals + ' profissional(is)';
@@ -110,11 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
         '<div class="plan-preco mono">' +
-          '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? p.price_monthly * 12 : p.price_monthly) + '</span>' +
+          '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
           '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
         '</div>' +
-        '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · mesmo valor mensal (' +
-          DB.fmtBRL(p.price_monthly) + '/mês)</div>' +
+        '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · parcelas a partir de ' +
+          DB.fmtBRL(Math.round(anualBase / 12 * 100) / 100) + '/mês</div>' +
         '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
           '<label>Parcelar em</label>' +
           '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +

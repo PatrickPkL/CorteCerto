@@ -140,11 +140,19 @@ function temEmailReal() {
   return !DEMO_MODE;
 }
 
+function mascaraEmail(email) {
+  var s = String(email || "").split("@");
+  if (s.length !== 2) return "[oculto]";
+  var local = s[0].slice(0, 2) + "***";
+  var dom = s[1].split(".").map(function (p, i) { return i === 0 ? p.slice(0, 2) + "***" : p; }).join(".");
+  return local + "@" + dom;
+}
+
 function enviarEmailComTimeout(destino, tag) {
   if (DEMO_MODE) {
     console.log("========================================");
     console.log("[EMAIL - MODO DEMO] " + (tag || ""));
-    console.log("Para:", destino.to);
+    console.log("Para:", mascaraEmail(destino.to));
     console.log("Assunto:", destino.subject);
     console.log("========================================");
     return Promise.resolve();

@@ -51,13 +51,35 @@
 
   /* processarImagem continua no navegador (FileReader + canvas) */
   API.processarImagem = function (file) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const tiposOk = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!tiposOk.includes(file.type)) {
         return reject({ status: 400, error: 'Formato inválido. Use JPEG, PNG, WebP ou GIF.' });
       }
-      if (file.size > 5 * 1024 * 1024) {
-        return reject({ status: 400, error: 'Imagem muito grande (máx. 5MB).' });
+
+      // [SEGURANÇA] Validação de magic bytes (não confia em file.type)
+      const headerOk = await new Promise((resolve) => {
+        const blob = file.slice(0, 4);
+        const r = new FileReader();
+        r.onload = () => {
+          const arr = new Uint8Array(r.result);
+          const hex = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+          const isJpeg = hex.startsWith('ffd8ff');
+          const isPng  = hex === '89504e47';
+          const isGif  = hex === '47494638';
+          const isWebp = arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46;
+          resolve(isJpeg || isPng || isGif || isWebp);
+        };
+        r.onerror = () => resolve(false);
+        r.readAsArrayBuffer(blob);
+      });
+      if (!headerOk) {
+        return reject({ status: 400, error: 'Arquivo não é uma imagem válida.' });
+      }
+
+      // [SEGURANÇA] Reduzido de 5MB para 3MB para evitar DoS com uploads simultâneos
+      if (file.size > 3 * 1024 * 1024) {
+        return reject({ status: 400, error: 'Imagem muito grande (máx. 3MB).' });
       }
       const reader = new FileReader();
       reader.onload = ev => {
@@ -65,10 +87,18 @@
         img.onload = () => {
           const MAX_DIM = 1000;
           let w = img.width, h = img.height;
+
+          // [SEGURANÇA] Rejeita imagens muito pequenas (lixo/placeholder)
+          if (w < 50 || h < 50) {
+            return reject({ status: 400, error: 'Imagem muito pequena (mínimo 50x50).' });
+          }
+
           if (w > MAX_DIM || h > MAX_DIM) {
             const escala = Math.min(MAX_DIM / w, MAX_DIM / h);
             w = Math.round(w * escala); h = Math.round(h * escala);
           }
+          // [SEGURANÇA] Reencode via canvas remove naturalmente metadados EXIF
+          // (GPS, modelo da câmera, data/hora) — a imagem processada contém apenas pixels
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
@@ -77,6 +107,11 @@
           while (url.length > 300 * 1024 && qualidade > 0.45) {
             qualidade -= 0.08;
             url = canvas.toDataURL('image/jpeg', qualidade);
+          }
+
+          // [SEGURANÇA] Rejeita se resultado processado ainda é grande demais
+          if (url.length > 500 * 1024) {
+            return reject({ status: 400, error: 'Imagem processada ainda muito grande. Tente uma imagem menor.' });
           }
           resolve(url);
         };

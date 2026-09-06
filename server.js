@@ -95,6 +95,12 @@ function json(res, status, obj) {
   res.end(corpo);
 }
 
+// [SEGURANÇA] Helper para mascarar e-mail em logs
+function mascararEmail(e) {
+  const [u, d] = String(e || '').split('@');
+  return (u && u[0] ? u[0] : '') + '***@' + (d || '');
+}
+
 /* ---------------- rate-limit ---------------- */
 const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
@@ -105,6 +111,11 @@ const _failedAuth = new Map();
 const AUTH_FAIL_MAX = 5;
 const AUTH_FAIL_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_BLOCK_MS = 15 * 60 * 1000;
+
+// [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além de IP
+const _failedAuthByIdent = new Map();
+const AUTH_FAIL_MAX_IDENT = 10;
+const AUTH_BLOCK_MS_IDENT = 30 * 60 * 1000; // 30 minutos
 
 /* Métodos RPC que exigem sessão válida (segunda camada de defesa) */
 const _authRequired = new Set([
@@ -218,7 +229,8 @@ function handleRpc(req, res) {
   let corpo = '';
   req.on('data', c => {
     corpo += c;
-    if (corpo.length > 2e6) req.destroy();
+    // [SEGURANÇA] Reduzido de 2MB para 500KB — galeria envia 1 foto por chamada
+    if (corpo.length > 500 * 1024) req.destroy();
   });
   req.on('end', () => {
     let metodo;
@@ -254,6 +266,17 @@ function handleRpc(req, res) {
        Sanitiza __proto__/prototype/constructor em payloads aninhados. */
     const argList = Array.isArray(args) ? args.map(a => sanitizarParams(a, 0)) : [];
 
+    // [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além do IP
+    const ident = (args && args[0] && (args[0].email || args[0].ident || args[0].cpf)) || null;
+    if (ident) {
+      const identKey = 'ident:' + String(ident).toLowerCase().trim();
+      const recIdent = _failedAuthByIdent.get(identKey);
+      if (recIdent && Date.now() < recIdent.blockedUntil) {
+        return json(res, 429, { ok: false, error: 'Muitas tentativas. Aguarde ' +
+          Math.ceil((recIdent.blockedUntil - Date.now()) / 60000) + ' min.' });
+      }
+    }
+
     /* segunda camada: métodos autenticados exigem token válido */
     if (_authRequired.has(metodo)) {
       const tk = req.headers['x-cc-token'] || null;
@@ -279,7 +302,7 @@ function handleRpc(req, res) {
     global.__CC_HTTP = true;
     const ip = req.socket.remoteAddress || '0.0.0.0';
     const ts = new Date().toISOString();
-    const argsStr = JSON.stringify(Array.isArray(args) ? args : []).slice(0, 200);
+    // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
 
     /* brute-force guard para verifyCode */
     if (metodo === 'verifyCode') {
@@ -317,8 +340,19 @@ function handleRpc(req, res) {
                   prev.blockedUntil = 0;
                 }
                 _failedAuth.set(ip, prev);
+                // [SEGURANÇA] Incrementa tbm por identidade (e-mail/CPF)
+                if (ident && metodo === 'verifyCode') {
+                  const identKey = 'ident:' + String(ident).toLowerCase().trim();
+                  const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
+                  recIdent.count++;
+                  if (recIdent.count >= AUTH_FAIL_MAX_IDENT) {
+                    recIdent.blockedUntil = Date.now() + AUTH_BLOCK_MS_IDENT;
+                  }
+                  _failedAuthByIdent.set(identKey, recIdent);
+                }
               }
-              if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
+              // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
+              if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=[REDACTED]', e);
               json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
             })
           .finally(() => {
@@ -348,8 +382,19 @@ function handleRpc(req, res) {
           prev.blockedUntil = 0;
         }
         _failedAuth.set(ip, prev);
+        // [SEGURANÇA] Incrementa tambem por identidade (e-mail/CPF)
+        if (ident && metodo === 'verifyCode') {
+          const identKey = 'ident:' + String(ident).toLowerCase().trim();
+          const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
+          recIdent.count++;
+          if (recIdent.count >= AUTH_FAIL_MAX_IDENT) {
+            recIdent.blockedUntil = Date.now() + AUTH_BLOCK_MS_IDENT;
+          }
+          _failedAuthByIdent.set(identKey, recIdent);
+        }
       }
-      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
+      // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
+      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=[REDACTED]', e);
       const saida = json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
@@ -584,7 +629,8 @@ function handleWebhookAbacate(req, res, url) {
     catch (e) { return json(res, 400, { ok: false, error: 'JSON inválido.' }); }
     try {
       const r = API.processarEventoWebhook(ev);
-      console.log('[webhook] ' + (ev.event || '?') + ' → ' + JSON.stringify(r));
+      // [SEGURANÇA] Não logar dados do evento (podem conter PII)
+      console.log('[webhook] event=' + (ev.event || '?') + ' ok=' + !r.ignored);
       return json(res, 200, { ok: true, data: r });
     } catch (e) {
       console.error('[webhook]', e);
@@ -751,7 +797,8 @@ function bancoRemoto() {
     console.log('  Banco de dados   : PostgreSQL (cortecerto)');
     console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
     if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      console.log('  E-mail (código)  : Gmail real (' + process.env.GMAIL_USER + ')');
+      // [SEGURANÇA] Mascarar e-mail no log de boot
+      console.log('  E-mail (código)  : Gmail real (' + mascararEmail(process.env.GMAIL_USER) + ')');
     } else {
       console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
     }

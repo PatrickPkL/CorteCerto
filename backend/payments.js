@@ -24,8 +24,8 @@
 Ao confirmar: subscription.status='ativa', plan_id do plano
     pago e current_period_end estendido em +30 dias (mensal) ou
     +365 dias (anual), a partir do fim do período vigente,
-    preservando trial em andamento. O total anual é SEMPRE
-    12× o valor mensal (sem desconto).
+    preservando trial em andamento. O total anual usa o preço
+    anual próprio do plano (price_annual) — não é 12× o mensal.
     ============================================================ */
 
 (function () {
@@ -215,9 +215,14 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     const nParcFinal = mtd === 'cartao' && !anual
       ? Math.min(12, Math.max(1, parseInt(parcelas, 10) || 1))
       : nParc;
-    const quantidade = anual ? 12 : 1;
-    /* Sem desconto: o plano anual custa exatamente 12× o valor mensal. */
-    const totalCents = Math.round(Number(plano.price_monthly || 0) * quantidade * 100);
+    /* Preço por período. Anual usa o preço anual próprio do plano
+       (price_annual) quando disponível; senão cai para 12× o mensal. */
+    const baseTotal = anual
+      ? (plano.price_annual != null && Number(plano.price_annual) > 0
+          ? Number(plano.price_annual)
+          : Number(plano.price_monthly || 0) * 12)
+      : Number(plano.price_monthly || 0);
+    const totalCents = Math.round(baseTotal * 100);
 
     /* pendente reutilizável? */
     const agora = agoraMsISO();

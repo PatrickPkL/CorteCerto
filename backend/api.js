@@ -2156,6 +2156,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   function bonusPlano(plano) {
     return plano ? {
       id: plano.id, name: plano.name, price_monthly: plano.price_monthly,
+      price_annual: plano.price_annual,
       max_professionals: plano.max_professionals, features: plano.features,
       permissions: plano.permissions || [], is_free: !!plano.is_free
     } : null;
@@ -2284,6 +2285,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* ================= UPLOADS E GALERIA (RF-062..065, RNF-11) ================= */
 
   function definirLogo(dataUrl) {
+    // [SEGURANÇA] Valida tamanho do dataUrl para evitar payloads gigantes
+    if (!dataUrl || typeof dataUrl !== 'string') err(400, 'Imagem inválida.');
+    if (dataUrl.length > 1024 * 1024) err(400, 'Imagem muito grande (máx. 1MB após processamento).');
+    if (!dataUrl.startsWith('data:image/')) err(400, 'Formato de imagem inválido.');
     const { shop } = exigirDono();
     shop.logo_url = dataUrl;
     shop.updated_at = agoraISO();
@@ -2293,6 +2298,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function definirCapa(dataUrl) {
+    // [SEGURANÇA] Valida tamanho do dataUrl para evitar payloads gigantes
+    if (!dataUrl || typeof dataUrl !== 'string') err(400, 'Imagem inválida.');
+    if (dataUrl.length > 1024 * 1024) err(400, 'Imagem muito grande (máx. 1MB após processamento).');
+    if (!dataUrl.startsWith('data:image/')) err(400, 'Formato de imagem inválido.');
     const { shop } = exigirDono();
     const db = DB._d();
     let galleryId = null;
@@ -2319,9 +2328,24 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   /** Escrita restrita ao dono — corrige DT-08. */
   function adicionarGaleria(dataUrls) {
+    // [SEGURANÇA] Valida dataUrl para evitar payloads gigantes
+    if (!Array.isArray(dataUrls) || !dataUrls.length) err(400, 'Imagens inválidas.');
+    (Array.isArray(dataUrls) ? dataUrls : [dataUrls]).forEach((url, i) => {
+      if (typeof url !== 'string' || url.length > 1024 * 1024 || !url.startsWith('data:image/')) {
+        err(400, 'Imagem ' + (i + 1) + ' inválida ou muito grande.');
+      }
+    });
     const { shop } = exigirDono();
     exigirFuncionalidade(shop.id, 'galeria', 'Gerenciar galeria de fotos');
     const db = DB._d();
+
+    // [SEGURANÇA] Limite de fotos por loja para evitar abuso de armazenamento
+    const LIMITE_GALERIA = 20;
+    const fotosAtuais = db.gallery_images.filter(g => g.barbershop_id === shop.id);
+    if (fotosAtuais.length + dataUrls.length > LIMITE_GALERIA) {
+      err(400, 'Limite de ' + LIMITE_GALERIA + ' fotos por loja atingido. Remova fotos antes de adicionar.');
+    }
+
     const criadas = (Array.isArray(dataUrls) ? dataUrls : [dataUrls]).map(url => {
       const g = {
         id: DB.proximoId(), barbershop_id: shop.id, url,

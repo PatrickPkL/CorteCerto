@@ -123,20 +123,25 @@ document.addEventListener('DOMContentLoaded', () => {
   inputGaleria?.addEventListener('change', async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const urls = [];
-    for (const file of files) {
-      try { urls.push(await API.processarImagem(file)); }
-      catch (err2) { showToast(file.name + ': ' + msgErro(err2), 'error'); }
+    // [SEGURANÇA] Limite de fotos por loja (deve bater com backend)
+    const LIMITE_GALERIA = 20;
+    const fotosAtuais = galleryGrid.querySelectorAll('.gallery-item:not(.gallery-add)').length;
+    if (fotosAtuais + files.length > LIMITE_GALERIA) {
+      showToast('Limite de ' + LIMITE_GALERIA + ' fotos por loja. Remova fotos antes de adicionar.', 'error');
+      e.target.value = '';
+      return;
     }
-    if (urls.length) {
+    // [SEGURANÇA] Envia 1 foto por chamada para manter request < 500KB
+    for (const file of files) {
       try {
-        API.adicionarGaleria(urls);
-        renderGaleria();
-        showToast(urls.length + ' foto(s) adicionada(s)!');
-      } catch (err2) {
-        showToast(msgErro(err2), 'error');
+        const dataUrl = await API.processarImagem(file);
+        await API.adicionarGaleria([dataUrl]);
+        showToast(file.name + ' adicionada!');
+      } catch (e) {
+        showToast(file.name + ': ' + msgErro(e), 'error');
       }
     }
+    renderGaleria();
     inputGaleria.value = '';
   });
 

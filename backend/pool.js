@@ -12,8 +12,11 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const _url = process.env.DATABASE_URL ||
-  'postgres://cortecerto_app:SUA_SENHA@127.0.0.1:5432/cortecerto';
+// [SEGURANÇA] Sem fallback hardcoded — DATABASE_URL é obrigatório
+const _url = process.env.DATABASE_URL;
+if (!_url) {
+  throw new Error('[SEGURANÇA] DATABASE_URL não configurada. Defina no .env ou variável de ambiente.');
+}
 
 /* Hosts gerenciados (Render/Neon) pedem SSL self-signed; o pg moderno
    trata "sslmode=require/ssl=true" como verify-full e exige cert válido.
@@ -29,7 +32,9 @@ if (_temSsl) {
     database: (_p.pathname || '').replace(/^\//, ''),
     user: decodeURIComponent(_p.username || ''),
     password: decodeURIComponent(_p.password || ''),
-    ssl: { rejectUnauthorized: false }
+    // [SEGURANÇA] Verifica certificado SSL (MITM protection)
+    // Banco local .pg não tem ssl= na URL → intocado; afeta só cloud
+    ssl: { rejectUnauthorized: true }
   };
 } else {
   _conn = _url;

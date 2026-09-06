@@ -2,6 +2,10 @@
    Corte Certo – db.js  (PRD v2 · Seção 5 / Seção 7)
    Persistência cuja FONTE DE VERDADE é o PostgreSQL.
 
+   [SEGURANÇA] Dados sensíveis (email/telefone) são descriptografados no boot
+   e ficam em memória. Em caso de memory dump, PII pode vazar.
+   Mitigação futura: descriptografar sob demanda (lazy) no getter.
+
    Estratégia "espelho PG->memória":
      - init() carrega todas as tabelas do PostgreSQL para a memória
        (formato compatível com api.js/auth.js), descriptografando

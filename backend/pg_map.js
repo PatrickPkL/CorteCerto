@@ -207,13 +207,13 @@ const MAP = [
   {
     colecao: 'plans', tabela: 'plans', pk: 'id', dateOut: 'iso',
     toPg: (p) => ({
-      id: p.id, name: p.name, price_monthly: p.price_monthly, price_per_employee: p.price_per_employee || 0,
+      id: p.id, name: p.name, price_monthly: p.price_monthly, price_annual: p.price_annual || 0, price_per_employee: p.price_per_employee || 0,
       max_professionals: p.max_professionals, features: knexArr(p.features || []),
       permissions: knexArr(p.permissions || []), is_free: !!p.is_free, active: tagBool(p.active),
       created_at: toPgDate(p.created_at) || new Date()
     }),
     toMem: (r) => ({
-      id: r.id, name: r.name, price_monthly: Number(r.price_monthly), price_per_employee: Number(r.price_per_employee || 0),
+      id: r.id, name: r.name, price_monthly: Number(r.price_monthly), price_annual: Number(r.price_annual || 0), price_per_employee: Number(r.price_per_employee || 0),
       max_professionals: r.max_professionals, features: r.features || [], permissions: r.permissions || [],
       is_free: !!r.is_free, active: r.active ? 1 : 0,
       created_at: toMemDate(r.created_at, 'iso')
@@ -380,7 +380,7 @@ const CASTS = {
   working_hours: { barbershop_id: 'uuid', professional_id: 'uuid', day_of_week: 'int', start_time: 'time', end_time: 'time', lunch_start: 'time', lunch_end: 'time', is_open: 'boolean' },
   schedule_exceptions: { barbershop_id: 'uuid', professional_id: 'uuid', type: 'exc_tipo', starts_at: 'timestamptz', ends_at: 'timestamptz' },
   clients: { barbershop_id: 'uuid', user_id: 'uuid', total_spent: 'numeric', last_visit_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
-  plans: { max_professionals: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
+  plans: { max_professionals: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_annual: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
   subscriptions: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'sub_status', trial_ends_at: 'timestamptz', current_period_end: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
   appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
