@@ -356,6 +356,40 @@ const MAP = [
     toMem: (r) => ({
       id: r.id, token: r.token, email: r.email, created_at: toMemDate(r.created_at, 'iso'), expires_at: toMemDate(r.expires_at, 'iso')
     })
+  },
+  {
+    colecao: 'reports', tabela: 'reports', pk: 'id', dateOut: 'iso',
+    toPg: (r) => ({
+      id: r.id, reporter_user_id: r.reporter_user_id || null, reporter_role: r.reporter_role || null,
+      reporter_name: r.reporter_name || null, target_type: r.target_type,
+      target_user_id: r.target_user_id || null,
+      target_barbershop_id: r.target_barbershop_id || null,
+      target_client_id: r.target_client_id || null,
+      target_display: r.target_display || null,
+      reason: r.reason, description: r.description != null ? r.description : null,
+      status: r.status || 'pendente', status_note: r.status_note != null ? r.status_note : null,
+      created_at: toPgDate(r.created_at) || new Date(), updated_at: toPgDate(r.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, reporter_user_id: r.reporter_user_id, reporter_role: r.reporter_role,
+      reporter_name: r.reporter_name, target_type: r.target_type,
+      target_user_id: r.target_user_id, target_barbershop_id: r.target_barbershop_id,
+      target_client_id: r.target_client_id, target_display: r.target_display,
+      reason: r.reason, description: r.description != null ? r.description : null,
+      status: r.status, status_note: r.status_note != null ? r.status_note : null,
+      created_at: toMemDate(r.created_at, 'iso'), updated_at: toMemDate(r.updated_at, 'iso')
+    })
+  },
+  {
+    colecao: 'blocked_clients', tabela: 'blocked_clients', pk: ['barbershop_id', 'client_id'], dateOut: 'iso',
+    toPg: (b) => ({
+      barbershop_id: b.barbershop_id, client_id: b.client_id,
+      created_at: toPgDate(b.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      barbershop_id: r.barbershop_id, client_id: r.client_id,
+      created_at: toMemDate(r.created_at, 'iso')
+    })
   }
 ];
 
@@ -391,7 +425,9 @@ const CASTS = {
   tickets: { salao_id: 'uuid', user_id: 'uuid', status: 'tik_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
   magic_tokens: { user_id: 'uuid', used: 'boolean', expires_at: 'timestamptz', created_at: 'timestamptz' },
   superadmin_sessions: { expires_at: 'timestamptz', created_at: 'timestamptz' },
-  audit_log: { user_id: 'uuid', extra: 'jsonb', ip_address: 'inet', timestamp: 'timestamptz' }
+  audit_log: { user_id: 'uuid', extra: 'jsonb', ip_address: 'inet', timestamp: 'timestamptz' },
+  reports: { reporter_user_id: 'uuid', target_type: 'report_target', target_user_id: 'uuid', target_barbershop_id: 'uuid', target_client_id: 'uuid', status: 'report_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  blocked_clients: { barbershop_id: 'uuid', client_id: 'uuid', created_at: 'timestamptz' }
 };
 
 const BY_COLECAO = {};

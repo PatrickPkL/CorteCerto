@@ -490,4 +490,117 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  /* ==========================================================
+     DENÚNCIA DE PERFIL (barbeiro/salão) — cliente
+     ========================================================== */
+  const modalDen = document.getElementById('modal-denunciar');
+  const formDen = document.getElementById('form-denunciar');
+  const btnDen = document.getElementById('btn-denunciar');
+  const denTarget = document.getElementById('den-target');
+  const denMotivo = document.getElementById('den-motivo');
+  const denOutroMotivo = document.getElementById('den-outro-motivo');
+  const denCampoOutro = document.getElementById('den-campo-outro');
+  const denDesc = document.getElementById('den-descricao');
+
+  function exigirSessaoDenuncia() {
+    if (Auth.usuarioAtual()) return true;
+    sessionStorage.setItem('cc_flash', JSON.stringify({
+      texto: 'Faça login para denunciar um perfil.',
+      tipo: 'error'
+    }));
+    const volta = 'salao-publico.html?id=' + encodeURIComponent(loja.id);
+    window.location.href = '../admin/login.html?next=' + encodeURIComponent(volta);
+    return false;
+  }
+
+  if (btnDen && modalDen && formDen) {
+    btnDen.addEventListener('click', () => {
+      if (!exigirSessaoDenuncia()) return;
+
+      const u = Auth.usuarioAtual();
+      /* barbeiro/dono não denuncia por aqui (usa o CRM para clientes) */
+      if (u && (u.role === 'dono' || u.role === 'barbeiro')) {
+        showToast('Denúncias de perfis de salão/barbeiro são feitas pela conta do cliente.', 'error');
+        return;
+      }
+
+      /* alvos: o próprio salão e os barbeiros ativos listados na página */
+      denTarget.innerHTML = '';
+      const opSalao = document.createElement('option');
+      opSalao.value = 'salao:' + loja.id;
+      opSalao.textContent = 'Esta barbearia (' + (loja.name || '') + ')';
+      denTarget.appendChild(opSalao);
+      profissionais.forEach(p => {
+        const op = document.createElement('option');
+        op.value = 'barbeiro:' + p.id + ':' + (p.user_id || '');
+        op.textContent = 'Um barbeiro (' + p.name + ')';
+        denTarget.appendChild(op);
+      });
+
+      denMotivo.value = '';
+      denOutroMotivo.value = '';
+      if (denCampoOutro) denCampoOutro.style.display = 'none';
+      denDesc.value = '';
+
+      abrirModal(modalDen);
+    });
+
+    /* mostra o campo "conte o motivo" quando seleciona "outro" */
+    denMotivo.addEventListener('change', () => {
+      if (!denCampoOutro) return;
+      const outro = denMotivo.value === 'outro';
+      denCampoOutro.style.display = outro ? '' : 'none';
+      if (outro) denOutroMotivo.focus();
+    });
+
+    document.getElementById('btn-fechar-modal-denunciar')
+      ?.addEventListener('click', () => fecharModal(modalDen));
+    modalDen.addEventListener('click', (e) => {
+      if (e.target === modalDen) fecharModal(modalDen);
+    });
+
+    formDen.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!exigirSessaoDenuncia()) return;
+      const alvo = (denTarget?.value || '').split(':');
+      const [tipo, id1, id2] = alvo;
+      if (!tipo || !id1) { showToast('Selecione o perfil a denunciar.', 'error'); return; }
+      let motivo = denMotivo?.value || '';
+      if (!motivo) { showToast('Selecione um motivo.', 'error'); return; }
+      if (motivo === 'outro') {
+        motivo = (denOutroMotivo?.value || '').trim();
+        if (!motivo) { showToast('Conte o motivo da denúncia.', 'error'); return; }
+      }
+
+      const payload = {
+        target_type: tipo, // 'salao' | 'barbeiro'
+        reason: motivo,
+        description: (denDesc?.value || '').trim(),
+        target_display: loja.name
+      };
+      if (tipo === 'salao') payload.target_barbershop_id = id1;
+      if (tipo === 'barbeiro') {
+        payload.target_barbershop_id = loja.id;
+        payload.target_user_id = id2 || null;
+        const prof = profissionais.find(p => String(p.id) === id1);
+        payload.target_display = prof ? prof.name : loja.name;
+      }
+
+      const btnEnv = formDen.querySelector('button[type="submit"]');
+      btnEnv.disabled = true;
+      btnEnv.textContent = 'Enviando...';
+      try {
+        API.denunciarPerfil(payload);
+        showToast('Denúncia enviada! Nossa equipe vai analisar.');
+        fecharModal(modalDen);
+        formDen.reset();
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      } finally {
+        btnEnv.disabled = false;
+        btnEnv.textContent = 'Enviar denúncia';
+      }
+    });
+  }
 });

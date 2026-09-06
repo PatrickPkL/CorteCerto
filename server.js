@@ -144,6 +144,8 @@ const _authRequired = new Set([
   'criarCobrancaPlano', 'statusCobranca', 'listarMinhasCobrancas',
   'confirmarCobrancaDemo', 'simularCobranca',
   'criarReview', 'minhasReviews',
+  'denunciarPerfil', 'minhasDenuncias',
+  'bloquearCliente', 'desbloquearCliente', 'clienteBloqueado',
   'logout'
 ]);
 
@@ -158,7 +160,8 @@ const _RPC_BLOQUEADOS = new Set([
   'superAdminLogin', 'superAdminAuth', 'superAdminLogout',
   'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
-  'saTickets', 'saResponderTicket'
+  'saTickets', 'saResponderTicket',
+  'saListarDenuncias', 'saResolverDenuncia'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -514,6 +517,27 @@ function handleSuperAdmin(req, res, pathname, url) {
   if (rota === 'ticket' && idParam && req.method === 'PUT') {
     return readBody().then(dados => {
       const r = API.saResponderTicket(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/denuncias?status=...&tipo=... */
+  if (rota === 'denuncias' && req.method === 'GET') {
+    try {
+      var qs = new URL(url, 'http://localhost').searchParams;
+      var r = API.saListarDenuncias({
+        status: qs.get('status') || 'todos',
+        tipo: qs.get('tipo') || 'todos'
+      });
+      json(res, 200, { ok: true, data: r });
+    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/denuncia/:id — atualiza status/nota */
+  if (rota === 'denuncia' && idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saResolverDenuncia(idParam, dados);
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
   }

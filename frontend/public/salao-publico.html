@@ -51,6 +51,7 @@
   </div>
 
   <button id="btn-compartilhar" type="button" class="btn btn-outline" style="margin-top:8px; padding:5px 14px; font-size:13px;">Compartilhar</button>
+  <button id="btn-denunciar" type="button" class="btn btn-outline" style="margin-top:8px; padding:5px 14px; font-size:13px; color:var(--danger, #e74c3c); border-color:var(--danger, #e74c3c); margin-left:8px;">Denunciar perfil</button>
 
   <h3 class="section-title">Escolha o profissional</h3>
 
@@ -96,6 +97,51 @@
         <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
           <button type="button" class="btn btn-outline" id="btn-fechar-modal-agendar">Cancelar</button>
           <button type="submit" class="btn btn-brass" id="btn-confirmar-agendamento" disabled>Confirmar agendamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-denunciar" class="modal-overlay" style="display:none;">
+    <div class="card" style="width:460px;">
+      <h3 class="section-title" style="border-bottom-color:var(--danger, #e74c3c);">Denunciar perfil</h3>
+      <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
+        Sua denúncia é enviada com sigilo para análise. Não compartilhamos seus dados com o perfil denunciado.
+      </p>
+      <form id="form-denunciar">
+        <div class="field">
+          <label for="den-target">Quem você quer denunciar?</label>
+          <select id="den-target" name="target_type" required></select>
+        </div>
+        <div class="field">
+          <label for="den-motivo">Qual o motivo?</label>
+          <select id="den-motivo" name="reason" required>
+            <option value="">Selecione um motivo...</option>
+            <option value="conteudo_inadequado">Conteúdo ou fotos inadequadas</option>
+            <option value="descricao_falsa">Descrição falsa</option>
+            <option value="precos_enganosos">Preços enganosos</option>
+            <option value="comportamento_abusivo">Comportamento abusivo</option>
+            <option value="nao_comparecimento">Não comparecimento</option>
+            <option value="spam">Spam</option>
+            <option value="outro">Outro / motivo não listado</option>
+          </select>
+        </div>
+        <div class="field" id="den-campo-outro" style="display:none;">
+          <label for="den-outro-motivo">Conte o motivo da denúncia</label>
+          <input type="text" id="den-outro-motivo" name="reason_custom" maxlength="100"
+            placeholder="Ex.: atendeu com atraso e foi grosseiro...">
+        </div>
+        <div class="field">
+          <label for="den-descricao">Detalhes (opcional)</label>
+          <textarea id="den-descricao" name="description" rows="3" maxlength="2000"
+            placeholder="Descreva o que aconteceu..."></textarea>
+        </div>
+        <p id="den-aviso" style="color:var(--danger, #e74c3c); font-size:12.5px; display:none; margin-bottom:10px;">
+          Faça login para enviar uma denúncia.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+          <button type="button" class="btn btn-outline" id="btn-fechar-modal-denunciar">Cancelar</button>
+          <button type="submit" class="btn btn-brass">Enviar denúncia</button>
         </div>
       </form>
     </div>

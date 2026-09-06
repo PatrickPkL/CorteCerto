@@ -1423,6 +1423,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!/^\d{2}:\d{2}$/.test(hora)) err(400, 'Horário inválido.');
     if (!clientName) err(400, 'Nome do cliente é obrigatório.');
 
+    /* bloqueio: cliente bloqueado pelo salão não consegue agendar */
+    const telCli = String(payload.client_phone || '').replace(/\D/g, '');
+    const clienteBloq = (db.clients || []).find(c =>
+      c.barbershop_id === shop.id && telCli && c.phone === telCli);
+    if (clienteBloq && _clienteBloqueado(shop.id, clienteBloq.id)) {
+      err(403, 'Este cliente está bloqueado e não pode realizar novos agendamentos nesta barbearia.');
+    }
+    if (user && user.role === 'cliente') {
+      const cliPorUser = (db.clients || []).find(c =>
+        c.barbershop_id === shop.id && c.user_id === user.id);
+      if (cliPorUser && _clienteBloqueado(shop.id, cliPorUser.id)) {
+        err(403, 'Você está bloqueado nesta barbearia e não pode realizar novos agendamentos.');
+      }
+    }
+
     /* duração = soma dos serviços | informado | 30 (RF-039.2) */
     const idsServicos = Array.isArray(payload.service_ids) && payload.service_ids.length
       ? payload.service_ids.map(String)
@@ -1793,7 +1808,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       id: c.id, name: c.name, phone: c.phone || '', email: c.email || '',
       notes: c.notes || '', total_visits: c.total_visits,
       total_spent: c.total_spent, last_visit_at: c.last_visit_at,   // campo correto (DT-23)
-      user_id: c.user_id || null, created_at: c.created_at
+      user_id: c.user_id || null, created_at: c.created_at,
+      blocked: _clienteBloqueado(c.barbershop_id, c.id)
     };
   }
 
@@ -2142,6 +2158,203 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     DB._d().reviews.push(r);
     DB.salvar();
     return r;
+  }
+
+  /* ================= DENÚNCIAS E BLOQUEIOS ================= */
+
+  const MOTIVOS_DENUNCIA = [
+    'conteudo_inadequado', 'descricao_falsa', 'precos_enganosos',
+    'comportamento_abusivo', 'nao_comparecimento', 'spam', 'outro'
+  ];
+  const TIPOS_ALVO = ['salao', 'barbeiro', 'cliente'];
+
+  function isMembroEquipe(user) {
+    return user && (user.role === 'dono' || user.role === 'barbeiro');
+  }
+
+  /* Denúncia de perfil — regras por papel:
+     - cliente logado         → denuncia salão OU barbeiro (página pública)
+     - dono/barbeiro (equipe) → denuncia cliente (CRM) */
+  function denunciarPerfil(dados) {
+    dados = dados || {};
+    const user = sessao(); // exige login para denunciar (evita abuso anônimo)
+    const targetType = String(dados.target_type || '').toLowerCase();
+    const motivo = String(dados.reason || '').toLowerCase();
+    const descricao = String(dados.description || '').trim().slice(0, 2000);
+
+    if (TIPOS_ALVO.indexOf(targetType) === -1) err(400, 'Tipo de alvo inválido.');
+    if (MOTIVOS_DENUNCIA.indexOf(motivo) === -1) err(400, 'Motivo da denúncia inválido.');
+
+    const db = DB._d();
+    let targetUserId = dados.target_user_id ? String(dados.target_user_id) : null;
+    let targetBarbershopId = dados.target_barbershop_id ? String(dados.target_barbershop_id) : null;
+    let targetClientId = dados.target_client_id ? String(dados.target_client_id) : null;
+    let targetDisplay = String(dados.target_display || '');
+
+    /* ---------- regras por papel/alvo ---------- */
+    if (targetType === 'salao') {
+      if (isMembroEquipe(user)) err(403, 'Equipe do salão não pode denunciar outro salão.');
+      if (!targetBarbershopId) err(400, 'Informe o salão denunciado.');
+    } else if (targetType === 'barbeiro') {
+      if (isMembroEquipe(user)) err(403, 'Equipe do salão não pode denunciar barbeiros.');
+      if (!targetUserId) err(400, 'Informe o barbeiro denunciado.');
+      // barbeiro alvo precisa pertencer a um salão (profissional ou dono)
+      const prof = db.professionals.find(p => p.user_id == targetUserId);
+      const dono = db.barbershops.find(b => b.owner_user_id == targetUserId);
+      if (!prof && !dono) err(400, 'Barbeiro não encontrado.');
+      if (!targetDisplay) targetDisplay = (prof && prof.name) || (dono && dono.name) || '';
+    } else if (targetType === 'cliente') {
+      if (!isMembroEquipe(user)) err(403, 'Apenas a equipe do salão pode denunciar clientes.');
+      const { shop } = exigirEquipe();
+      targetBarbershopId = shop.id;
+      if (!targetClientId) err(400, 'Informe o cliente denunciado.');
+      const c = db.clients.find(x => x.id == targetClientId && x.barbershop_id === shop.id);
+      if (!c) err(404, 'Cliente não encontrado.');
+      targetUserId = c.user_id || null;
+      targetDisplay = c.name;
+    }
+
+    /* impede auto-denúncia (não pode denunciar a si mesmo) */
+    if (targetUserId && targetUserId === user.id) err(400, 'Você não pode denunciar a si mesmo.');
+
+    const r = {
+      id: DB.proximoId(),
+      reporter_user_id: user.id,
+      reporter_role: user.role,
+      reporter_name: user.name,
+      target_type: targetType,
+      target_user_id: targetUserId,
+      target_barbershop_id: targetBarbershopId,
+      target_client_id: targetClientId,
+      target_display: targetDisplay,
+      reason: motivo,
+      description: descricao,
+      status: 'pendente',
+      status_note: null,
+      created_at: agoraISO(),
+      updated_at: agoraISO()
+    };
+    db.reports = db.reports || [];
+    db.reports.push(r);
+    DB.salvar();
+    _auditLog(user.id, 'denunciar_perfil', { target_type: targetType, target_id: targetUserId || targetBarbershopId || targetClientId, reason: motivo });
+    return { ok: true, id: r.id, status: r.status };
+  }
+
+  /* Minhas denúncias (o denunciante vê o que enviou) */
+  function minhasDenuncias() {
+    const user = sessao();
+    return (_db().reports || [])
+      .filter(r => r.reporter_user_id === user.id)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(denunciaPublica);
+  }
+
+  function denunciaPublica(r) {
+    return {
+      id: r.id,
+      target_type: r.target_type,
+      target_display: r.target_display,
+      reason: r.reason,
+      description: r.description,
+      status: r.status,
+      created_at: r.created_at
+    };
+  }
+
+  /* ---------- bloqueio de cliente pelo salão (barbeiro/dono) ---------- */
+
+  function _clienteBloqueado(shopId, clientId) {
+    return !!(_db().blocked_clients || []).find(b =>
+      b.barbershop_id == shopId && b.client_id == clientId);
+  }
+
+  function bloquearCliente(clientId) {
+    const { shop } = exigirEquipe();
+    const db = DB._d();
+    const c = db.clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    if (!_clienteBloqueado(shop.id, c.id)) {
+      db.blocked_clients = db.blocked_clients || [];
+      db.blocked_clients.push({ barbershop_id: shop.id, client_id: c.id, created_at: agoraISO() });
+    }
+    DB.salvar();
+    _auditLog(sessao().id, 'bloquear_cliente', { client_id: c.id, client_name: c.name });
+    return { ok: true, bloqueado: true };
+  }
+
+  function desbloquearCliente(clientId) {
+    const { shop } = exigirEquipe();
+    const db = DB._d();
+    const c = db.clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    db.blocked_clients = (db.blocked_clients || []).filter(b =>
+      !(b.barbershop_id == shop.id && b.client_id == c.id));
+    DB.salvar();
+    _auditLog(sessao().id, 'desbloquear_cliente', { client_id: c.id, client_name: c.name });
+    return { ok: true, bloqueado: false };
+  }
+
+  /* inclui o status de bloqueio na ficha pública do cliente (CRM) */
+  function clienteBloqueado(clientId) {
+    const { shop } = exigirEquipe();
+    const c = _db().clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    return { blocked: _clienteBloqueado(shop.id, c.id) };
+  }
+
+  /* ---------- super-admin: moderação de denúncias ---------- */
+
+  function saListarDenuncias(filtros) {
+    filtros = filtros || {};
+    const db = _db();
+    let lista = db.reports || [];
+    if (filtros.status && filtros.status !== 'todos') {
+      lista = lista.filter(r => r.status === filtros.status);
+    }
+    if (filtros.tipo && filtros.tipo !== 'todos') {
+      lista = lista.filter(r => r.target_type === filtros.tipo);
+    }
+    return lista
+      .slice()
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(r => {
+        const alvo = db.users.find(u => u.id === r.target_user_id);
+        const loja = db.barbershops.find(b => b.id === r.target_barbershop_id);
+        return {
+          id: r.id,
+          reporter_name: r.reporter_name,
+          reporter_role: r.reporter_role,
+          target_type: r.target_type,
+          target_display: r.target_display,
+          target_user_name: alvo ? alvo.name : null,
+          target_barbershop_name: loja ? loja.name : null,
+          reason: r.reason,
+          description: r.description,
+          status: r.status,
+          status_note: r.status_note,
+          created_at: r.created_at
+        };
+      });
+  }
+
+  function saResolverDenuncia(id, dados) {
+    dados = dados || {};
+    const db = _db();
+    const r = (db.reports || []).find(x => x.id == id);
+    if (!r) err(404, 'Denúncia não encontrada.');
+    const novoStatus = String(dados.status || '');
+    if (novoStatus && ['pendente', 'investigando', 'resolvido', 'rejeitado'].indexOf(novoStatus) === -1) {
+      err(400, 'Status inválido.');
+    }
+    if (novoStatus) r.status = novoStatus;
+    if (dados.status_note != null) r.status_note = String(dados.status_note).trim() || null;
+    r.updated_at = agoraISO();
+    DB.salvar();
+    return {
+      id: r.id, status: r.status, status_note: r.status_note,
+      target_type: r.target_type, target_display: r.target_display
+    };
   }
 
   /* ================= ASSINATURAS E PLANOS (RF-057..061, DT-12) ================= */
@@ -2847,6 +3060,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // reviews
     reviewsDaLoja, criarReview, minhasReviews,
 
+    // denúncias e bloqueios
+    denunciarPerfil, minhasDenuncias,
+    bloquearCliente, desbloquearCliente, clienteBloqueado,
+
     // assinatura
     listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura, ativarTrial,
 
@@ -2880,6 +3097,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
-    saTickets, saResponderTicket
+    saTickets, saResponderTicket,
+    saListarDenuncias, saResolverDenuncia
   };
 })();
