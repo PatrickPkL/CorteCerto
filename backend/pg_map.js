@@ -68,8 +68,10 @@ const MAP = [
     colecao: 'users', tabela: 'users', pk: 'id', encUsers: true, dateOut: 'local',
     toPg: (u) => ({
       id: u.id, role: u.role, name: u.name,
-      email: crypt.criptografar(u.email), email_hash: crypt.hashSHA256((u.email || '').toLowerCase()),
-      phone: crypt.criptografar(u.phone), phone_hash: crypt.hashSHA256(u.phone || ''),
+      email: u.email ? crypt.criptografar(u.email) : null,
+      email_hash: u.email ? crypt.hashSHA256(String(u.email).toLowerCase()) : null,
+      phone: u.phone ? crypt.criptografar(u.phone) : null,
+      phone_hash: u.phone ? crypt.hashSHA256(u.phone) : null,
       verified: tagBool(u.verified),
       prefs: knexJson(u.prefs || { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }),
       consentimentos: knexJsonArr(u.consentimentos || []),
@@ -210,12 +212,13 @@ const MAP = [
       id: p.id, name: p.name, price_monthly: p.price_monthly, price_annual: p.price_annual || 0, price_per_employee: p.price_per_employee || 0,
       max_professionals: p.max_professionals, features: knexArr(p.features || []),
       permissions: knexArr(p.permissions || []), is_free: !!p.is_free, active: tagBool(p.active),
+      nivel_relatorio: p.nivel_relatorio || null,
       created_at: toPgDate(p.created_at) || new Date()
     }),
     toMem: (r) => ({
       id: r.id, name: r.name, price_monthly: Number(r.price_monthly), price_annual: Number(r.price_annual || 0), price_per_employee: Number(r.price_per_employee || 0),
       max_professionals: r.max_professionals, features: r.features || [], permissions: r.permissions || [],
-      is_free: !!r.is_free, active: r.active ? 1 : 0,
+      is_free: !!r.is_free, active: r.active ? 1 : 0, nivel_relatorio: r.nivel_relatorio || null,
       created_at: toMemDate(r.created_at, 'iso')
     })
   },
@@ -390,6 +393,23 @@ const MAP = [
       barbershop_id: r.barbershop_id, client_id: r.client_id,
       created_at: toMemDate(r.created_at, 'iso')
     })
+  },
+  {
+    colecao: 'relatorios_diarios', tabela: 'relatorios_diarios', pk: 'id', dateOut: 'date',
+    toPg: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, data: r.data,
+      faturamento: r.faturamento, agendamentos: r.agendamentos || 0,
+      ticket: r.ticket != null ? r.ticket : null,
+      faixa_pico: r.faixa_pico != null ? r.faixa_pico : null,
+      created_at: toPgDate(r.created_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, barbershop_id: r.barbershop_id, data: toMemDate(r.data, 'date'),
+      faturamento: Number(r.faturamento) || 0, agendamentos: r.agendamentos || 0,
+      ticket: r.ticket != null ? Number(r.ticket) : null,
+      faixa_pico: r.faixa_pico != null ? r.faixa_pico : null,
+      created_at: toMemDate(r.created_at, 'iso')
+    })
   }
 ];
 
@@ -427,7 +447,8 @@ const CASTS = {
   superadmin_sessions: { expires_at: 'timestamptz', created_at: 'timestamptz' },
   audit_log: { user_id: 'uuid', extra: 'jsonb', ip_address: 'inet', timestamp: 'timestamptz' },
   reports: { reporter_user_id: 'uuid', target_type: 'report_target', target_user_id: 'uuid', target_barbershop_id: 'uuid', target_client_id: 'uuid', status: 'report_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
-  blocked_clients: { barbershop_id: 'uuid', client_id: 'uuid', created_at: 'timestamptz' }
+  blocked_clients: { barbershop_id: 'uuid', client_id: 'uuid', created_at: 'timestamptz' },
+  relatorios_diarios: { barbershop_id: 'uuid', data: 'date', faturamento: 'numeric', agendamentos: 'int', ticket: 'numeric', created_at: 'timestamptz' }
 };
 
 const BY_COLECAO = {};

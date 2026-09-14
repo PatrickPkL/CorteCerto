@@ -122,7 +122,7 @@ const _authRequired = new Set([
   'criarAgendamento', 'listarAgendamentos', 'atualizarAgendamento',
   'excluirAgendamento', 'meusAgendamentos', 'getAgendamento',
   'listarClientes', 'getCliente', 'criarCliente', 'atualizarCliente', 'agendamentosDoCliente',
-  'dashboardStats', 'exportarCSV',
+  'dashboardStats', 'exportarCSV', 'gerarRelatorio', 'gerarRelatorioDiario',
   'minhaLoja', 'atualizarLoja', 'excluirLoja',
   'criarServico', 'atualizarServico', 'excluirServico',
   'criarProfissional', 'atualizarProfissional', 'desativarProfissional',
@@ -810,6 +810,30 @@ function bancoRemoto() {
   } catch (e) {
     console.error('[boot] Falha ao carregar o banco de dados:', e);
     process.exit(1);
+  }
+
+  /* Job diário dos relatórios: padrão de TODOS os planos pagos.
+     Ao virar o dia (00:00) grava o snapshot de faturamento por loja;
+     no boot de um dia novo também cobre o dia anterior (catch-up). */
+  {
+    let diaGerado = '';
+    async function garantirRelatoriosDiarios() {
+      try {
+        const hoje = global.DB.hojeISO();
+        if (diaGerado !== hoje) {
+          const internos = global.__CC_INTERNAL || {};
+          if (typeof internos.gerarDiariosParaData === 'function') {
+            internos.gerarDiariosParaData(hoje);
+            console.log('[relatorios] snapshots diários gerados às 00:00 (' + hoje + ')');
+          }
+          diaGerado = hoje;
+        }
+      } catch (e) {
+        console.error('[relatorios][job]', e);
+      }
+    }
+    garantirRelatoriosDiarios();
+    setInterval(garantirRelatoriosDiarios, 60 * 1000);
   }
 
   Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)

@@ -136,3 +136,128 @@
   line-height: 1.6;
   color: var(--text-muted);
 }
+
+/* ---------- abas dos relatórios (Diário/Geral/Horários/Benefícios) ---------- */
+.rel-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 18px 0 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rel-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Work Sans', sans-serif;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.rel-tab:hover { border-color: var(--brass, #B8863B); color: var(--text-strong, #2B2620); }
+
+.rel-tab.active {
+  background: var(--brass, #B8863B);
+  border-color: var(--brass, #B8863B);
+  color: #fff;
+}
+
+.rel-panel { margin-top: 18px; }
+
+.rel-panel h3.section-title { margin-top: 0; }
+
+.rel-block-note {
+  margin: 6px 0 0;
+  padding: 9px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.rel-beneficio-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.rel-beneficio-list li { margin: 4px 0; font-size: 14px; }
+
+.rel-plano-mini {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft, rgba(220, 212, 194, .4));
+  border-radius: var(--radius);
+}
+
+.rel-plano-mini.atual {
+  border-color: var(--brass, #B8863B);
+  background: var(--brass-soft, rgba(184, 134, 59, .1));
+}
+
+.rel-plano-mini h4 {
+  margin: 0 0 4px;
+  font-size: 14.5px;
+}
+
+.rel-plano-mini .rel-plano-preco {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.rel-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.rel-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.rel-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft, rgba(220, 212, 194, .35));
+}
+
+.rel-table .mono { font-family: 'JetBrains Mono', monospace; }
+
+.chart-box-chart { height: 200px; }
+
+.rel-report-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--line-soft, rgba(220, 212, 194, .35));
+}
+
+.rel-report-item:last-child { border-bottom: none; }
+
+.rel-report-info { min-width: 0; }
+
+.rel-report-nome { font-size: 14.5px; font-weight: 600; }
+
+.rel-report-desc {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}

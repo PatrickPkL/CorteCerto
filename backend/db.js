@@ -114,9 +114,11 @@ window.DB = (function () {
       const cur = db[m.colecao] || [];
       const prev = _orig[m.colecao];
       const prevJson = prev === undefined ? '[]' : JSON.stringify(prev);
-      if (JSON.stringify(cur) !== prevJson) {
-        await writeCol(m, cur, prev || []);
-        _orig[m.colecao] = _deep(cur);
+      const curJson = JSON.stringify(cur);
+      if (curJson !== prevJson) {
+        const snap = _deep(cur);
+        await writeCol(m, snap, prev || []);
+        _orig[m.colecao] = snap;
       }
     }
   }
@@ -136,6 +138,7 @@ window.DB = (function () {
       case 'jsonb': return { sql: '?::jsonb', binds: [typeof v === 'string' ? v : JSON.stringify(v)] };
       case 'jsonb[]': {
         const arr = v || [];
+        if (!arr.length) return { sql: 'ARRAY[]::jsonb[]', binds: [] };
         return {
           sql: 'ARRAY[' + arr.map(() => '?::jsonb').join(',') + ']',
           binds: arr.map(x => (typeof x === 'string' ? x : JSON.stringify(x)))
@@ -264,6 +267,7 @@ window.DB = (function () {
     if (!_loaded) { await init(); }
     await asAdmin(async trx => {
       const tabelas = [
+        'relatorios_diarios',
         'blocked_clients', 'reports', 'superadmin_sessions', 'audit_log', 'tickets', 'gallery_images', 'reviews',
         'notifications', 'magic_tokens', 'sms_codes', 'sessions', 'appointment_services',
         'appointments', 'payments', 'subscriptions', 'plans', 'clients',

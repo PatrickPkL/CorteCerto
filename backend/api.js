@@ -85,7 +85,7 @@ window.API = (function () {
    *
    * O plano EFETIVO de uma loja é o da assinatura vigente (trial em
    * andamento ou período pago corrente). Fora isso (sem assinatura,
-   * expirada ou cancelada) a loja cai automaticamente no plano Free —
+   * expirada ou cancelada) a loja fica sem plano —
    * leituras continuam liberadas, escritas exigem a permissão do plano.
    */
   function planoFree() {
@@ -2006,6 +2006,360 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return '\uFEFF' + cab.map(campo).join(';') + '\r\n' + corpo.join('\r\n');
   }
 
+  /* ================= RELATÓRIOS ESCALONADOS (RF-070 v3.1) =================
+     Cada plano pago libera um relatório progressivamente mais completo:
+
+       Free          → sem acesso a relatórios
+       Autonomo      → basico        (faturamento total)
+       Salao         → intermediario (+ total agendamentos, ticket médio)
+       Salao Pro     → completo      (+ serviço/profissional top, horários
+                                      de pico, comparação de períodos, CSV)
+
+     [SEGURANÇA] O nível vem do plano EFETIVO da loja no backend. Campos
+     dos níveis superiores NUNCA são calculados/retornados para os
+     inferiores (fail-closed) — o frontend apenas renderiza o que chega.
+  ===================================================================== */
+
+  /* Nível de relatório do plano EFETIVO da loja.
+     Free/planos sem valor → null (sem acesso). */
+  function nivelRelatorioDe(shopId) {
+    const { plano } = planoEfetivo(shopId);
+    const nivel = plano && plano.nivel_relatorio;
+    return ['basico', 'intermediario', 'completo'].includes(nivel) ? nivel : null;
+  }
+
+  /* Gate de acesso (mesma regra usada na API e nos testes) */
+  function podeAcessarRelatorio(nivelPlano) {
+    return ['basico', 'intermediario', 'completo'].includes(nivelPlano);
+  }
+
+  /* Resolve a loja da sessão, o nível e barra planos sem relatórios */
+  function exigirNivelRelatorio() {
+    const { shop } = exigirDono();
+    const nivel = nivelRelatorioDe(shop.id);
+    if (!podeAcessarRelatorio(nivel)) {
+      const { plano } = planoEfetivo(shop.id);
+      throw {
+        status: 403,
+        error: 'Relatórios estão bloqueados no seu plano (' + ((plano && plano.name) || 'sem plano') +
+          '). Assine ou faça upgrade na aba Assinatura para liberar.'
+      };
+    }
+    return { shop, nivel };
+  }
+
+  /* ---- funções auxiliares ---- */
+
+  function noPeriodo(shopId, inicio, fim) {
+    return DB._d().appointments.filter(a =>
+      a.barbershop_id === shopId && a.status === 'concluido' &&
+      a.starts_at.slice(0, 10) >= inicio && a.starts_at.slice(0, 10) <= fim);
+  }
+
+  function calcularFaturamentoTotal(shopId, inicio, fim) {
+    return noPeriodo(shopId, inicio, fim)
+      .reduce((acc, a) => acc + Number(a.price_total || 0), 0);
+  }
+
+  function contarAgendamentos(shopId, inicio, fim) {
+    return noPeriodo(shopId, inicio, fim).length;
+  }
+
+  /* Resumo (textos) das funcionalidades de relatório — benefícios idênticos
+     em todos os planos pagos (v4). O nível diferencia apenas o número de
+     profissionais; relatórios completos valem para qualquer plano. */
+  function relatoriosResumoPorNivel(nivel) {
+    switch (nivel) {
+      case 'basico':
+      case 'intermediario':
+      case 'completo':
+        return [
+          'Relatório diário gerado automaticamente às 00:00',
+          'Totais financeiros: dia a dia, semana e mês',
+          'Gráfico com o dia de maior lucro no período',
+          'Relatório detalhado por atendimento (cliente, profissional, serviço, valor)',
+          'Comparação de períodos e horários de pico',
+          'Exportação dos dados em CSV'
+        ];
+      default:
+        return [
+          'Relatório diário gerado automaticamente às 00:00 (todos os planos pagos)',
+          'Assine um plano pago para liberar os relatórios'
+        ];
+    }
+  }
+
+  /* Semana corrente (últimos 7 dias) + delta da semana anterior (Autonomo+) */
+  function resumoSemanal(shopId) {
+    const hoje = DB.hojeISO();
+    const inicio = DB.addDiasISO(-6);
+    const antIni = DB.addDiasISO(-13);
+    const antFim = DB.addDiasISO(-7);
+    const fAtual = calcularFaturamentoTotal(shopId, inicio, hoje);
+    const fAnte = calcularFaturamentoTotal(shopId, antIni, antFim);
+    return {
+      inicio, fim: hoje,
+      faturamento: Math.round(fAtual * 100) / 100,
+      agendamentos: contarAgendamentos(shopId, inicio, hoje),
+      delta_faturamento_pct: fAnte > 0 ? Math.round((fAtual - fAnte) / fAnte * 1000) / 10 : null
+    };
+  }
+
+  /* Série diária por dia (para o gráfico do dia com mais lucro) */
+  function serieDias(shopId, inicio, fim) {
+    const mapa = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      const d = a.starts_at.slice(0, 10);
+      if (!mapa[d]) mapa[d] = { data: d, faturamento: 0, agendamentos: 0 };
+      mapa[d].faturamento += Number(a.price_total || 0);
+      mapa[d].agendamentos++;
+    });
+    return Object.keys(mapa).sort().map(d => ({
+      data: d,
+      faturamento: Math.round(mapa[d].faturamento * 100) / 100,
+      agendamentos: mapa[d].agendamentos
+    }));
+  }
+
+  /* Dia com o maior faturamento no período (Salão+) */
+  function melhorDiaDe(shopId, inicio, fim) {
+    const serie = serieDias(shopId, inicio, fim);
+    if (!serie.length) return null;
+    return serie.reduce((a, b) => (b.faturamento > a.faturamento ? b : a));
+  }
+
+  /* Resultado mensal (mês corrente) + delta do mês anterior (Salão+) */
+  function resumoMensal(shopId) {
+    const hoje = DB.hojeISO();
+    const inicio = hoje.slice(0, 7) + '-01';
+    const prev = new Date(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 1, 0);
+    const prevAno = prev.getFullYear();
+    const prevMes = prev.getMonth() + 1;
+    const prevLabel = prevAno + '-' + String(prevMes).padStart(2, '0');
+    const prevIni = prevLabel + '-01';
+    const prevFim = prevLabel + '-' + String(new Date(prevAno, prevMes, 0).getDate()).padStart(2, '0');
+    const fMensal = calcularFaturamentoTotal(shopId, inicio, hoje);
+    const fPrev = calcularFaturamentoTotal(shopId, prevIni, prevFim);
+    return {
+      mes: hoje.slice(0, 7), inicio, fim: hoje,
+      faturamento: Math.round(fMensal * 100) / 100,
+      agendamentos: contarAgendamentos(shopId, inicio, hoje),
+      delta_faturamento_pct: fPrev > 0 ? Math.round((fMensal - fPrev) / fPrev * 1000) / 10 : null,
+      mes_anterior: prevLabel
+    };
+  }
+
+  /* Detalhamento por atendimento: o cliente que fez aquele corte (Salão Pro) */
+  function atendimentosDetalhados(shopId, inicio, fim, limite) {
+    const db = DB._d();
+    return noPeriodo(shopId, inicio, fim)
+      .slice()
+      .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+      .slice(0, limite || 200)
+      .map(a => {
+        const prof = a.professional_id ? db.professionals.find(p => p.id === a.professional_id) : null;
+        const itens = itensDoAgendamento(a.id);
+        return {
+          id: a.id,
+          data: a.starts_at.slice(0, 10),
+          hora: a.starts_at.slice(11, 16),
+          cliente: a.client_name || '—',
+          profissional: prof ? prof.name : '—',
+          servicos: itens.map(i => i.name).join(', ') || '—',
+          valor: Math.round(Number(a.price_total || 0) * 100) / 100
+        };
+      });
+  }
+
+  function servicoMaisRealizado(shopId, inicio, fim) {
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => itensDoAgendamento(a.id).forEach(i => {
+      if (!contagem[i.name]) contagem[i.name] = { nome: i.name, count: 0, receita: 0 };
+      contagem[i.name].count++;
+      contagem[i.name].receita += Number(i.price || 0);
+    }));
+    return Object.values(contagem)
+      .sort((a, b) => b.count - a.count || b.receita - a.receita)[0] || null;
+  }
+
+  function profissionalMaisRentavel(shopId, inicio, fim) {
+    const db = DB._d();
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      if (a.professional_id == null) return;
+      if (!contagem[a.professional_id]) {
+        const p = db.professionals.find(x => x.id === a.professional_id);
+        contagem[a.professional_id] = {
+          id: a.professional_id, nome: p ? p.name : '—', receita: 0, atendimentos: 0
+        };
+      }
+      contagem[a.professional_id].receita += Number(a.price_total || 0);
+      contagem[a.professional_id].atendimentos++;
+    });
+    return Object.values(contagem).sort((a, b) => b.receita - a.receita)[0] || null;
+  }
+
+  function horariosPico(shopId, inicio, fim, limite) {
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      const h = Number(a.starts_at.slice(11, 13));
+      const faixa = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+      contagem[faixa] = (contagem[faixa] || 0) + 1;
+    });
+    return Object.keys(contagem)
+      .map(faixa => ({ faixa, count: contagem[faixa] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limite || 5);
+  }
+
+  /* Job diário (00:00, padrão de todos os planos): gera/refresca o snapshot
+     de faturamento por loja para a data informada + ontem (re-catchup).
+     INTERNO — não é exposto via RPC (apenas window.__CC_INTERNAL). */
+  function gerarDiariosParaData(data) {
+    const db = DB._d();
+    const alvos = [];
+    [data || DB.hojeISO(), DB.addDiasISO(-1)].forEach(d => {
+      if (d && alvos.indexOf(d) < 0) alvos.push(d);
+    });
+    for (const dia of alvos) {
+      const existentes = new Set(
+        db.relatorios_diarios.filter(r => r.data === dia).map(r => r.barbershop_id));
+      for (const loja of db.barbershops) {
+        if (existentes.has(loja.id)) continue;
+        const lista = db.appointments.filter(a =>
+          a.barbershop_id === loja.id && a.status === 'concluido' &&
+          a.starts_at.slice(0, 10) === dia);
+        const faturamento = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
+        const faixas = {};
+        lista.forEach(a => {
+          const h = Number(a.starts_at.slice(11, 13));
+          const f = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+          faixas[f] = (faixas[f] || 0) + 1;
+        });
+        const top = Object.keys(faixas).sort((a, b) => faixas[b] - faixas[a])[0] || null;
+        db.relatorios_diarios.push({
+          id: DB.proximoId(), barbershop_id: loja.id, data: dia,
+          faturamento: Math.round(faturamento * 100) / 100,
+          agendamentos: lista.length,
+          ticket: lista.length ? Math.round(faturamento / lista.length * 100) / 100 : null,
+          faixa_pico: top,
+          created_at: agoraISO()
+        });
+      }
+    }
+    DB.salvar();
+    return db.relatorios_diarios.filter(r => alvos.indexOf(r.data) >= 0).length;
+  }
+
+  /* Janela imediatamente anterior ao período atual (comparação) */
+  function janelaPeriodoAnterior(periodo) {
+    switch (periodo) {
+      case 'today': return { inicio: DB.addDiasISO(-1), fim: DB.addDiasISO(-1) };
+      case 'week': return { inicio: DB.addDiasISO(-13), fim: DB.addDiasISO(-7) };
+      case 'year': return { inicio: DB.addDiasISO(-729), fim: DB.addDiasISO(-365) };
+      case 'month':
+      default: return { inicio: DB.addDiasISO(-59), fim: DB.addDiasISO(-30) };
+    }
+  }
+
+  function comparacaoPeriodos(shopId, periodo) {
+    const atual = janelaPeriodo(periodo);
+    const anterior = janelaPeriodoAnterior(periodo);
+    const fAtual = calcularFaturamentoTotal(shopId, atual.inicio, atual.fim);
+    const fAnter = calcularFaturamentoTotal(shopId, anterior.inicio, anterior.fim);
+    const aAtual = contarAgendamentos(shopId, atual.inicio, atual.fim);
+    const aAnter = contarAgendamentos(shopId, anterior.inicio, anterior.fim);
+    const pct = (atualVal, antVal) =>
+      antVal > 0 ? Math.round((atualVal - antVal) / antVal * 1000) / 10 : null;
+    return {
+      periodo_anterior: anterior,
+      faturamento_anterior: Math.round(fAnter * 100) / 100,
+      agendamentos_anterior: aAnter,
+      delta_faturamento_pct: pct(fAtual, fAnter),
+      delta_agendamentos_pct: pct(aAtual, aAnter)
+    };
+  }
+
+  /* [SEGURANÇA] Endpoint principal: devolve SOMENTE os campos que o
+     nível do plano autoriza (fail-closed no backend).
+     Acumulativo: básico ⊂ intermediário ⊂ completo. */
+  function gerarRelatorio(periodo) {
+    const { shop, nivel } = exigirNivelRelatorio();
+    const { inicio, fim } = janelaPeriodo(periodo || 'month');
+
+    const resultado = {
+      nivel, period: periodo || 'month', start_date: inicio, end_date: fim
+    };
+
+    // --- NÍVEL BÁSICO (Autônomo E Superior) ---
+    const faturamento = calcularFaturamentoTotal(shop.id, inicio, fim);
+    resultado.faturamento = Math.round(faturamento * 100) / 100;
+    resultado.lucro = resultado.faturamento;              // lucro = faturamento (sem custos cadastrados)
+    resultado.totalAgendamentos = contarAgendamentos(shop.id, inicio, fim);
+    resultado.semanal = resumoSemanal(shop.id);           // resultado lucrativo da semana
+
+    // --- NÍVEL INTERMEDIÁRIO (Salão E Superior) ---
+    if (nivel === 'intermediario' || nivel === 'completo') {
+      resultado.ticketMedio = resultado.totalAgendamentos > 0
+        ? Math.round(faturamento / resultado.totalAgendamentos * 100) / 100
+        : 0;
+      resultado.melhorDia = melhorDiaDe(shop.id, inicio, fim);   // dia com mais lucro
+      resultado.melhorDiaSerie = serieDias(shop.id, inicio, fim); // série do gráfico
+      resultado.mensal = resumoMensal(shop.id);                   // resultado mensal
+    }
+
+    // --- NÍVEL COMPLETO (apenas Salão Pro) ---
+    if (nivel === 'completo') {
+      resultado.servicoMaisRealizado = servicoMaisRealizado(shop.id, inicio, fim);
+      resultado.profissionalMaisRentavel = profissionalMaisRentavel(shop.id, inicio, fim);
+      resultado.horariosPico = horariosPico(shop.id, inicio, fim, 5);
+      resultado.comparacaoPeriodos = comparacaoPeriodos(shop.id, periodo || 'month');
+      resultado.atendimentosDetalhados = atendimentosDetalhados(shop.id, inicio, fim, 200);
+      resultado.exportar_csv = true;
+    }
+
+    return resultado;
+  }
+
+  /* Relatório DIÁRIO — padrão de todos os planos pagos. Usa o snapshot
+     gerado às 00:00 (job) e cai para cálculo em tempo real se ainda
+     não existir (ex.: servidor acaba de subir). */
+  function gerarRelatorioDiario(data) {
+    const { shop, nivel } = exigirNivelRelatorio();
+    const dia = data || DB.hojeISO();
+    const reg = DB._d().relatorios_diarios.find(r =>
+      r.barbershop_id === shop.id && r.data === dia);
+    if (reg) {
+      return {
+        data: reg.data,
+        faturamento: Number(reg.faturamento || 0),
+        agendamentos: reg.agendamentos || 0,
+        ticket: reg.ticket != null ? Number(reg.ticket) : 0,
+        faixa_pico: reg.faixa_pico || null,
+        gerado_em: reg.created_at || null, nivel
+      };
+    }
+    const lista = DB._d().appointments.filter(a =>
+      a.barbershop_id === shop.id && a.status === 'concluido' &&
+      a.starts_at.slice(0, 10) === dia);
+    const fat = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
+    const faixas = {};
+    lista.forEach(a => {
+      const h = Number(a.starts_at.slice(11, 13));
+      const f = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+      faixas[f] = (faixas[f] || 0) + 1;
+    });
+    const top = Object.keys(faixas).sort((a, b) => faixas[b] - faixas[a])[0] || null;
+    return {
+      data: dia,
+      faturamento: Math.round(fat * 100) / 100,
+      agendamentos: lista.length,
+      ticket: lista.length ? Math.round(fat / lista.length * 100) / 100 : 0,
+      faixa_pico: top,
+      gerado_em: null, nivel
+    };
+  }
+
   /* ================= BUSCA PÚBLICA (RF-050..054) ================= */
 
   function buscar(params) {
@@ -2371,7 +2725,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       id: plano.id, name: plano.name, price_monthly: plano.price_monthly,
       price_annual: plano.price_annual,
       max_professionals: plano.max_professionals, features: plano.features,
-      permissions: plano.permissions || [], is_free: !!plano.is_free
+      permissions: plano.permissions || [], is_free: !!plano.is_free,
+      nivel_relatorio: plano.nivel_relatorio || null,
+      relatorios_resumo: relatoriosResumoPorNivel(plano.nivel_relatorio || null)
     } : null;
   }
 
@@ -2381,21 +2737,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const plano = db.plans.find(p => p.id === (sub && sub.plan_id));
     let liberado = false;
     try {
-      liberado = typeof window.API.acessoLiberado === 'function'
+      liberado = sub && typeof window.API.acessoLiberado === 'function'
         ? window.API.acessoLiberado(sub.barbershop_id)
         : false;
     } catch (e) { liberado = false; }
-    const efetivo = (liberado && plano) ? plano : planoFree();
+    const efetivo = (liberado && plano) ? plano : (planoFree() || null);
     return {
-      id: sub.id,
+      id: sub ? sub.id : null,
       plan: bonusPlano(plano),
       plano_efetivo: bonusPlano(efetivo),
-      status: sub.status,
-      trial_ends_at: sub.trial_ends_at,
-      current_period_end: sub.current_period_end,
-      trial_usado: !!sub.trial_usado,
-      on_trial: sub.status === 'trial' && sub.trial_ends_at >= hoje,
-      days_left_in_trial: sub.trial_ends_at
+      status: sub ? sub.status : null,
+      trial_ends_at: sub ? sub.trial_ends_at : null,
+      current_period_end: sub ? sub.current_period_end : null,
+      trial_usado: !!(sub && sub.trial_usado),
+      on_trial: !!(sub && sub.status === 'trial' && sub.trial_ends_at >= hoje),
+      days_left_in_trial: (sub && sub.trial_ends_at)
         ? Math.max(0, Math.round((DB.parseISO(sub.trial_ends_at) - DB.parseISO(hoje)) / 86400000))
         : 0
     };
@@ -2403,17 +2759,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function minhaAssinatura() {
     const { shop } = exigirDono();
-    let sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
-    if (!sub) {
-      sub = {
-        id: DB.proximoId(), barbershop_id: shop.id, plan_id: planoFree().id,
-        status: 'ativa', trial_ends_at: null, current_period_end: null,
-        trial_usado: false, created_at: agoraISO(), updated_at: agoraISO()
-      };
-      DB._d().subscriptions.push(sub);
-      DB.salvar();
-    }
-    return assinaturaPublica(sub);
+    /* Sem plano gratuito: loja sem assinatura fica com plano_efetivo
+       nulo até assinar (trial, PIX ou trocarPlano criam a assinatura). */
+    const sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
+    return assinaturaPublica(sub || null);
   }
 
   /**
@@ -3008,6 +3357,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true };
   }
 
+  /* Funções internas fora do roteador RPC (usadas pelo job diário do server.js) */
+  window.__CC_INTERNAL = window.__CC_INTERNAL || {};
+  window.__CC_INTERNAL.gerarDiariosParaData = gerarDiariosParaData;
+
   /* ================= API pública ================= */
 
   return {
@@ -3052,7 +3405,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     listarClientes, getCliente, criarCliente, atualizarCliente, agendamentosDoCliente,
 
     // dashboard
-    dashboardStats, exportarCSV,
+    dashboardStats, exportarCSV, gerarRelatorio, gerarRelatorioDiario,
 
     // busca
     buscar, sugestoes,
