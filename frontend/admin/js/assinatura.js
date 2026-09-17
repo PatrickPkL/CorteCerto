@@ -150,51 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function fecharPagamento() {
     pararTimers();
     cobrancaId = null;
-    ['pg-card-numero', 'pg-card-titular', 'pg-card-validade', 'pg-card-cvv'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    const marca = document.getElementById('pg-card-marca');
-    if (marca) marca.textContent = '';
     fecharModal(modalPg);
     render();
   }
-
-  function metodoSelecionado() {
-    const ativo = modalPg?.querySelector('.plan-metodo-tgl .plan-tgl-btn.active');
-    return ativo ? ativo.dataset.metodo : 'pix';
-  }
-
-  /* troca de método dentro do modal */
-  modalPg?.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      modalPg.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const m = btn.dataset.metodo;
-      const titulo = document.getElementById('pg-titulo');
-      if (titulo) titulo.textContent = m === 'cartao' ? 'Pagar com Cartão' : 'Pagar com PIX';
-      const pixBox = document.getElementById('pg-pix-box');
-      const cartaoBox = document.getElementById('pg-cartao-box');
-      if (pixBox) pixBox.style.display = m === 'pix' ? 'block' : 'none';
-      if (cartaoBox) cartaoBox.style.display = m === 'cartao' ? 'block' : 'none';
-      const st = document.getElementById('pg-status');
-      if (st) { st.textContent = 'Escolha o método e confirme.'; st.style.color = 'var(--text-muted)'; }
-    });
-  });
-
-  /* máscaras do formulário de cartão */
-  const inpNumero = document.getElementById('pg-card-numero');
-  inpNumero?.addEventListener('input', () => {
-    inpNumero.value = (inpNumero.value.replace(/\D/g, '').slice(0, 16).match(/.{1,4}/g) || []).join(' ');
-  });
-  const inpVal = document.getElementById('pg-card-validade');
-  inpVal?.addEventListener('input', () => {
-    let v = inpVal.value.replace(/\D/g, '').slice(0, 4);
-    if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
-    inpVal.value = v;
-  });
-  const inpCvv = document.getElementById('pg-card-cvv');
-  inpCvv?.addEventListener('input', () => { inpCvv.value = inpCvv.value.replace(/\D/g, '').slice(0, 4); });
 
   function statusTexto(c) {
     if (c.status === 'paid') return 'Pagamento confirmado!';
@@ -237,25 +195,9 @@ function fecharPagamento() {
     if (anual && c.installments > 1) rotulo += ' · ' + c.installments + '×';
     if (anual && c.installments === 1) rotulo += ' · à vista';
     const titulo = document.getElementById('pg-titulo');
-    if (titulo) titulo.textContent = c.metodo === 'cartao' ? 'Pagar com Cartão' : 'Pagar com PIX';
+    if (titulo) titulo.textContent = 'Pagar com PIX';
     setText('pg-plano', rotulo);
     setText('pg-valor', DB.fmtBRL(c.amount_cents / 100));
-
-    const pixBox = document.getElementById('pg-pix-box');
-    const cartaoBox = document.getElementById('pg-cartao-box');
-    if (pixBox) pixBox.style.display = c.metodo === 'cartao' ? 'none' : 'block';
-    if (cartaoBox) cartaoBox.style.display = c.metodo === 'cartao' ? 'block' : 'none';
-
-    if (c.metodo === 'cartao') {
-      const marca = document.getElementById('pg-card-marca');
-      if (marca) {
-        marca.textContent = c.card_brand
-          ? 'Cartão ' + c.card_brand + (c.card_last4 ? ' •••• ' + c.card_last4 : '')
-          : '';
-      }
-      document.querySelectorAll('.plan-metodo-tgl .plan-tgl-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.metodo === 'cartao'));
-    }
 
     const qr = document.getElementById('pg-qrcode');
     const semqr = document.getElementById('pg-semqr');
@@ -296,20 +238,9 @@ function fecharPagamento() {
   }
 
   function abrirPagamento(plano, periodo, parcelas) {
-    const metodo = metodoSelecionado();
     let c;
     try {
-      if (metodo === 'cartao') {
-        const cardData = {
-          numero: document.getElementById('pg-card-numero').value.replace(/\s/g, ''),
-          titular: document.getElementById('pg-card-titular').value.trim(),
-          validade: document.getElementById('pg-card-validade').value.trim(),
-          cvv: document.getElementById('pg-card-cvv').value.trim()
-        };
-        c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'cartao', cardData);
-      } else {
-        c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'pix');
-      }
+      c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'pix');
     } catch (e) { showToast(msgErro(e), 'error'); return; }
     mostrarCobranca(c, plano);
   }

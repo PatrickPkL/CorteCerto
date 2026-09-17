@@ -173,12 +173,6 @@
     <div id="modal-pagamento" style="display:none;">
       <div class="card" style="width:480px; max-height:90vh; overflow-y:auto;">
         <h3 class="section-title" id="pg-titulo">Pagar com PIX</h3>
-        <div style="text-align:center; margin-bottom:14px;">
-          <div class="plan-tgl plan-metodo-tgl" role="tablist" aria-label="Método de pagamento">
-            <button type="button" class="plan-tgl-btn active" data-metodo="pix">PIX</button>
-            <button type="button" class="plan-tgl-btn" data-metodo="cartao">Cartão (crédito/débito)</button>
-          </div>
-        </div>
         <div style="text-align:center;">
           <p style="margin:4px 0 0;" class="eyebrow" id="pg-plano">—</p>
           <div class="stat-value mono" id="pg-valor" style="font-size:26px;">—</div>
@@ -193,28 +187,6 @@
                      style="flex:1; font-size:11px; font-family:monospace;">
               <button type="button" class="btn btn-outline" id="pg-copiar">Copiar</button>
             </div>
-          </div>
-
-          <div id="pg-cartao-box" style="display:none; text-align:left; max-width:400px; margin:0 auto;">
-            <div class="field">
-              <label for="pg-card-numero">Número do cartão</label>
-              <input type="text" id="pg-card-numero" inputmode="numeric" placeholder="0000 0000 0000 0000" required>
-            </div>
-            <div class="field">
-              <label for="pg-card-titular">Nome impresso</label>
-              <input type="text" id="pg-card-titular" placeholder="Como está no cartão" required>
-            </div>
-            <div style="display:flex; gap:10px;">
-              <div class="field" style="flex:1;">
-                <label for="pg-card-validade">Validade</label>
-                <input type="text" id="pg-card-validade" placeholder="MM/AA" required>
-              </div>
-              <div class="field" style="flex:1;">
-                <label for="pg-card-cvv">CVV</label>
-                <input type="text" id="pg-card-cvv" inputmode="numeric" placeholder="•••" required>
-              </div>
-            </div>
-            <p id="pg-card-marca" style="font-size:12px; color:var(--text-muted); margin:4px 0 6px;"></p>
           </div>
 
           <p id="pg-status" style="margin:12px 0 0; font-size:14px; color:var(--text-muted);">
