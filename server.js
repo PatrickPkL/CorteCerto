@@ -844,6 +844,20 @@ function bancoRemoto() {
      Sem isso, tabelas novas (ex.: reports) faltam e o boot morre em
      "relation ... does not exist". Mantém o deploy em dia sem passo manual. */
   if (process.env.MIGRATION_DATABASE_URL && process.env.AUTO_MIGRATE !== '0') {
+    /* Guard: o deploy é remoto mas MIGRATION_DATABASE_URL aponta para o host
+       local (127.0.0.1/localhost) — erro clássico de copiar o .env.example.
+       Em vez de um ECONNREFUSED sem contexto, orientamos sobre como corrigir. */
+    if (bancoRemoto()) {
+      let migHost = null;
+      try { migHost = new URL(process.env.MIGRATION_DATABASE_URL).hostname; } catch (e) { /* não é uma URL */ }
+      if (migHost === '127.0.0.1' || migHost === 'localhost' || migHost === '::1') {
+        console.error('[migrate] MIGRATION_DATABASE_URL aponta para "' + migHost +
+          ':5432", mas o banco do app é remoto (Render/Neon).');
+        console.error('[migrate] Configure MIGRATION_DATABASE_URL com a "Internal Database URL" do Postgres');
+        console.error('[migrate] no painel do Render (mesmo host e usuário dono do DATABASE_URL de produção).');
+        process.exit(1);
+      }
+    }
     try {
       const knexFactory = require('knex');
       const cfg = require('./knexfile').production;
