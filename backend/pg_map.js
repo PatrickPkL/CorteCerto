@@ -73,6 +73,8 @@ const MAP = [
       phone: u.phone ? crypt.criptografar(u.phone) : null,
       phone_hash: u.phone ? crypt.hashSHA256(u.phone) : null,
       verified: tagBool(u.verified),
+      password_hash: u.password_hash || null,
+      barbershop_id: u.barbershop_id || null,
       prefs: knexJson(u.prefs || { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }),
       consentimentos: knexJsonArr(u.consentimentos || []),
       created_at: toPgDate(u.created_at), updated_at: toPgDate(u.updated_at) || new Date()
@@ -81,6 +83,8 @@ const MAP = [
       id: r.id, role: r.role, name: r.name,
       email: crypt.descriptografar(r.email), phone: crypt.descriptografar(r.phone),
       verified: r.verified ? 1 : 0,
+      password_hash: r.password_hash || null,
+      barbershop_id: r.barbershop_id || null,
       prefs: r.prefs || null,
       consentimentos: (r.consentimentos && r.consentimentos.length) ? r.consentimentos : [],
       created_at: toMemDate(r.created_at, 'local')
@@ -117,6 +121,7 @@ const MAP = [
       tags: knexArr(b.tags || []),
       rating_base: (b.ratingBase || 0), rating_count_base: (b.ratingCountBase || 0),
       slot_interval_min: (b.slotIntervalMin || 15),
+      codigo_unico: b.codigo_unico || null,
       created_at: toPgDate(b.created_at) || new Date(), updated_at: toPgDate(b.updated_at) || new Date()
     }),
     toMem: (r) => ({
@@ -127,6 +132,7 @@ const MAP = [
       logo_url: r.logo_url, cover_url: r.cover_url, tags: r.tags || [],
       ratingBase: Number(r.rating_base || 0), ratingCountBase: Number(r.rating_count_base || 0),
       slotIntervalMin: Number(r.slot_interval_min || 15),
+      codigo_unico: r.codigo_unico || null,
       created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
     })
   },
@@ -210,14 +216,14 @@ const MAP = [
     colecao: 'plans', tabela: 'plans', pk: 'id', dateOut: 'iso',
     toPg: (p) => ({
       id: p.id, name: p.name, price_monthly: p.price_monthly, price_annual: p.price_annual || 0, price_per_employee: p.price_per_employee || 0,
-      max_professionals: p.max_professionals, features: knexArr(p.features || []),
+      max_professionals: p.max_professionals, max_dependents: p.max_dependents, features: knexArr(p.features || []),
       permissions: knexArr(p.permissions || []), is_free: !!p.is_free, active: tagBool(p.active),
       nivel_relatorio: p.nivel_relatorio || null,
       created_at: toPgDate(p.created_at) || new Date()
     }),
     toMem: (r) => ({
       id: r.id, name: r.name, price_monthly: Number(r.price_monthly), price_annual: Number(r.price_annual || 0), price_per_employee: Number(r.price_per_employee || 0),
-      max_professionals: r.max_professionals, features: r.features || [], permissions: r.permissions || [],
+      max_professionals: r.max_professionals, max_dependents: r.max_dependents, features: r.features || [], permissions: r.permissions || [],
       is_free: !!r.is_free, active: r.active ? 1 : 0, nivel_relatorio: r.nivel_relatorio || null,
       created_at: toMemDate(r.created_at, 'iso')
     })
@@ -439,7 +445,7 @@ function knexArr(arr) { return arr || []; }
 /* Tipos SQL por coluna para casts explícitos no upsert.
    Colunas não listadas são tratadas como texto/valor simples. */
 const CASTS = {
-  users: { role: 'usr_role', prefs: 'jsonb', consentimentos: 'jsonb[]', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  users: { role: 'usr_role', prefs: 'jsonb', consentimentos: 'jsonb[]', barbershop_id: 'uuid', created_at: 'timestamptz', updated_at: 'timestamptz' },
   sessions: { user_id: 'uuid', expires_at: 'timestamptz', created_at: 'timestamptz' },
   sms_codes: { expires_at: 'timestamptz', next_allowed_at: 'timestamptz', created_at: 'timestamptz', payload: 'jsonb' },
   barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', slot_interval_min: 'int', created_at: 'timestamptz', updated_at: 'timestamptz' },
@@ -449,7 +455,7 @@ const CASTS = {
   working_hours: { barbershop_id: 'uuid', professional_id: 'uuid', day_of_week: 'int', start_time: 'time', end_time: 'time', lunch_start: 'time', lunch_end: 'time', is_open: 'boolean' },
   schedule_exceptions: { barbershop_id: 'uuid', professional_id: 'uuid', type: 'exc_tipo', starts_at: 'timestamptz', ends_at: 'timestamptz' },
   clients: { barbershop_id: 'uuid', user_id: 'uuid', total_spent: 'numeric', last_visit_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
-  plans: { max_professionals: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_annual: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
+  plans: { max_professionals: 'int', max_dependents: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_annual: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
   subscriptions: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'sub_status', trial_ends_at: 'timestamptz', current_period_end: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
   appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', lembrete_email_em: 'timestamptz', lembrete_dia_email_em: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },

@@ -146,6 +146,18 @@
   API.gerarLembretesAmanha = function () { return rpc('gerarLembretesAmanha', []); };
   API.lojasProximas = function (dados) { return rpc('lojasProximas', [dados]); };
 
+  /* Login do funcionário/dependente: além do RPC, grava a sessão
+     local (token/user/barbershop) igual ao verifyCode. */
+  API.loginDependente = function (dados) {
+    const r = rpc('loginDependente', [dados]);
+    if (r && r.token) {
+      localStorage.setItem(KEY_TOKEN, r.token);
+      localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
+      localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
+    }
+    return r;
+  };
+
   /* ---------------- Auth (espelho do backend) ---------------- */
 
   function limpar() {
@@ -185,7 +197,7 @@
     },
 
     salaoDoUsuario(user) {
-      if (!user || (user.role !== 'dono' && user.role !== 'barbeiro')) return null;
+      if (!user || (user.role !== 'dono' && user.role !== 'barbeiro' && user.role !== 'dependente')) return null;
       try { return JSON.parse(localStorage.getItem(KEY_LOJA)) || null; }
       catch (e) { return null; }
     },

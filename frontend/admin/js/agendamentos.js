@@ -5,7 +5,7 @@
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const usuario = exigirLogin(['dono', 'barbeiro']);
+  const usuario = exigirLogin(['dono', 'barbeiro', 'dependente']);
   if (!usuario) return;
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {

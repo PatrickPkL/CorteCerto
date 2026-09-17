@@ -83,6 +83,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   })();
 
+  /* ---------- código único da empresa (acesso dos funcionários) ---------- */
+  (function montarCodigoUnico() {
+    const input = document.getElementById('codigo-unico');
+    if (!input) return;
+
+    let dados = null;
+    try { dados = API.meuCodigoEmpresa(); }
+    catch (e) { showToast(msgErro(e), 'error'); return; }
+
+    input.value = dados.codigo_unico || '';
+
+    const cota = document.getElementById('codigo-unico-cota');
+    if (cota) {
+      cota.textContent = dados.max_dependents == null
+        ? (dados.dependentes_ativos + ' funcionário(s) · ilimitado no plano ' + dados.plano)
+        : (dados.dependentes_ativos + ' de ' + dados.max_dependents + ' funcionário(s) no plano ' + dados.plano);
+    }
+
+    const acao = (fn) => {
+      try { fn(); } catch (e) { showToast(msgErro(e), 'error'); }
+    };
+    const copiar = (ok) => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(ok).catch(() => {
+          input.select(); document.execCommand('copy'); ok();
+        });
+      } else {
+        input.select(); document.execCommand('copy'); ok();
+      }
+    };
+
+    document.getElementById('btn-copiar-codigo')?.addEventListener('click', () => {
+      acao(() => copiar(() => showToast('Código único copiado!')));
+    });
+
+    document.getElementById('btn-compartilhar-codigo')?.addEventListener('click', () => {
+      const texto = 'Meu Código Único na Corte Certo: ' + dados.codigo_unico +
+        ' — use com seu Login e Senha para acessar agenda e clientes.';
+      if (navigator.share) {
+        navigator.share({ text: texto }).catch(() => { /* cancelado */ });
+        return;
+      }
+      acao(() => copiar(() => {
+        showToast('Código copiado para compartilhar!');
+      }));
+    });
+  })();
+
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
   function setDelta(id, texto, cls) {
     const el = document.getElementById(id);

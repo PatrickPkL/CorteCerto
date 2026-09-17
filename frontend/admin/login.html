@@ -29,6 +29,7 @@
       <div class="role-selector">
         <button type="button" class="role-btn active" data-role="cliente">Cliente</button>
         <button type="button" class="role-btn" data-role="dono">Salão / Barbearia</button>
+        <button type="button" class="role-btn" data-role="dependente">Funcionário / Dependente</button>
       </div>
 
       <div class="demo-hint" id="demo-hint-login">
@@ -116,6 +117,32 @@
             e os <a href="../public/termos.html" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
           </label>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta do salão</button>
+        </form>
+      </div>
+
+      <!-- FUNCIONÁRIO / DEPENDENTE -->
+      <div id="painel-depend" style="display:none;">
+        <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
+          Entre com as credenciais criadas pelo dono da empresa. Você precisará
+          do <strong>Código Único</strong> da empresa para acessar agenda e clientes.</p>
+        <form id="form-dep-login">
+          <div class="field">
+            <label for="dep-login">Login (e-mail)</label>
+            <input type="email" id="dep-login" placeholder="funcionario@empresa.com.br" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="dep-senha">Senha</label>
+            <input type="password" id="dep-senha" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label for="dep-codigo">Código Único da empresa</label>
+            <input type="text" id="dep-codigo" placeholder="Ex: 7KXQ9M2A" required
+                   style="text-transform:uppercase; font-family:monospace; letter-spacing:2px;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar</button>
+          <p style="text-align:center; margin-top:12px; font-size:13.5px;">
+            Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
+          </p>
         </form>
       </div>
 

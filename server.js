@@ -126,6 +126,7 @@ const _authRequired = new Set([
   'minhaLoja', 'atualizarLoja', 'excluirLoja',
   'criarServico', 'atualizarServico', 'excluirServico',
   'criarProfissional', 'atualizarProfissional', 'desativarProfissional',
+  'meuCodigoEmpresa', 'listarDependentes', 'criarDependente', 'excluirDependente',
   'salvarHorariosLoja', 'atualizarLinhaHorario',
   'listarExcecoes', 'criarExcecao', 'excluirExcecao',
   'minhaAssinatura', 'trocarPlano', 'cancelarAssinatura',
@@ -166,7 +167,7 @@ const _RPC_BLOQUEADOS = new Set([
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
-  'recuperarAcesso', 'logout'
+  'recuperarAcesso', 'logout', 'loginDependente'
 ]);
 const _RPC_API = new Set();
 Object.keys(API).forEach(nome => {
@@ -271,7 +272,7 @@ function handleRpc(req, res) {
     const argList = Array.isArray(args) ? args.map(a => sanitizarParams(a, 0)) : [];
 
     // [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além do IP
-    const ident = (args && args[0] && (args[0].email || args[0].ident || args[0].cpf)) || null;
+    const ident = (args && args[0] && (args[0].email || args[0].ident || args[0].cpf || args[0].login)) || null;
     if (ident) {
       const identKey = 'ident:' + String(ident).toLowerCase().trim();
       const recIdent = _failedAuthByIdent.get(identKey);

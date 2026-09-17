@@ -65,16 +65,25 @@ window.API = (function () {
     const user = sessao();
     const shop = Auth.salaoDoUsuario(user);
     if (!shop) err(404, 'Nenhum salão vinculado a esta conta.');
-    if (user.role !== 'dono') err(403, 'Acesso restrito ao dono do salão.');
+    if (user.role !== 'dono') {
+      /* Dependente/Funcionário: bloqueio explícito de relatórios
+         financeiros/gerenciais e de toda ação exclusiva do dono. */
+      if (user.role === 'dependente') {
+        err(403, 'Acesso restrito: a conta Dependente não pode acessar relatórios financeiros/gerenciais nem essa área do dono.');
+      }
+      err(403, 'Acesso restrito ao dono do salão.');
+    }
     return { user, shop };
   }
 
-  /* Equipe = dono OU barbeiro ajudante vinculado à loja (RBAC) */
+  /* Equipe = dono, barbeiro ajudante OU dependente (funcionário) da
+     loja. Libera agenda e clientes; relatórios financeiros/gerenciais
+     continuam exclusivos do dono (exigirDono). */
   function exigirEquipe() {
     const user = sessao();
     const shop = Auth.salaoDoUsuario(user);
     if (!shop) err(404, 'Nenhum salão vinculado a esta conta.');
-    if (user.role !== 'dono' && user.role !== 'barbeiro') {
+    if (user.role !== 'dono' && user.role !== 'barbeiro' && user.role !== 'dependente') {
       err(403, 'Acesso restrito à equipe do salão.');
     }
     return { user, shop };
@@ -1051,6 +1060,223 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     });
   }
 
+  /* ============================================================
+     Dependente / Funcionário (3º papel)
+     ============================================================ */
+
+  /* Garante que a loja sempre tenha um Código Único (backfill para
+     lojas antigas que nunca tiveram um gerado). */
+  function codigoUnicoDaLoja(shop) {
+    if (!shop.codigo_unico) {
+      shop.codigo_unico = Auth.gerarCodigoUnico();
+      DB.salvar();
+    }
+    return shop.codigo_unico;
+  }
+
+  function dependentesDaLoja(shopId) {
+    return DB._d().users.filter(u => u.role === 'dependente' && u.barbershop_id === shopId);
+  }
+
+  /* Plano efetivo + cota de dependentes da loja. */
+  function cotaDependentes(shopId) {
+    const db = DB._d();
+    const sub = db.subscriptions.find(s => s.barbershop_id === shopId);
+    const plano = sub && db.plans.find(p => p.id === sub.plan_id);
+    const ativos = dependentesDaLoja(shopId);
+    let limite;
+    if (!plano) {
+      limite = 0;
+    } else if (plano.max_dependents == null) {
+      limite = Infinity; // ilimitado (Salao Pro)
+    } else {
+      limite = plano.max_dependents;
+    }
+    return { plano, ativos, limite, nomePlano: plano ? plano.name : 'sem plano' };
+  }
+
+  /* Cota do plano no painel do dono (ex.: "1 de 5 usados") */
+  function meuCodigoEmpresa() {
+    const { shop } = exigirDono();
+    const { plano, ativos, limite, nomePlano } = cotaDependentes(shop.id);
+    return {
+      codigo_unico: codigoUnicoDaLoja(shop),
+      empresa: shop.name,
+      plano: nomePlano,
+      max_dependents: limite === Infinity ? null : limite,
+      dependentes_ativos: ativos.length,
+      dependentes: ativos.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: String(u.email || ''),
+        created_at: u.created_at || null
+      }))
+    };
+  }
+
+  function listarDependentes() {
+    return meuCodigoEmpresa();
+  }
+
+  /* RF: o dono cria as credenciais (Login/Senha) do funcionário.
+     A cota é definida pelo plano: Básico/Autonomo = 1; Salao = 5;
+     Salao Pro = ilimitado. */
+  function criarDependente(dados) {
+    const { shop, user } = exigirDono();
+    const db = DB._d();
+
+    const nome = String((dados && dados.name) || '').trim();
+    if (nome.length < 2) err(400, 'Informe o nome do funcionário.');
+
+    const login = String((dados && (dados.login || dados.email)) || '').trim().toLowerCase();
+    if (!login || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)) {
+      err(400, 'Informe um e-mail válido para ser o login do funcionário.');
+    }
+
+    const senha = String((dados && dados.senha) || '');
+    if (senha.length < 6) err(400, 'A senha precisa ter ao menos 6 caracteres.');
+
+    /* identidade não pode pertencer a outro papel importante */
+    const existente = db.users.find(u => String(u.email || '').toLowerCase() === login);
+    if (existente) {
+      if (existente.role === 'dono' || existente.role === 'barbeiro') {
+        err(409, 'Este e-mail já pertence a outra conta (dono/barbeiro).');
+      }
+      if (existente.role === 'dependente') {
+        err(409, 'Já existe um funcionário com este login nesta conta.');
+      }
+    }
+
+    /* cota do plano — erro exato exigido pelo RF */
+    const { plano, ativos, limite, nomePlano } = cotaDependentes(shop.id);
+    if (limite === 0) {
+      err(402, 'Sua assinatura está inativa. Assine um plano para cadastrar funcionários.');
+    }
+    if (ativos.length >= limite) {
+      err(409, 'Já está no número de dependentes desta conta');
+    }
+
+    const agora = DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos());
+    let conta;
+    if (existente) {
+      /* cliente existente vira dependente desta loja */
+      conta = existente;
+      conta.role = 'dependente';
+      conta.barbershop_id = shop.id;
+      conta.name = nome;
+      conta.password_hash = Auth.hashSenha(senha);
+      conta.email = login;
+      conta.verified = 1;
+    } else {
+      conta = {
+        id: DB.proximoId(),
+        role: 'dependente',
+        name: nome,
+        email: login,
+        phone: String((dados && dados.phone) || '').replace(/\D/g, ''),
+        verified: 1,
+        password_hash: Auth.hashSenha(senha),
+        barbershop_id: shop.id,
+        created_at: agora,
+        prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
+      };
+      db.users.push(conta);
+    }
+
+    _auditLog(user.id, 'criar_dependente', { dependente_id: conta.id });
+    DB.salvar();
+    return {
+      id: conta.id, name: conta.name, email: conta.email,
+      barbershop_id: conta.barbershop_id, created_at: conta.created_at,
+      plano: nomePlano, usados: ativos.length + 1,
+      limite: limite === Infinity ? null : limite
+    };
+  }
+
+  /* Espelha no estado em memória as ações ON DELETE das FKs para users
+     (SET NULL / CASCADE). Sem isso, linhas antigas com user_id apagado
+     fariam o syncAll falhar na FK (ex.: audit_log_user_id_fkey). */
+  function _limparReferenciasUsuario(db, userId) {
+    (db.audit_log || []).forEach(l => { if (l.user_id === userId) l.user_id = null; });
+    (db.appointments || []).forEach(a => { if (a.user_id === userId) a.user_id = null; });
+    (db.clients || []).forEach(c => { if (c.user_id === userId) c.user_id = null; });
+    (db.reviews || []).forEach(r => { if (r.user_id === userId) r.user_id = null; });
+    (db.professionals || []).forEach(p => { if (p.user_id === userId) p.user_id = null; });
+    (db.tickets || []).forEach(t => { if (t.user_id === userId) t.user_id = null; });
+    (db.reports || []).forEach(r => {
+      if (r.reporter_user_id === userId) r.reporter_user_id = null;
+      if (r.target_user_id === userId) r.target_user_id = null;
+    });
+    db.sessions = (db.sessions || []).filter(s => s.user_id !== userId);
+    db.notifications = (db.notifications || []).filter(n => n.user_id !== userId);
+    db.magic_tokens = (db.magic_tokens || []).filter(t => t.user_id !== userId);
+    db.favorites = (db.favorites || []).filter(f => f.user_id !== userId);
+  }
+
+  function excluirDependente(id) {
+    const { shop, user } = exigirDono();
+    const db = DB._d();
+    const alvo = db.users.find(u => u.id == id && u.role === 'dependente' && u.barbershop_id === shop.id);
+    if (!alvo) err(404, 'Funcionário não encontrado nesta empresa.');
+    _limparReferenciasUsuario(db, alvo.id);
+    db.users = db.users.filter(u => u.id !== alvo.id);
+    _auditLog(user.id, 'excluir_dependente', { dependente_id: alvo.id });
+    DB.salvar();
+    return { ok: true, id: alvo.id };
+  }
+
+  /* login público do funcionário — exige o Código Único da empresa */
+  const _loginDepFalhas = new Map();
+  const LOGIN_DEP_MAX = 5;
+  const LOGIN_DEP_BLOQUEIO_MS = 15 * 60 * 1000;
+
+  function loginDependente(dados) {
+    const db = DB._d();
+    const login = String((dados && (dados.login || dados.email)) || '').trim().toLowerCase();
+    const senha = String((dados && dados.senha) || '');
+    const codigo = String((dados && dados.codigo_unico) || '').trim().toUpperCase();
+
+    if (!login || !senha || !codigo) {
+      err(400, 'Informe login, senha e o código único da empresa.');
+    }
+
+    const chave = codigo + '|' + login;
+    const falha = _loginDepFalhas.get(chave);
+    if (falha && Date.now() < falha.bloqueioAte) {
+      const min = Math.ceil((falha.bloqueioAte - Date.now()) / 60000);
+      err(429, 'Muitas tentativas. Aguarde ' + min + ' min para tentar novamente.');
+    }
+
+    /* anti-enumeração: mensagens idênticas para qualquer combinação errada */
+    const negar = () => {
+      const rec = _loginDepFalhas.get(chave) || { conta: 0, bloqueioAte: 0 };
+      rec.conta++;
+      if (rec.conta >= LOGIN_DEP_MAX) rec.bloqueioAte = Date.now() + LOGIN_DEP_BLOQUEIO_MS;
+      _loginDepFalhas.set(chave, rec);
+      err(401, 'Login, senha ou código único incorretos.');
+    };
+
+    const loja = db.barbershops.find(b =>
+      b.codigo_unico && b.codigo_unico.toUpperCase() === codigo);
+    if (!loja) return negar();
+
+    const usuario = db.users.find(u =>
+      u.role === 'dependente' &&
+      u.barbershop_id === loja.id &&
+      String(u.email || '').toLowerCase() === login);
+    if (!usuario) return negar();
+    if (!Auth.verificarSenha(senha, usuario.password_hash)) return negar();
+
+    _loginDepFalhas.delete(chave);
+    Auth.criarSessao(usuario.id);
+    _auditLog(usuario.id, 'login_sucesso');
+    return {
+      token: localStorage.getItem('token'),
+      user: Auth.publicUser(usuario),
+      barbershop: Auth.salaoDoUsuario(usuario)
+    };
+  }
+
   function atualizarProfissional(id, patch) {
     const { shop } = exigirDono();
     exigirFuncionalidade(shop.id, 'profissionais', 'Editar profissionais');
@@ -1536,7 +1762,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
     let shopId = payload.barbershop_id;
     let origin = payload.origin || 'online';
-    if (!shopId && (user.role === 'dono' || user.role === 'barbeiro')) {
+    if (!shopId && (user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente')) {
       const loja = Auth.salaoDoUsuario(user);
       if (loja) { shopId = loja.id; origin = origin === 'online' ? 'admin' : origin; }
     }
@@ -1545,7 +1771,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!shop) err(404, 'Salão não encontrado.');
 
     /* staff só cria na própria loja — nunca numa alheia */
-    if (user.role === 'dono' || user.role === 'barbeiro') {
+    if (user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente') {
       const minha = Auth.salaoDoUsuario(user);
       if (!minha || minha.id != shop.id) {
         err(403, 'Você só pode agendar pela sua própria loja.');
@@ -1794,7 +2020,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const lojaAg = db.barbershops.find(b => b.id === ag.barbershop_id);
     const ehEquipe = !!lojaAg && (
       lojaAg.owner_user_id === user.id ||
-      (user.role === 'barbeiro' && (Auth.salaoDoUsuario(user) || {}).id === lojaAg.id)
+      ((user.role === 'barbeiro' || user.role === 'dependente') &&
+        (Auth.salaoDoUsuario(user) || {}).id === lojaAg.id)
     );
     const ehCliente = ag.user_id === user.id;
     if (!ehEquipe && !ehCliente) err(403, 'Você não tem permissão sobre este agendamento.');
@@ -2670,7 +2897,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   const TIPOS_ALVO = ['salao', 'barbeiro', 'cliente'];
 
   function isMembroEquipe(user) {
-    return user && (user.role === 'dono' || user.role === 'barbeiro');
+    return user && (user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente');
   }
 
   /* Denúncia de perfil — regras por papel:
@@ -3546,6 +3773,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     profissionaisDaLoja, criarProfissional, atualizarProfissional,
     desativarProfissional, precoEfetivo,
 
+    // dependentes / funcionários
+    meuCodigoEmpresa, listarDependentes, criarDependente, excluirDependente,
+    loginDependente,
+
     // horários
     horariosDaLoja, salvarHorariosLoja, atualizarLinhaHorario,
     listarExcecoes, criarExcecao, excluirExcecao,
@@ -3563,7 +3794,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       const lojaAg = DB._d().barbershops.find(b => b.id === a.barbershop_id);
       const ehEquipe = !!lojaAg && (
         lojaAg.owner_user_id === user.id ||
-        (user.role === 'barbeiro' && (Auth.salaoDoUsuario(user) || {}).id === lojaAg.id)
+        ((user.role === 'barbeiro' || user.role === 'dependente') &&
+          (Auth.salaoDoUsuario(user) || {}).id === lojaAg.id)
       );
       const ehCliente = a.user_id === user.id;
       if (!ehEquipe && !ehCliente) err(403, 'Você não tem permissão sobre este agendamento.');

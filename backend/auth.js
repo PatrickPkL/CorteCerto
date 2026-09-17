@@ -69,6 +69,52 @@ window.Auth = (function () {
     throw { status: 500, error: 'Não foi possível gerar um identificador único para o salão.' };
   }
 
+  /* Código Único da empresa (alfanumérico, sem 0/O/1/I), usado no
+     acesso das contas Dependente/Funcionário (Login + Senha + Código). */
+  const ALCARISO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  function gerarCodigoUnico() {
+    const db = DB._d();
+    for (let i = 0; i < 30; i++) {
+      let c = '';
+      for (let j = 0; j < 8; j++) {
+        c += ALCARISO.charAt(Math.floor(Math.random() * ALCARISO.length));
+      }
+      if (!db.barbershops.some(b => b.codigo_unico === c)) return c;
+    }
+    throw { status: 500, error: 'Não foi possível gerar um código único para a empresa.' };
+  }
+
+  /* ---------------- senha dos funcionários (scrypt) ---------------- */
+  // Formato armazenado: scrypt:$N:$r:$p:$saltB64:$hashB64 — nunca em claro.
+
+  const SENHA_N = 16384, SENHA_R = 8, SENHA_P = 1, SENHA_KEYLEN = 64;
+
+  /* backend/auth.js roda apenas no Node (o browser usa o espelho em
+     frontend/shared/js/api.js), então o módulo nativo está disponível. */
+  const _crypto = require('crypto');
+
+  function hashSenha(senha) {
+    const salt = _crypto.randomBytes(16);
+    const hash = _crypto.scryptSync(String(senha), salt, SENHA_KEYLEN, { N: SENHA_N, r: SENHA_R, p: SENHA_P });
+    return 'scrypt:' + SENHA_N + ':' + SENHA_R + ':' + SENHA_P + ':' +
+      salt.toString('base64') + ':' + hash.toString('base64');
+  }
+
+  function verificarSenha(senha, hashArmazenado) {
+    if (!hashArmazenado || typeof hashArmazenado !== 'string') return false;
+    const partes = String(hashArmazenado).split(':');
+    if (partes[0] !== 'scrypt' || partes.length !== 6) return false;
+    const N = parseInt(partes[1], 10), r = parseInt(partes[2], 10), p = parseInt(partes[3], 10);
+    const salt = Buffer.from(partes[4], 'base64');
+    const esperado = Buffer.from(partes[5], 'base64');
+    let calculado;
+    try {
+      calculado = _crypto.scryptSync(String(senha), salt, esperado.length, { N, r, p, maxmem: 64 * 1024 * 1024 });
+    } catch (e) { return false; }
+    return calculado.length === esperado.length && _crypto.timingSafeEqual(calculado, esperado);
+  }
+
   /* ---------------- sessão ---------------- */
 
   function usuarioAtual() {
@@ -100,6 +146,11 @@ window.Auth = (function () {
       const prof = db.professionals.find(p => p.user_id === user.id);
       if (!prof) return null;
       return db.barbershops.find(b => b.id === prof.barbershop_id) || null;
+    }
+    /* Dependente/Funcionário: vínculo direto users.barbershop_id
+       (acessa DADOS e AGENDA da empresa pelo Código Único). */
+    if (user.role === 'dependente' && user.barbershop_id) {
+      return db.barbershops.find(b => b.id === user.barbershop_id) || null;
     }
     return null;
   }
@@ -485,6 +536,7 @@ window.Auth = (function () {
       name: nomeSalao,
       description: '',
       slug,
+      codigo_unico: gerarCodigoUnico(),
       phone: (() => {
         const d = String(usuario.phone || '').replace(/\D/g, '');
         return d ? '(' + String(d).slice(0, 2) + ') ' + String(d).slice(2) : '';
@@ -570,6 +622,9 @@ window.Auth = (function () {
     logout,
     logoutTodos,
     limparSessao,
-    criarSessao
+    criarSessao,
+    gerarCodigoUnico,
+    hashSenha,
+    verificarSenha
   };
 })();

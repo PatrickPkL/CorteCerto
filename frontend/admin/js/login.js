@@ -11,11 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const roleBtns = document.querySelectorAll('.role-btn');
   const painelCliente = document.getElementById('painel-cliente');
   const painelDono = document.getElementById('painel-dono');
+  const painelDepend = document.getElementById('painel-depend');
 
   function mostrarPapel(papel) {
     roleBtns.forEach(b => b.classList.toggle('active', b.dataset.role === papel));
     if (painelCliente) painelCliente.style.display = papel === 'cliente' ? '' : 'none';
     if (painelDono) painelDono.style.display = papel === 'dono' ? '' : 'none';
+    if (painelDepend) painelDepend.style.display = papel === 'dependente' ? '' : 'none';
     voltarAoInicio();
   }
 
@@ -59,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function mostrarEtapaCodigo(res) {
-    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
+    document.querySelectorAll('#painel-cliente form, #painel-dono form, #painel-depend form').forEach(f => {
       f.style.display = 'none';
     });
     if (bannerCodigo) {
@@ -79,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function abrirRecuperar() {
     if (painelCliente) painelCliente.style.display = 'none';
     if (painelDono) painelDono.style.display = 'none';
+    if (painelDepend) painelDepend.style.display = 'none';
     const pr = document.getElementById('painel-recuperar');
     if (pr) pr.style.display = '';
     voltarAoInicio();
@@ -148,6 +151,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* login do FUNCIONÁRIO/DEPENDENTE — Login + Senha + Código Único */
+  document.getElementById('form-dep-login')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    try {
+      const r = API.loginDependente({
+        login: document.getElementById('dep-login').value,
+        senha: document.getElementById('dep-senha').value,
+        codigo_unico: document.getElementById('dep-codigo').value
+      });
+      sessionStorage.removeItem('cc_flash');
+      showToast('Bem-vindo, ' + (r.user.name ? r.user.name.split(' ')[0] : 'funcionário') + '!');
+      setTimeout(() => { window.location.href = destinoPosLogin(r.user); }, 700);
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
+      const s = document.getElementById('dep-senha');
+      if (s) { s.value = ''; s.focus(); }
+    }
+  });
+
   /* verificar */
   document.getElementById('form-verificar-codigo')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -190,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function mostrarRecuperar() {
     voltarAoInicio();
-    document.querySelectorAll('#painel-cliente form, #painel-dono form').forEach(f => {
+    document.querySelectorAll('#painel-cliente form, #painel-dono form, #painel-depend form').forEach(f => {
       f.style.display = 'none';
     });
     if (etapaRecuperar) etapaRecuperar.style.display = '';

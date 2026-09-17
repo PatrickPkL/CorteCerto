@@ -241,6 +241,14 @@ function exigirLogin(role) {
     window.location.replace('agendamentos.html');
     return null;
   }
+  if (u && u.role === 'dependente' && !papeis.includes('dependente')) {
+    sessionStorage.setItem('cc_flash', JSON.stringify({
+      texto: 'Acesso restrito: a conta Dependente permite apenas Agendamentos e Clientes (relatórios são bloqueados).',
+      tipo: 'error'
+    }));
+    window.location.replace('agendamentos.html');
+    return null;
+  }
 
   if (!u || !papeis.includes(u.role)) {
     const aqui = window.location.pathname.split('/').pop();
@@ -276,6 +284,12 @@ function destinoPosLogin(usuario) {
 
   /* barbeiro ajudante (RBAC): apenas Agendamentos e Clientes */
   if (usuario.role === 'barbeiro') {
+    if (next && ['agendamentos.html', 'clientes.html'].includes(next)) return next;
+    return 'agendamentos.html';
+  }
+
+  /* dependente/funcionário (RBAC): agenda + clientes; relatórios bloqueados */
+  if (usuario.role === 'dependente') {
     if (next && ['agendamentos.html', 'clientes.html'].includes(next)) return next;
     return 'agendamentos.html';
   }
@@ -460,7 +474,7 @@ function aplicarGatesDeFuncionalidade() {
 
 function montarShellAdmin() {
   const u = Auth.usuarioAtual();
-  if (!u || (u.role !== 'dono' && u.role !== 'barbeiro')) return;
+  if (!u || (u.role !== 'dono' && u.role !== 'barbeiro' && u.role !== 'dependente')) return;
   const loja = Auth.salaoDoUsuario(u);
 
   const avatar = document.getElementById('sb-avatar');
@@ -470,6 +484,10 @@ function montarShellAdmin() {
     if (avatar) avatar.textContent = DB.iniciais(u.name);
     if (nomeEl) nomeEl.textContent = u.name;
     if (planoEl) planoEl.textContent = 'Perfil: barbeiro';
+  } else if (u.role === 'dependente') {
+    if (avatar) avatar.textContent = DB.iniciais(u.name);
+    if (nomeEl) nomeEl.textContent = u.name;
+    if (planoEl) planoEl.textContent = (loja ? loja.name : 'Funcionário');
   } else {
     if (avatar && loja) avatar.textContent = DB.iniciais(loja.name);
     if (nomeEl && loja) nomeEl.textContent = loja.name;
@@ -496,10 +514,11 @@ function montarShellAdmin() {
   }
 }
 
-/* RBAC do ajudante: mantém na sidebar apenas Agendamentos e Clientes */
+/* RBAC do ajudante e do dependente: mantém na sidebar apenas
+   Agendamentos e Clientes (Relatórios e demais áreas ficam ocultos) */
 function aplicarRBACSidebar() {
   const u = Auth.usuarioAtual();
-  if (!u || u.role !== 'barbeiro') return;
+  if (!u || (u.role !== 'barbeiro' && u.role !== 'dependente')) return;
 
   const permitidas = ['agendamentos.html', 'clientes.html'];
   document.querySelectorAll('.sidebar .nav-item').forEach(item => {
