@@ -271,6 +271,8 @@ const MAP = [
       client_name: a.client_name, client_phone: a.client_phone || '', client_email: a.client_email || '',
       starts_at: toPgDate(a.starts_at), ends_at: toPgDate(a.ends_at), status: a.status, origin: a.origin || 'online',
       price_total: a.price_total, cancellation_reason: a.cancellation_reason, notes: a.notes,
+      lembrete_email_em: toPgDate(a.lembrete_email_em) || null,
+      lembrete_dia_email_em: toPgDate(a.lembrete_dia_email_em) || null,
       created_at: toPgDate(a.created_at) || new Date(), updated_at: toPgDate(a.updated_at) || new Date()
     }),
     toMem: (r) => ({
@@ -279,6 +281,8 @@ const MAP = [
       starts_at: toMemDate(r.starts_at, 'local'), ends_at: toMemDate(r.ends_at, 'local'),
       status: r.status, origin: r.origin, price_total: Number(r.price_total || 0),
       cancellation_reason: r.cancellation_reason, notes: r.notes,
+      lembrete_email_em: r.lembrete_email_em ? toMemDate(r.lembrete_email_em, 'local') : null,
+      lembrete_dia_email_em: r.lembrete_dia_email_em ? toMemDate(r.lembrete_dia_email_em, 'local') : null,
       created_at: toMemDate(r.created_at, 'local')
     })
   },
@@ -410,6 +414,17 @@ const MAP = [
       faixa_pico: r.faixa_pico != null ? r.faixa_pico : null,
       created_at: toMemDate(r.created_at, 'iso')
     })
+  },
+  {
+    colecao: 'platform_settings', tabela: 'platform_settings', pk: 'chave', dateOut: 'iso',
+    toPg: (s) => ({
+      chave: s.chave, valor: knexJson(s.valor || {}),
+      updated_at: toPgDate(s.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      chave: r.chave, valor: r.valor || {},
+      updated_at: toMemDate(r.updated_at, 'iso')
+    })
   }
 ];
 
@@ -437,7 +452,7 @@ const CASTS = {
   plans: { max_professionals: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_annual: 'numeric', price_per_employee: 'numeric', created_at: 'timestamptz' },
   subscriptions: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'sub_status', trial_ends_at: 'timestamptz', current_period_end: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
-  appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', lembrete_email_em: 'timestamptz', lembrete_dia_email_em: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   appointment_services: { appointment_id: 'uuid', service_id: 'uuid', price_snapshot: 'numeric' },
   reviews: { barbershop_id: 'uuid', user_id: 'uuid', rating: 'int', created_at: 'timestamptz' },
   gallery_images: { barbershop_id: 'uuid', sort_order: 'int', created_at: 'timestamptz' },
@@ -448,7 +463,8 @@ const CASTS = {
   audit_log: { user_id: 'uuid', extra: 'jsonb', ip_address: 'inet', timestamp: 'timestamptz' },
   reports: { reporter_user_id: 'uuid', target_type: 'report_target', target_user_id: 'uuid', target_barbershop_id: 'uuid', target_client_id: 'uuid', status: 'report_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
   blocked_clients: { barbershop_id: 'uuid', client_id: 'uuid', created_at: 'timestamptz' },
-  relatorios_diarios: { barbershop_id: 'uuid', data: 'date', faturamento: 'numeric', agendamentos: 'int', ticket: 'numeric', created_at: 'timestamptz' }
+  relatorios_diarios: { barbershop_id: 'uuid', data: 'date', faturamento: 'numeric', agendamentos: 'int', ticket: 'numeric', created_at: 'timestamptz' },
+  platform_settings: { valor: 'jsonb', updated_at: 'timestamptz' }
 };
 
 const BY_COLECAO = {};

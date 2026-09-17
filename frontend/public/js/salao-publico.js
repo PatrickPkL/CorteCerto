@@ -403,6 +403,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /* Atualização quase-tempo-real: a cada 30s revalida os horários livres
+     do dia escolhido e reflete mudanças do salão sem recarregar a página. */
+  function atualizarSlotsTempoReal() {
+    if (!svcSelecionado || !dataEscolhida || fieldHorarios.style.display === 'none') return;
+    let disp;
+    try { disp = API.disponibilidade(loja.id, dataEscolhida, duracaoAtual()); }
+    catch (e) { return; }
+    const disponiveis = disp.available_slots || [];
+
+    if (disponiveis.length) {
+      slotTimes.querySelectorAll('p').forEach(p => p.remove());
+    }
+
+    slotTimes.querySelectorAll('.slot-time').forEach(b => {
+      if (disponiveis.indexOf(b.textContent) < 0) b.remove();
+    });
+
+    const atuais = Array.from(slotTimes.querySelectorAll('.slot-time')).map(b => b.textContent);
+    disponiveis.forEach(hora => {
+      if (atuais.indexOf(hora) >= 0) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'slot-time';
+      btn.textContent = hora;
+      btn.addEventListener('click', () => {
+        slotTimes.querySelectorAll('.slot-time').forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        selecionarHorario(hora);
+      });
+      slotTimes.appendChild(btn);
+    });
+
+    disponiveis.forEach(hora => {
+      const b = Array.from(slotTimes.querySelectorAll('.slot-time')).find(x => x.textContent === hora);
+      if (b) slotTimes.appendChild(b);
+    });
+
+    if (!disponiveis.length && !slotTimes.querySelector('.slot-time')) {
+      slotTimes.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:4px 0;">Nenhum horário livre neste dia.</p>';
+    }
+
+    if (horaEscolhida && disponiveis.indexOf(horaEscolhida) < 0) {
+      horaEscolhida = null;
+      profResolvido = null;
+      hrLivreOk = false;
+      btnConfirmar.disabled = true;
+      fieldDados.style.display = 'none';
+      fieldTelefone.style.display = 'none';
+      if (profInfo) profInfo.textContent = 'O horário escolhido acabou de ser ocupado. Selecione outro.';
+      showToast('Um horário foi ocupado. Escolha outro.', 'error');
+    } else if (horaEscolhida) {
+      const b = Array.from(slotTimes.querySelectorAll('.slot-time')).find(x => x.textContent === horaEscolhida);
+      if (b) b.classList.add('active');
+    }
+
+    const faixasEl = document.getElementById('slot-faixas');
+    if (faixasEl) {
+      const range = disp.free_ranges || [];
+      faixasEl.textContent = range.length
+        ? 'Horários livres: ' + range.map(r => r.start + ' às ' + r.end).join(' · ')
+        : 'Sem horário livre neste dia.';
+    }
+  }
+
+  setInterval(atualizarSlotsTempoReal, 30000);
+
   document.querySelectorAll('.btn-agendar').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -486,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(texto + url).then(() => alert('Link copiado!'));
       } else {
-        window.open('https://wa.me/?text=' + encodeURIComponent(texto + url), '_blank');
+        try { window.prompt('Copie o link:', texto + url); } catch (e) { /* noop */ }
       }
     });
   }

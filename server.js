@@ -137,10 +137,9 @@ const _authRequired = new Set([
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
   'definirLogo', 'definirCapa',
-  'galeriaDaLoja', 'adicionarGaleria', 'removerGaleria',
-  'servicosDaLoja', 'profissionaisDaLoja', 'horariosDaLoja',
+  'adicionarGaleria', 'removerGaleria',
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
-  'ativarTrial',
+  'ativarTrial', 'assinarComTrial',
   'criarCobrancaPlano', 'statusCobranca', 'listarMinhasCobrancas',
   'confirmarCobrancaDemo', 'simularCobranca',
   'criarReview', 'minhasReviews',
@@ -157,11 +156,13 @@ const _authRequired = new Set([
    REST próprias com needAuth() + rate-limit. */
 const _RPC_BLOQUEADOS = new Set([
   'err', '_auditLog', 'processarEventoWebhook',
+  'definirModoGratuito',
   'superAdminLogin', 'superAdminAuth', 'superAdminLogout',
   'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
   'saTickets', 'saResponderTicket',
-  'saListarDenuncias', 'saResolverDenuncia'
+  'saListarDenuncias', 'saResolverDenuncia',
+  'saListarPlanos', 'saAtualizarPrecosPlano', 'saObterConfig', 'saDefinirSiteGratis'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -356,7 +357,8 @@ function handleRpc(req, res) {
               }
               // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
               if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=[REDACTED]', e);
-              json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
+              json(res, st, Object.assign({ ok: false, status: st, error: (e && e.error) || 'Erro interno.' },
+                (e && e.code) ? { code: e.code } : null));
             })
           .finally(() => {
             /* limpa o contexto HTTP somente depois de a Promise resolver —
@@ -398,7 +400,8 @@ function handleRpc(req, res) {
       }
       // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
       if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=[REDACTED]', e);
-      const saida = json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
+      const saida = json(res, status, Object.assign({ ok: false, status, error: (e && e.error) || 'Erro interno.' },
+        (e && e.code) ? { code: e.code } : null));
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
       return saida;
@@ -465,6 +468,36 @@ function handleSuperAdmin(req, res, pathname, url) {
     try { const r = API.saRelatorios(); json(res, 200, { ok: true, data: r }); }
     catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
     return;
+  }
+
+  /* GET /api/super-admin/config — configurações globais da plataforma */
+  if (rota === 'config' && !idParam && req.method === 'GET') {
+    try { const r = API.saObterConfig(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/config — liga/desliga o modo grátis do site */
+  if (rota === 'config' && !idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saDefinirSiteGratis(dados.site_gratis);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/planos — planos e preços */
+  if (rota === 'planos' && !idParam && req.method === 'GET') {
+    try { const r = API.saListarPlanos(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/plano/:id/precos — atualiza preços do plano */
+  if (rota === 'plano' && idParam && parts[2] === 'precos' && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saAtualizarPrecosPlano(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* GET /api/super-admin/lojas */
@@ -816,17 +849,13 @@ function bancoRemoto() {
      Ao virar o dia (00:00) grava o snapshot de faturamento por loja;
      no boot de um dia novo também cobre o dia anterior (catch-up). */
   {
-    let diaGerado = '';
     async function garantirRelatoriosDiarios() {
       try {
         const hoje = global.DB.hojeISO();
-        if (diaGerado !== hoje) {
-          const internos = global.__CC_INTERNAL || {};
-          if (typeof internos.gerarDiariosParaData === 'function') {
-            internos.gerarDiariosParaData(hoje);
-            console.log('[relatorios] snapshots diários gerados às 00:00 (' + hoje + ')');
-          }
-          diaGerado = hoje;
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.gerarDiariosParaData === 'function') {
+          internos.gerarDiariosParaData(hoje);
+          console.log('[relatorios] snapshot diário atualizado (' + hoje + ')');
         }
       } catch (e) {
         console.error('[relatorios][job]', e);
@@ -834,6 +863,45 @@ function bancoRemoto() {
     }
     garantirRelatoriosDiarios();
     setInterval(garantirRelatoriosDiarios, 60 * 1000);
+  }
+
+  /* Job de lembretes por e-mail (Gmail): envia 1 dia antes e no dia do
+     agendamento. As marcas persistidas (lembrete_email_em /
+     lembrete_dia_email_em) evitam reenvio; roda no boot e a cada 30
+     minutos, sem depender de o dono abrir o painel. */
+  {
+    async function enviarLembretesAmanha() {
+      try {
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.gerarLembretesAmanha === 'function') {
+          const r = internos.gerarLembretesAmanha();
+          if (r && r.enviados) console.log('[lembretes] e-mails de lembrete enviados: ' + r.enviados);
+        }
+      } catch (e) {
+        console.error('[lembretes][job]', e);
+      }
+    }
+    enviarLembretesAmanha();
+    setInterval(enviarLembretesAmanha, 30 * 60 * 1000);
+  }
+
+  /* Job de assinatura: ao terminar os 10 dias grátis de uma loja, gera a
+     cobrança do plano escolhido e bloqueia o acesso pago até o pagamento.
+     Roda no boot e a cada 30 minutos. */
+  {
+    async function cobrarTrialsVencidos() {
+      try {
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.cobrarTrialsVencidos === 'function') {
+          const r = await internos.cobrarTrialsVencidos();
+          if (r && r.geradas) console.log('[assinatura] cobranças geradas após o trial: ' + r.geradas);
+        }
+      } catch (e) {
+        console.error('[assinatura][job]', e);
+      }
+    }
+    cobrarTrialsVencidos();
+    setInterval(cobrarTrialsVencidos, 30 * 60 * 1000);
   }
 
   Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)

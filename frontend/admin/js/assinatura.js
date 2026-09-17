@@ -14,17 +14,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  /* motivo do redirecionamento (ação bloqueada por falta de assinatura) */
+  try {
+    const aviso = sessionStorage.getItem('cc_assinatura_aviso');
+    if (aviso) {
+      sessionStorage.removeItem('cc_assinatura_aviso');
+      showToast(aviso, 'error');
+    }
+  } catch (e) { /* sessionStorage indisponível */ }
+
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
   function setHTML(id, v) { const el = document.getElementById(id); if (el) el.innerHTML = v; }
 
   const STATUS_LABEL = {
-    trial: ['badge-pendente', 'Em trial'],
+    trial: ['badge-pendente', '10 dias grátis'],
     ativa: ['badge-confirmado', 'Ativa'],
-    cancelada: ['badge-cancelado', 'Cancelada']
+    cancelada: ['badge-cancelado', 'Cancelada'],
+    expirada: ['badge-cancelado', 'Expirada']
   };
 
   let planos = [];
   try { planos = API.listarPlanos(); } catch (e) { /* noop */ }
+
+  /* Ao expirar os 10 dias grátis, abre automaticamente a cobrança PIX
+     (código + QR Code) uma vez por carregamento da página. */
+  let cobrancaAutoAberta = false;
 
   function render() {
     let sub;
@@ -33,19 +47,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const [cls, label] = STATUS_LABEL[sub.status] || ['', sub.status];
+    const [cls, label] = STATUS_LABEL[sub.status] || ['', 'Sem assinatura'];
     setHTML('st-status', '<span class="badge ' + cls + '">' + label + '</span>');
     setText('st-plano', sub.plano_efetivo ? sub.plano_efetivo.name : (sub.plan ? sub.plan.name : '—'));
     setText('st-preco', sub.plano_efetivo ? DB.fmtBRL(sub.plano_efetivo.price_monthly) + '/mês' : '—');
 
-    const ofertaTrial = document.getElementById('box-trial-oferta');
-    if (ofertaTrial) ofertaTrial.hidden = !!sub.on_trial || !!sub.trial_usado;
+    let liberado = false;
+    try { liberado = !!API.acessoLiberado(loja.id); } catch (e) { liberado = false; }
 
     if (sub.on_trial) {
+      const valorPlano = sub.plan ? DB.fmtBRL(sub.plan.price_monthly) + '/mês' : '—';
       setText('st-cobranca', DB.fmtDataBR(sub.trial_ends_at));
-      setText('st-cobranca-nota', 'trial ativo — assine para continuar');
-      setHTML('st-trial', 'Trial termina em <strong>' + sub.days_left_in_trial +
-        ' dia(s)</strong> (' + DB.fmtDataBR(sub.trial_ends_at) + '). Assine um plano para continuar após o trial.');
+      setText('st-cobranca-nota', 'fim dos 10 dias grátis');
+      setHTML('st-trial', 'Você está nos <strong>10 dias grátis</strong> do plano ' +
+        esc(sub.plan ? sub.plan.name : '') + ' — termina em <strong>' + sub.days_left_in_trial +
+        ' dia(s)</strong> (' + DB.fmtDataBR(sub.trial_ends_at) + '). Depois disso, o sistema gera ' +
+        'automaticamente a cobrança de ' + valorPlano + '.');
       document.getElementById('box-trial').hidden = false;
     } else {
       const venceu = sub.current_period_end && sub.current_period_end < DB.hojeISO();
@@ -55,8 +72,32 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('box-trial').hidden = true;
     }
 
+    const devePagar = !liberado && !sub.on_trial && !!(sub.plan || sub.trial_usado);
+    const boxPend = document.getElementById('box-pendente');
+    if (boxPend) {
+      boxPend.hidden = !devePagar;
+      if (devePagar) {
+        setText('st-pendente', 'Seus 10 dias grátis terminaram. Pague o PIX abaixo para ' +
+          'reativar o acesso' + (sub.plan ? ' ao plano ' + sub.plan.name : '') + '.');
+      }
+    }
+
     renderPlanos(sub);
     renderHistorico(sub);
+
+    /* Assinatura inativa (trial expirado/cancelado): leva direto para a
+       cobrança PIX com o código copia-e-cola e o QR Code. */
+    if (devePagar && sub.plan && !cobrancaAutoAberta) {
+      cobrancaAutoAberta = true;
+      setTimeout(() => {
+        try {
+          /* força PIX (código + QR) como método da cobrança pós-trial */
+          const pixBtn = modalPg.querySelector('.plan-metodo-tgl .plan-tgl-btn[data-metodo="pix"]');
+          if (pixBtn && !pixBtn.classList.contains('active')) pixBtn.click();
+          abrirPagamento(sub.plan, 'mensal', 1);
+        } catch (e) { showToast(msgErro(e), 'error'); }
+      }, 60);
+    }
   }
 
   /* ---------- cards de planos ---------- */
@@ -83,13 +124,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#lista-planos .plan-card').forEach(card => {
       const plano = planos.find(p => String(p.id) === card.dataset.plano);
       if (!plano) return;
+      const base = anual
+        ? (plano.price_annual != null && Number(plano.price_annual) > 0
+          ? Number(plano.price_annual) : Number(plano.price_monthly) * 12)
+        : Number(plano.price_monthly);
+      const riscado = card.querySelector('.plan-preco-riscado');
       const valorEl = card.querySelector('.plan-preco-valor');
       const unidEl = card.querySelector('.plan-preco-unidade');
       const nota = card.querySelector('.plan-anual-nota');
       const parc = card.querySelector('.plan-parcelas');
-      valorEl.textContent = anual ? DB.fmtBRL(plano.price_annual != null && Number(plano.price_annual) > 0
-        ? plano.price_annual : plano.price_monthly * 12) : DB.fmtBRL(plano.price_monthly);
-      unidEl.textContent = anual ? '/ano' : '/mês';
+      if (riscado) {
+        /* card em trial: preço cheio riscado + R$ 0,00 nos 10 primeiros dias */
+        riscado.textContent = DB.fmtBRL(base);
+        if (valorEl) valorEl.textContent = 'R$ 0,00';
+        if (unidEl) unidEl.textContent = 'nos primeiros 10 dias';
+        const depois = card.querySelector('.plan-preco-depois');
+        if (depois) depois.textContent = 'Depois ' + DB.fmtBRL(base) +
+          (anual ? '/ano' : '/mês') + ' · cancele quando quiser';
+        return;
+      }
+      if (valorEl) valorEl.textContent = DB.fmtBRL(base);
+      if (unidEl) unidEl.textContent = anual ? '/ano' : '/mês';
       if (nota) nota.hidden = !anual;
       if (parc) parc.hidden = !anual;
     });
@@ -99,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('lista-planos');
     if (!box) return;
 
+    const podeTrial = !subAtual.trial_usado && !subAtual.on_trial;
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;
@@ -109,24 +165,43 @@ document.addEventListener('DOMContentLoaded', () => {
         ? 'Profissionais ilimitados'
         : 'Até ' + p.max_professionals + ' profissional(is)';
       const feats = (p.features || []).map(f => '<li>' + esc(f) + '</li>').join('');
-      const botao = p.is_free
-        ? '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
-            (atual ? 'Plano atual' : 'Plano base') + '</button>'
-        : '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
-            (atual ? 'Renovar' : 'Assinar agora') + '</button>';
-      return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '">' +
+
+      let botao;
+      if (p.is_free) {
+        botao = '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
+          (atual ? 'Plano atual' : 'Plano base') + '</button>';
+      } else if (podeTrial) {
+        botao = '<button type="button" class="btn btn-brass btn-assinar-trial" data-id="' + p.id + '">' +
+          'Começar 10 dias grátis</button>';
+      } else {
+        botao = '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
+          (atual ? 'Renovar' : 'Assinar agora') + '</button>';
+      }
+
+      const preco = podeTrial
+        ? '<div class="plan-preco mono">' +
+            '<span class="plan-preco-riscado">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
+            '<span class="plan-preco-valor">R$ 0,00</span>' +
+            '<small class="plan-preco-unidade">nos primeiros 10 dias</small>' +
+          '</div>' +
+          '<div class="plan-preco-depois">Depois ' + DB.fmtBRL(anual ? anualBase : p.price_monthly) +
+            (anual ? '/ano' : '/mês') + ' · cancele quando quiser</div>'
+        : '<div class="plan-preco mono">' +
+            '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
+            '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
+          '</div>' +
+          '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · parcelas a partir de ' +
+            DB.fmtBRL(Math.round(anualBase / 12 * 100) / 100) + '/mês</div>' +
+          '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
+            '<label>Parcelar em</label>' +
+            '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
+          '</div>';
+
+      return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '"' +
+          (podeTrial ? ' data-trial="1"' : '') + '>' +
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
-        '<div class="plan-preco mono">' +
-          '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
-          '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
-        '</div>' +
-        '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · parcelas a partir de ' +
-          DB.fmtBRL(Math.round(anualBase / 12 * 100) / 100) + '/mês</div>' +
-        '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
-          '<label>Parcelar em</label>' +
-          '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
-        '</div>' +
+        preco +
         '<ul class="plan-feats"><li>' + limite + '</li>' + feats + '</ul>' +
         botao +
       '</div>';
@@ -139,6 +214,24 @@ document.addEventListener('DOMContentLoaded', () => {
           ? Number(btn.closest('.plan-card').querySelector('.plan-parcelas-sel').value) || 12
           : 1;
         if (plano) abrirPagamento(plano, periodoGlobal, parcelas);
+      });
+    });
+
+    box.querySelectorAll('.btn-assinar-trial').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plano = planos.find(p => String(p.id) === btn.dataset.id);
+        if (!plano) return;
+        if (!confirm('Começar 10 dias grátis no plano ' + plano.name +
+          '? Depois do período, a cobrança do plano é gerada automaticamente.')) return;
+        try {
+          API.assinarComTrial(plano.id);
+          showToast('10 dias grátis ativados no plano ' + plano.name + '!', 'success');
+          render();
+          montarShellAdmin();
+        } catch (e) {
+          showToast(msgErro(e), 'error');
+          render();
+        }
       });
     });
   }
@@ -406,18 +499,13 @@ function fecharPagamento() {
     }
   });
 
-  /* ---------- trial opcional (10 dias) ---------- */
-  document.getElementById('btn-ativar-trial')?.addEventListener('click', () => {
-    if (!confirm('Ativar o trial de 10 dias do plano Salão? Válido uma única vez por loja.')) return;
-    try {
-      API.ativarTrial();
-      showToast('Trial ativado! Plano Salão liberado por 10 dias.', 'success');
-      render();
-      montarShellAdmin();
-    } catch (err3) {
-      showToast(msgErro(err3), 'error');
-      render();
-    }
+  /* ---------- pagar a cobrança gerada ao fim dos 10 dias ---------- */
+  document.getElementById('btn-pagar-pendente')?.addEventListener('click', () => {
+    let sub = null;
+    try { sub = API.minhaAssinatura(); } catch (e) { /* noop */ }
+    const plano = planos.find(p => String(p.id) === (sub && sub.plan && sub.plan.id));
+    if (!plano) { showToast('Plano não encontrado.', 'error'); return; }
+    abrirPagamento(plano, 'mensal', 1);
   });
 
   /* ---------- seletor global Mensal/Anual ---------- */

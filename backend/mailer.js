@@ -333,6 +333,9 @@ function enviarCodigoExclusao(email, codigo) {
 
 function enviarBoasVindas(dados) {
   var link = APP_URL + "/painel";
+  var linkAgend = dados.shopId
+    ? (APP_URL + "/public/salao-publico.html?id=" + encodeURIComponent(dados.shopId))
+    : null;
 
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Bem-vindo ao Corte Certo, ' + (dados.nome || "") + "!</p>" +
@@ -346,7 +349,12 @@ function enviarBoasVindas(dados) {
       '<p style="color:#333333;font-size:14px;margin:0 0 10px 0;">3. Compartilhe o link de agendamento com seus clientes</p>' +
       '<p style="color:#333333;font-size:14px;margin:0;">4. Acompanhe seus agendamentos no painel</p>' +
     "</div>" +
+    (linkAgend
+      ? '<p style="color:#555555;font-size:14px;margin:0 0 6px 0;">Seu link exclusivo de agendamento:</p>' +
+        '<p style="font-size:13px;word-break:break-all;margin:0 0 16px 0;"><a href="' + linkAgend + '" style="color:#b8863b;">' + linkAgend + "</a></p>"
+      : "") +
     '<div style="text-align:center;">' +
+      (linkAgend ? botaoHTML(linkAgend, "Abrir meu link de agendamento") + "<br><br>" : "") +
       botaoHTML(link, "Acessar meu painel") +
     "</div>";
 
@@ -359,26 +367,35 @@ function enviarBoasVindas(dados) {
 }
 
 function enviarLembrete(email, dados) {
+  var quando = dados.quando || "amanh\u00e3";
   var assunto;
   if (dados.isCliente) {
-    assunto = "Lembrete: amanh\u00e3 \u00e0s " + (dados.hora || "") + " em " + (dados.salaoNome || "");
+    assunto = "Lembrete: agendamento " + quando + " \u00e0s " + (dados.hora || "") + " em " + (dados.salaoNome || "");
   } else {
-    assunto = "Lembrete: " + (dados.nome || "Cliente") + " amanh\u00e3 \u00e0s " + (dados.hora || "");
+    assunto = "Lembrete: " + (dados.nome || "Cliente") + " tem agendamento " + quando + " \u00e0s " + (dados.hora || "");
   }
 
   var urlPainel = dados.appUrl || APP_URL + "/painel";
+  var linkAgenda = dados.linkAgendamento || null;
 
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá' + (dados.nome ? ", " + dados.nome : "") + "!</p>" +
-    '<p style="color:#555555;font-size:14px;margin:0 0 8px 0;">Lembrando do seu agendamento amanh\u00e3:</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 8px 0;">Este é um aviso do compromisso que você marcou no site:</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 8px 0;">Seu agendamento é <strong>' + quando + "</strong>:</p>" +
     '<div style="background-color:#f9f9f9;border-radius:6px;padding:16px;margin:16px 0;">' +
       '<p style="color:#333333;font-size:14px;margin:0 0 6px 0;"><strong>Salão:</strong> ' + (dados.salaoNome || "") + "</p>" +
       '<p style="color:#333333;font-size:14px;margin:0 0 6px 0;"><strong>Serviço:</strong> ' + (dados.servicos || "") + "</p>" +
       '<p style="color:#333333;font-size:14px;margin:0 0 6px 0;"><strong>Hora:</strong> ' + (dados.hora || "") + "</p>" +
       (dados.endereco ? '<p style="color:#333333;font-size:14px;margin:0;"><strong>Endereço:</strong> ' + dados.endereco + "</p>" : "") +
     "</div>" +
+    (dados.isCliente && linkAgenda
+      ? '<p style="color:#555555;font-size:14px;margin:0 0 6px 0;">Precisa marcar outro horário? Use seu link:</p>' +
+        '<p style="font-size:13px;word-break:break-all;margin:0 0 16px 0;"><a href="' + linkAgenda + '" style="color:#b8863b;">' + linkAgenda + "</a></p>"
+      : "") +
     '<div style="text-align:center;">' +
-      botaoHTML(urlPainel, dados.isCliente ? "Gerenciar agendamento" : "Ver no painel") +
+      (dados.isCliente && linkAgenda
+        ? botaoHTML(linkAgenda, "Ver salão e agendar")
+        : botaoHTML(urlPainel, dados.isCliente ? "Gerenciar agendamento" : "Ver no painel")) +
     "</div>";
 
   return enviarEmailComTimeout({

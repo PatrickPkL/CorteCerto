@@ -441,7 +441,8 @@ window.Auth = (function () {
         Mailer.enviarBoasVindas({
           email: usuario.email, nome: usuario.name,
           nomeSalao: p.salon_name || (barbearia && barbearia.name) || 'Seu salão',
-          trialDias: 7
+          trialDias: 7,
+          shopId: barbearia && barbearia.id
         }).catch(function(e) { console.error('[onboarding] falha:', e); });
       }
       DB.salvar();

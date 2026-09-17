@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planos · Super Admin · Corte Certo</title>
+<script src="../shared/js/tema-inicio.js"></script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #f0f0f0;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: flex;
+    min-height: 100vh;
+  }
+  .sa-sidebar {
+    width: 220px; background: #161616; border-right: 1px solid #222;
+    padding: 24px 0; display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
+  }
+  .sa-sidebar-brand {
+    font-size: 1.15rem; font-weight: 700; padding: 0 20px 20px;
+    border-bottom: 1px solid #222; margin-bottom: 8px;
+  }
+  .sa-sidebar-brand span { color: #b8863b; }
+  .sa-sidebar-nav { flex: 1; padding: 8px 0; }
+  .sa-sidebar-nav a {
+    display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+    color: #888; text-decoration: none; font-size: .9rem;
+    transition: color .2s, background .2s;
+  }
+  .sa-sidebar-nav a:hover,
+  .sa-sidebar-nav a.active { color: #f0f0f0; background: rgba(184,134,59,.1); }
+  .sa-sidebar-nav a.active { border-right: 3px solid #b8863b; }
+  .sa-sidebar-footer { padding: 12px 20px; border-top: 1px solid #222; }
+  .sa-sidebar-footer a {
+    display: flex; align-items: center; gap: 10px; color: #888;
+    text-decoration: none; font-size: .85rem; padding: 8px 0; transition: color .2s;
+  }
+  .sa-sidebar-footer a:hover { color: #e74c3c; }
+
+  .sa-main { margin-left: 220px; flex: 1; padding: 32px; min-height: 100vh; }
+  .sa-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .sa-header h1 { font-size: 1.4rem; font-weight: 600; }
+
+  .sa-card {
+    background: #161616; border: 1px solid #222; border-radius: 10px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .sa-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .sa-card p.sa-hint { color: #888; font-size: .85rem; margin-bottom: 16px; }
+
+  .sa-table-wrap {
+    background: #161616; border: 1px solid #222; border-radius: 10px; overflow-x: auto;
+  }
+  .sa-table { width: 100%; border-collapse: collapse; }
+  .sa-table th {
+    text-align: left; padding: 14px 16px; font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .5px; color: #888; border-bottom: 1px solid #222;
+  }
+  .sa-table td { padding: 12px 16px; font-size: .9rem; border-bottom: 1px solid #1a1a1a; }
+  .sa-table tbody tr:hover { background: rgba(184,134,59,.05); }
+
+  .sa-input {
+    width: 120px; padding: 8px 10px; background: #0c0c0c; border: 1px solid #333;
+    border-radius: 6px; color: #f0f0f0; font-size: .9rem; outline: none;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .sa-input:focus { border-color: #b8863b; }
+
+  .sa-btn-salvar {
+    padding: 8px 16px; background: #b8863b; border: none; border-radius: 6px;
+    color: #0c0c0c; font-weight: 600; font-size: .85rem; cursor: pointer;
+    transition: filter .2s;
+  }
+  .sa-btn-salvar:hover { filter: brightness(1.1); }
+  .sa-btn-salvar:disabled { opacity: .6; cursor: default; }
+
+  .sa-tag { font-size: .7rem; text-transform: uppercase; color: #888; border: 1px solid #333; border-radius: 10px; padding: 2px 8px; }
+
+  .sa-toggle-row { display: flex; align-items: center; gap: 14px; }
+  .sa-switch { position: relative; display: inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+  .sa-switch input { opacity: 0; width: 0; height: 0; }
+  .sa-slider {
+    position: absolute; cursor: pointer; inset: 0; background: #333;
+    transition: .2s; border-radius: 28px;
+  }
+  .sa-slider::before {
+    content: ""; position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px;
+    background: #f0f0f0; transition: .2s; border-radius: 50%;
+  }
+  .sa-switch input:checked + .sa-slider { background: #2ecc71; }
+  .sa-switch input:checked + .sa-slider::before { transform: translateX(24px); }
+  .sa-aviso {
+    margin-top: 14px; padding: 12px 14px; border-radius: 8px;
+    background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.35);
+    color: #2ecc71; font-size: .85rem;
+  }
+  .sa-loading { text-align: center; color: #888; padding: 32px 0; }
+
+  @media (max-width: 768px) {
+    .sa-sidebar { width: 60px; }
+    .sa-sidebar-brand, .sa-sidebar-nav a span, .sa-sidebar-footer a span { display: none; }
+    .sa-sidebar-nav a { justify-content: center; padding: 12px 0; }
+    .sa-main { margin-left: 60px; padding: 20px 16px; }
+    .sa-input { width: 90px; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sa-sidebar">
+  <div class="sa-sidebar-brand">Corte<span>Certo</span></div>
+  <nav class="sa-sidebar-nav">
+    <a href="index.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="relatorios.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Relatórios</span>
+    </a>
+    <a href="planos.html" class="active">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>Planos</span>
+    </a>
+    <a href="denuncias.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.8 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/></svg>
+      <span>Denúncias</span>
+    </a>
+    <a href="suporte-sa.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+      <span>Suporte</span>
+    </a>
+    <a href="bot.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="20" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="16" cy="13" r="1"/><path d="M9 17h6"/></svg>
+      <span>Atendente</span>
+    </a>
+    <a href="chats.html">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg>
+      <span>Chats</span>
+    </a>
+    <a href="index.html#lojas-section">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Lojas</span>
+    </a>
+  </nav>
+  <div class="sa-sidebar-footer">
+    <a href="#" id="btn-sair">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>Sair</span>
+    </a>
+  </div>
+</aside>
+
+<main class="sa-main">
+  <div class="sa-header">
+    <h1>Planos e preços</h1>
+  </div>
+
+  <div class="sa-card">
+    <h2>Modo grátis do site</h2>
+    <p class="sa-hint">Quando ligado, TODAS as lojas usam o sistema completo (funções e relatórios) sem exigir assinatura. Os preços abaixo permanecem salvos.</p>
+    <div class="sa-toggle-row">
+      <label class="sa-switch">
+        <input type="checkbox" id="tgl-site-gratis">
+        <span class="sa-slider"></span>
+      </label>
+      <strong id="lbl-site-gratis">Desligado</strong>
+    </div>
+    <div class="sa-aviso" id="aviso-site-gratis" hidden>
+      Modo grátis ATIVO — nenhuma loja está sendo cobrada e todas têm acesso total.
+    </div>
+  </div>
+
+  <div class="sa-card" style="padding:0; background:transparent; border:none;">
+    <h2>Preços dos planos</h2>
+    <p class="sa-hint">Edite os valores mensal, anual e por funcionário de cada plano.</p>
+    <div class="sa-table-wrap">
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th>Plano</th>
+            <th>Mensal (R$)</th>
+            <th>Anual (R$)</th>
+            <th>Por funcionário (R$)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-planos">
+          <tr><td colspan="5" class="sa-loading">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="../shared/js/shared.js"></script>
+<script src="js/super-auth.js"></script>
+<script src="js/planos-sa.js"></script>
+
+</body>
+</html>

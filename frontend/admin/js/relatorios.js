@@ -604,41 +604,65 @@ document.addEventListener('DOMContentLoaded', () => {
     baixarArquivo(nome, '\uFEFF' + csv);
   }
 
-  /* Aba RELATÓRIOS — gráficos fictícios (exemplo de como vai ficar) */
+  /* Aba RELATÓRIOS — gráficos reais calculados a partir dos dados do salão */
   function renderizarRelatorios() {
     const container = document.getElementById('pt-relatorios');
     if (!container) return;
     container.innerHTML = '';
 
-    const notaTopo = document.createElement('p');
-    notaTopo.className = 'chart-caption';
-    notaTopo.textContent = 'Gráficos fictícios só para visualização — serão substituídos pelos dados reais do salão.';
-    container.appendChild(notaTopo);
+    if (relatorioErro || !relatorio || !relatorio.nivel) {
+      container.innerHTML = '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
+        'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      return;
+    }
 
-    const mock = [
-      { titulo: 'Faturamento por dia da semana', cor: C.brass, linha: false,
-        rot: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
-        val: [182, 214, 165, 260, 305, 420, 195] },
-      { titulo: 'Faturamento por mês', cor: C.success, linha: true,
-        rot: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-        val: [1390, 1580, 1450, 1720, 1810, 1690, 1540, 1660, 1780, 1900, 1750, 1680] },
-      { titulo: 'Atendimentos por faixa de horário', cor: C.brassSoft, linha: false,
-        rot: ['09–11', '11–13', '13–15', '15–17', '17–19', '19–21'],
-        val: [6, 12, 9, 14, 18, 11] }
-    ];
+    let desenhou = false;
 
-    mock.forEach((g, i) => {
+    /* Faturamento por mês (agrega a série diária do período) */
+    const serie = relatorio.melhorDiaSerie || [];
+    if (serie.length) {
+      const porMes = {};
+      serie.forEach(d => {
+        const k = String(d.data || '').slice(0, 7);
+        if (!k) return;
+        porMes[k] = (porMes[k] || 0) + Number(d.faturamento || 0);
+      });
+      const chaves = Object.keys(porMes).sort().slice(-12);
+      const rot = chaves.map(rotuloMes);
+      const val = chaves.map(k => Math.round(porMes[k] * 100) / 100);
       const card = document.createElement('div');
       card.className = 'card';
-      card.appendChild(criarTituloSecao(g.titulo));
+      card.appendChild(criarTituloSecao('Faturamento por mês'));
       const cv = document.createElement('canvas');
-      cv.id = 'rel-mock-' + i;
       cv.className = 'chart-box chart-box-chart';
       card.appendChild(cv);
       container.appendChild(card);
-      if (g.linha) desenharLinhas(cv, g.rot, g.val, g.cor);
-      else desenharBarras(cv, g.rot, g.val, g.cor);
-    });
+      desenharBarras(cv, rot, val, C.brass);
+      desenhou = true;
+    }
+
+    /* Atendimentos por faixa de horário (dados reais do período) */
+    const pico = relatorio.horariosPico || [];
+    if (pico.length) {
+      const ordenado = pico.slice().sort((a, b) => String(a.faixa).localeCompare(String(b.faixa)));
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Atendimentos por faixa de horário'));
+      const cv = document.createElement('canvas');
+      cv.className = 'chart-box chart-box-chart';
+      card.appendChild(cv);
+      container.appendChild(card);
+      desenharBarras(cv, ordenado.map(p => p.faixa), ordenado.map(p => p.count), C.brassSoft);
+      desenhou = true;
+    }
+
+    if (!desenhou) {
+      const nota = document.createElement('p');
+      nota.className = 'chart-caption';
+      nota.textContent = 'Ainda não há faturamento concluído no período para exibir gráficos. ' +
+        'Eles aparecem automaticamente conforme os atendimentos forem concluídos.';
+      container.appendChild(nota);
+    }
   }
 
   /* [SEGURANÇA] Renderiza APENAS os campos que o backend liberou

@@ -29,6 +29,23 @@
     let resp = null;
     try { resp = JSON.parse(xhr.responseText); } catch (e) { /* resposta vazia */ }
     if (xhr.status >= 200 && xhr.status < 300 && resp && resp.ok) return resp.data;
+    /* Assinatura inativa: qualquer ação produtiva do dono é bloqueada no
+       backend (402). Aqui centralizamos o redirecionamento para a tela de
+       assinatura — exceto quando já estamos nela (aí só repassa o erro). */
+    if (resp && resp.code === 'assinatura_necessaria') {
+      const erro = resp.error || 'Sua assinatura está inativa. Assine para liberar esta ação.';
+      /* Chamadas automáticas de melhor-esforço (não iniciadas pelo usuário)
+         apenas falham em silêncio — não podem expulsar o dono da visualização. */
+      const automatico = (metodo === 'gerarLembretesPendentes');
+      try {
+        if (!automatico && !/assinatura\.html$/i.test(window.location.pathname)) {
+          sessionStorage.setItem('cc_assinatura_aviso', erro);
+          window.location.href = '/admin/assinatura.html';
+          return undefined;
+        }
+      } catch (e) { /* fora de contexto de navegador */ }
+      throw { status: 402, code: 'assinatura_necessaria', error: erro };
+    }
     throw {
       status: xhr.status || (resp && resp.status) || 500,
       error: (resp && resp.error) || ('Erro ' + xhr.status)

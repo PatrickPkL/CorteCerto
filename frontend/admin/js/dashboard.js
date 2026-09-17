@@ -26,6 +26,63 @@ document.addEventListener('DOMContentLoaded', () => {
     eyebrow.textContent = dias[agora.getDay()] + ', ' + agora.getDate() + ' de ' + meses[agora.getMonth()];
   }
 
+  /* ---------- link exclusivo de agendamento ---------- */
+  (function montarLinkAgendamento() {
+    const input = document.getElementById('link-agendamento');
+    if (!input) return;
+    const url = location.origin + '/public/salao-publico.html?id=' + encodeURIComponent(loja.id);
+    input.value = url;
+
+    /* Usar o link de agendamento é ação produtiva: exige assinatura ativa
+       (no modo grátis da plataforma, acessoLiberado devolve true). */
+    let liberado = true;
+    try { liberado = !!API.acessoLiberado(loja.id); } catch (e) { liberado = true; }
+    const irAssinar = () => {
+      sessionStorage.setItem('cc_assinatura_aviso',
+        'Assine um plano para usar o link de agendamento e as demais funções.');
+      window.location.href = 'assinatura.html';
+    };
+
+    const btnAbrir = document.getElementById('btn-abrir-link');
+    if (btnAbrir) {
+      btnAbrir.href = url;
+      btnAbrir.addEventListener('click', (ev) => {
+        if (!liberado) { ev.preventDefault(); irAssinar(); }
+      });
+    }
+    /* Compartilhar genérico: no celular abre as opções de qualquer app
+       (Instagram, Telegram, WhatsApp, etc.); no desktop copia o link. */
+    const btnCompartilhar = document.getElementById('btn-compartilhar-link');
+    if (btnCompartilhar) btnCompartilhar.addEventListener('click', () => {
+      if (!liberado) return irAssinar();
+      const texto = 'Agende seu horário na ' + (loja.name || 'nossa barbearia') + ': ';
+      if (navigator.share) {
+        navigator.share({ title: loja.name || 'Corte Certo', text: texto, url: url })
+          .catch(() => { /* usuário cancelou */ });
+        return;
+      }
+      const copiar = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(texto + url).then(() => showToast('Link copiado!'));
+        } else {
+          input.select(); document.execCommand('copy'); showToast('Link copiado!');
+        }
+      };
+      copiar();
+    });
+
+    const btnCopiar = document.getElementById('btn-copiar-link');
+    if (btnCopiar) btnCopiar.addEventListener('click', () => {
+      if (!liberado) return irAssinar();
+      const ok = () => showToast('Link copiado!');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(ok).catch(() => { input.select(); document.execCommand('copy'); ok(); });
+      } else {
+        input.select(); document.execCommand('copy'); ok();
+      }
+    });
+  })();
+
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
   function setDelta(id, texto, cls) {
     const el = document.getElementById(id);

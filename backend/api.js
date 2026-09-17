@@ -107,6 +107,7 @@ window.API = (function () {
       const plano = db.plans.find(p => p.id === sub.plan_id);
       if (plano) return { sub, plano };
     }
+    if (modoGratuito()) return { sub: sub || null, plano: planoGratuitoPlataforma() };
     return { sub: sub || null, plano: planoFree() };
   }
 
@@ -120,6 +121,7 @@ window.API = (function () {
   }
 
   function exigirFuncionalidade(shopId, chave, descricao) {
+    exigirAssinaturaAtiva(shopId);
     if (!temFuncionalidade(shopId, chave)) {
       const { plano } = planoEfetivo(shopId);
       const alvo = (plano && plano.name) || 'um plano pago';
@@ -131,6 +133,62 @@ window.API = (function () {
     }
   }
 
+  /* ---------------- Modo plataforma grátis (config global) ----------------
+     O super-admin pode ligar "site_gratis": nesse modo TODAS as lojas têm
+     acesso completo (funcionalidades e relatórios), sem exigir assinatura
+     ativa. Os preços cadastrados permanecem intactos para quando o modo
+     for desligado. */
+  const _PERMISSOES_COMPLETAS = ['servicos', 'profissionais', 'clientes', 'agendar',
+    'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'];
+
+  function modoGratuito() {
+    try {
+      const st = (_db().platform_settings || []).find(s => s.chave === 'site_gratis');
+      return !!(st && st.valor && st.valor.ativo);
+    } catch (e) { return false; }
+  }
+
+  function definirModoGratuito(ativo) {
+    const db = _db();
+    db.platform_settings = db.platform_settings || [];
+    let st = db.platform_settings.find(s => s.chave === 'site_gratis');
+    if (!st) {
+      st = { chave: 'site_gratis', valor: {}, updated_at: agoraISO() };
+      db.platform_settings.push(st);
+    }
+    st.valor = { ativo: !!ativo };
+    st.updated_at = agoraISO();
+    DB.salvar();
+    return { site_gratis: !!ativo };
+  }
+
+  function planoGratuitoPlataforma() {
+    return {
+      id: '__plataforma_gratis__', name: 'Grátis (plataforma)', is_free: true,
+      permissions: _PERMISSOES_COMPLETAS.slice(), features: [],
+      nivel_relatorio: 'completo', max_professionals: null,
+      price_monthly: 0, price_annual: 0, price_per_employee: 0
+    };
+  }
+
+  /* Bloqueia ações produtivas do dono quando não há assinatura ativa
+     (sistema de cobrança). Leituras seguem liberadas; o frontend redireciona
+     para a tela de assinatura ao receber code 'assinatura_necessaria'. */
+  function exigirAssinaturaAtiva(shopId) {
+    if (modoGratuito()) return;
+    let liberado = false;
+    try {
+      liberado = typeof window.API.acessoLiberado === 'function'
+        ? window.API.acessoLiberado(shopId)
+        : false;
+    } catch (e) { liberado = false; }
+    if (!liberado) {
+      throw {
+        status: 402, code: 'assinatura_necessaria',
+        error: 'Sua assinatura está inativa. Assine na aba Assinatura para liberar esta ação.'
+      };
+    }
+  }
 
   function podeVerAgendamento(user, ag) {
     if (!user) return false;
@@ -311,39 +369,70 @@ window.API = (function () {
     return { token: sessao.token, user: { id: usuario.id, name: usuario.name, role: usuario.role } };
   }
 
-  function gerarLembretesAmanha() {
-    var amanha = new Date();
-    amanha.setDate(amanha.getDate() + 1);
-    var alvo = amanha.toISOString().slice(0, 10);
-    var ags = (_db().appointments || []).filter(function(a) {
-      return a.date === alvo && (a.status === 'confirmado' || a.status === 'agendado');
+  /* Envia os lembretes por e-mail (Gmail) de uma data.
+     campoMarca: coluna persistida que registra o envio (evita reenvio).
+     quando: rótulo exibido no e-mail ("amanhã" / "hoje").
+     somenteFuturos: no dia, ignora horários que já passaram. */
+  function _enviarLembretesDe(dataAlvo, campoMarca, quando, somenteFuturos) {
+    const db = _db();
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const agoraMin = somenteFuturos ? DB.agoraMinutos() : null;
+    const ags = (db.appointments || []).filter(function(a) {
+      if (!a.starts_at || String(a.starts_at).slice(0, 10) !== dataAlvo || a[campoMarca]) return false;
+      if (a.status !== 'confirmado' && a.status !== 'pendente') return false;
+      if (somenteFuturos && DB.hhmmToMin(String(a.starts_at).slice(11, 16)) < agoraMin) return false;
+      return true;
     });
+    var enviados = 0;
     ags.forEach(function(ag) {
-      var loja = (_db().barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
-      var cli = (_db().users || []).find(function(u) { return u.id === ag.user_id; });
+      var loja = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
       if (!loja) return;
+      var cli = (db.users || []).find(function(u) { return u.id === ag.user_id; });
+      /* link exclusivo para o cliente marcar/ver o salão */
+      var linkAgenda = appUrl + '/public/salao-publico.html?id=' + encodeURIComponent(ag.barbershop_id);
       var dados = {
         salaoNome: loja.name,
         servicos: (function() {
-          var itens = (_db().appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
+          var itens = (db.appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
           return itens.length ? itens.map(function(i) { return i.name_snapshot || ''; }).join(' + ') : '';
         })(),
-        hora: ag.time,
+        hora: String(ag.starts_at || '').slice(11, 16),
         endereco: loja.address || '',
-        appUrl: process.env.APP_URL || 'http://localhost:3000'
+        appUrl: appUrl,
+        linkAgendamento: linkAgenda,
+        quando: quando
       };
-      if (cli && cli.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cli.email)) {
-        Mailer.enviarLembrete(cli.email, Object.assign({ nome: cli.name, isCliente: true }, dados))
+      var tentouEnviar = false;
+      var cliEmail = (cli && cli.email) || ag.client_email || '';
+      var cliNome = (cli && cli.name) || ag.client_name || '';
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliEmail)) {
+        Mailer.enviarLembrete(cliEmail, Object.assign({ nome: cliNome, isCliente: true }, dados))
           .catch(function() {});
+        tentouEnviar = true;
       }
-      var prof = (_db().professionals || []).find(function(p) { return p.id === ag.professional_id; });
+      var prof = (db.professionals || []).find(function(p) { return p.id === ag.professional_id; });
       if (prof && prof.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
         Mailer.enviarLembrete(prof.email, Object.assign({
           nome: prof.name, isCliente: false
         }, dados)).catch(function() {});
+        tentouEnviar = true;
+      }
+      /* marca como enviado (persistido) para o job não reenviar */
+      if (tentouEnviar) {
+        ag[campoMarca] = agoraISO();
+        enviados++;
       }
     });
-    return { enviados: ags.length };
+    if (enviados) DB.salvar();
+    return enviados;
+  }
+
+  /* Dispara os dois lembretes: 1 dia antes e no próprio dia. */
+  function gerarLembretesAmanha() {
+    var enviados = 0;
+    enviados += _enviarLembretesDe(DB.addDiasISO(1), 'lembrete_email_em', 'amanhã', false);
+    enviados += _enviarLembretesDe(DB.hojeISO(), 'lembrete_dia_email_em', 'hoje', true);
+    return { enviados: enviados };
   }
 
   /* ================= SUPER-ADMIN (v2.4) ================= */
@@ -468,6 +557,59 @@ window.API = (function () {
     sub.updated_at = agoraISO();
     DB.salvar();
     return sub;
+  }
+
+  /* ---------------- Super-admin: preços dos planos e modo grátis ---------------- */
+
+  function _numPreco(v, campo) {
+    if (v === undefined || v === null || v === '') return undefined;
+    var n = Number(v);
+    if (!isFinite(n) || n < 0) err(400, 'Valor inválido para ' + campo + '.');
+    return n;
+  }
+
+  function saListarPlanos() {
+    return (_db().plans || []).slice()
+      .sort(function(a, b) { return Number(a.price_monthly || 0) - Number(b.price_monthly || 0); })
+      .map(function(p) {
+        return {
+          id: p.id, name: p.name, is_free: !!p.is_free,
+          price_monthly: Number(p.price_monthly || 0),
+          price_annual: Number(p.price_annual || 0),
+          price_per_employee: Number(p.price_per_employee || 0),
+          max_professionals: (p.max_professionals == null) ? null : Number(p.max_professionals)
+        };
+      });
+  }
+
+  function saAtualizarPrecosPlano(planoId, dados) {
+    var p = (_db().plans || []).find(function(x) { return x.id == planoId; });
+    if (!p) err(404, 'Plano não encontrado.');
+    dados = dados || {};
+    var pm = _numPreco(dados.price_monthly, 'preço mensal');
+    var pa = _numPreco(dados.price_annual, 'preço anual');
+    var pe = _numPreco(dados.price_per_employee, 'preço por funcionário');
+    if (pm !== undefined) p.price_monthly = pm;
+    if (pa !== undefined) p.price_annual = pa;
+    if (pe !== undefined) p.price_per_employee = pe;
+    DB.salvar();
+    return {
+      ok: true, plano: {
+        id: p.id, name: p.name,
+        price_monthly: Number(p.price_monthly || 0),
+        price_annual: Number(p.price_annual || 0),
+        price_per_employee: Number(p.price_per_employee || 0)
+      }
+    };
+  }
+
+  function saObterConfig() {
+    return { site_gratis: modoGratuito() };
+  }
+
+  function saDefinirSiteGratis(ativo) {
+    if (ativo && typeof ativo === 'object') ativo = ativo.ativo;
+    return definirModoGratuito(!!ativo);
   }
 
   function saExcluirLoja(shopId) {
@@ -2036,6 +2178,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* Resolve a loja da sessão, o nível e barra planos sem relatórios */
   function exigirNivelRelatorio() {
     const { shop } = exigirDono();
+    exigirAssinaturaAtiva(shop.id);
     const nivel = nivelRelatorioDe(shop.id);
     if (!podeAcessarRelatorio(nivel)) {
       const { plano } = planoEfetivo(shop.id);
@@ -2221,11 +2364,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     [data || DB.hojeISO(), DB.addDiasISO(-1)].forEach(d => {
       if (d && alvos.indexOf(d) < 0) alvos.push(d);
     });
+    const hoje = DB.hojeISO();
     for (const dia of alvos) {
-      const existentes = new Set(
-        db.relatorios_diarios.filter(r => r.data === dia).map(r => r.barbershop_id));
+      const diaCorrente = dia === hoje;
       for (const loja of db.barbershops) {
-        if (existentes.has(loja.id)) continue;
+        const idx = db.relatorios_diarios.findIndex(r =>
+          r.barbershop_id === loja.id && r.data === dia);
+        if (idx >= 0 && !diaCorrente) continue; /* dias passados fechados: mantém o snapshot */
         const lista = db.appointments.filter(a =>
           a.barbershop_id === loja.id && a.status === 'concluido' &&
           a.starts_at.slice(0, 10) === dia);
@@ -2237,14 +2382,16 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
           faixas[f] = (faixas[f] || 0) + 1;
         });
         const top = Object.keys(faixas).sort((a, b) => faixas[b] - faixas[a])[0] || null;
-        db.relatorios_diarios.push({
+        const snap = {
           id: DB.proximoId(), barbershop_id: loja.id, data: dia,
           faturamento: Math.round(faturamento * 100) / 100,
           agendamentos: lista.length,
           ticket: lista.length ? Math.round(faturamento / lista.length * 100) / 100 : null,
           faixa_pico: top,
           created_at: agoraISO()
-        });
+        };
+        if (idx >= 0) db.relatorios_diarios[idx] = snap;
+        else db.relatorios_diarios.push(snap);
       }
     }
     DB.salvar();
@@ -2741,7 +2888,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
         ? window.API.acessoLiberado(sub.barbershop_id)
         : false;
     } catch (e) { liberado = false; }
-    const efetivo = (liberado && plano) ? plano : (planoFree() || null);
+    const efetivo = (liberado && plano) ? plano
+      : (modoGratuito() ? planoGratuitoPlataforma() : (planoFree() || null));
     return {
       id: sub ? sub.id : null,
       plan: bonusPlano(plano),
@@ -2766,37 +2914,46 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   /**
-   * RF-059 — trial opcional "10 dias grátis" (uma única vez por loja).
-   * Só vale para lojas sem trial ativo e que ainda não usaram o benefício.
+   * RF-059 — "10 dias grátis" no plano escolhido (uma única vez por loja).
+   * Ao assinar, o dono entra em trial com o plano selecionado; passados os
+   * 10 dias, o job de cobrança (payments.js) gera automaticamente a cobrança
+   * do plano e o acesso pago fica bloqueado até a confirmação do pagamento.
    */
-  function ativarTrial() {
+  function assinarComTrial(planId) {
     const { shop } = exigirDono();
     const db = DB._d();
-    const salaopro = db.plans.find(p => String(p.name || '').toLowerCase() === 'salao');
-    if (!salaopro) err(500, 'Plano Salão não encontrado.');
+    const plano = db.plans.find(p => p.id == planId);
+    if (!plano) err(404, 'Plano não encontrado.');
+    if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
     const hoje = DB.hojeISO();
 
     const idx = db.subscriptions.findIndex(s => s.barbershop_id === shop.id);
-    const existe = idx >= 0;
-    const subAtual = existe ? db.subscriptions[idx] : null;
+    const subAtual = idx >= 0 ? db.subscriptions[idx] : null;
     if (subAtual && subAtual.status === 'trial' && subAtual.trial_ends_at >= hoje) {
-      err(400, 'Você já está no período de trial.');
+      err(400, 'Você já está no período de 10 dias grátis.');
     }
     if (subAtual && subAtual.trial_usado) {
-      err(409, 'O trial de 10 dias já foi utilizado por esta loja.');
+      err(409, 'Os 10 dias grátis já foram utilizados. Finalize o pagamento para ativar o plano.');
     }
 
     const sub = {
       id: subAtual ? subAtual.id : DB.proximoId(),
-      barbershop_id: shop.id, plan_id: salaopro.id,
+      barbershop_id: shop.id, plan_id: plano.id,
       status: 'trial', trial_ends_at: DB.addDiasISO(10),
       current_period_end: null, trial_usado: true,
       created_at: subAtual ? subAtual.created_at : agoraISO(), updated_at: agoraISO()
     };
-    if (existe) db.subscriptions[idx] = sub;
+    if (idx >= 0) db.subscriptions[idx] = sub;
     else db.subscriptions.push(sub);
     DB.salvar();
     return assinaturaPublica(sub);
+  }
+
+  function ativarTrial() {
+    const db = DB._d();
+    const salaopro = db.plans.find(p => String(p.name || '').toLowerCase() === 'salao');
+    if (!salaopro) err(500, 'Plano Salão não encontrado.');
+    return assinarComTrial(salaopro.id);
   }
 
   /**
@@ -2810,28 +2967,24 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!plano) err(404, 'Plano não encontrado.');
     if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
 
-    let sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
-    if (!sub) {
-      sub = {
-        id: DB.proximoId(), barbershop_id: shop.id, plan_id: plano.id,
-        status: 'ativa', trial_ends_at: null,
-        current_period_end: DB.addDiasISO(30),
-        trial_usado: true, created_at: agoraISO(), updated_at: agoraISO()
-      };
-      db.subscriptions.push(sub);
-    } else {
-      sub.plan_id = plano.id;
-      sub.trial_usado = true;
-      if (sub.status === 'trial' && sub.trial_ends_at >= DB.hojeISO()) {
-        /* mantém trial original — sem loop infinito de graça */
-      } else {
-        sub.status = 'ativa';
-        sub.current_period_end = DB.addDiasISO(30);
-      }
-      sub.updated_at = agoraISO();
+    const sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
+    const hoje = DB.hojeISO();
+    const emTrial = sub && sub.status === 'trial' && sub.trial_ends_at >= hoje;
+    const pago = sub && sub.status === 'ativa' && sub.current_period_end >= hoje;
+
+    /* Sem trial usado e sem período pago: entra nos 10 dias grátis. */
+    if (!emTrial && !pago && (!sub || !sub.trial_usado)) {
+      return assinarComTrial(plano.id);
     }
-    DB.salvar();
-    return assinaturaPublica(sub);
+    /* Troca dentro do trial mantém o prazo (DT-12); troca com plano pago
+       apenas muda o plano já contratado, sem conceder período grátis. */
+    if (emTrial || pago) {
+      sub.plan_id = plano.id;
+      sub.updated_at = agoraISO();
+      DB.salvar();
+      return assinaturaPublica(sub);
+    }
+    err(402, 'Finalize o pagamento da cobrança para reativar o acesso.');
   }
 
   function cancelarAssinatura() {
@@ -3360,6 +3513,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* Funções internas fora do roteador RPC (usadas pelo job diário do server.js) */
   window.__CC_INTERNAL = window.__CC_INTERNAL || {};
   window.__CC_INTERNAL.gerarDiariosParaData = gerarDiariosParaData;
+  window.__CC_INTERNAL.gerarLembretesAmanha = gerarLembretesAmanha;
+  window.__CC_INTERNAL.notificar = notificar;
 
   /* ================= API pública ================= */
 
@@ -3419,6 +3574,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
     // assinatura
     listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura, ativarTrial,
+    assinarComTrial,
 
     // uploads / galeria
     definirLogo, definirCapa,
@@ -3446,11 +3602,15 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // magic link / lembretes
     verificarMagicLink, gerarLembretesAmanha,
 
+    // plataforma / assinatura (só o flag público; setters são internos)
+    modoGratuito,
+
     // super-admin
     superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
     saTickets, saResponderTicket,
-    saListarDenuncias, saResolverDenuncia
+    saListarDenuncias, saResolverDenuncia,
+    saListarPlanos, saAtualizarPrecosPlano, saObterConfig, saDefinirSiteGratis
   };
 })();

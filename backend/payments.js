@@ -189,8 +189,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * cobrança de 12× o valor mensal). A opção de parcelar só é
    * aceita no período anual (parcelas de 1 a 12).
    */
-  async function criarCobrancaPlano(planId, periodo, parcelas, metodo, cardData) {
-    const { shop } = exigirDonoLocal();
+  async function montarCobranca(shopId, planId, periodo, parcelas, metodo, cardData) {
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
@@ -227,7 +226,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     /* pendente reutilizável? */
     const agora = agoraMsISO();
     const existente = db.payments.find(p =>
-      p.barbershop_id === shop.id && p.plan_id === plano.id &&
+      p.barbershop_id === shopId && p.plan_id === plano.id &&
       p.billing_period === dias && (p.installments || 1) === nParcFinal &&
       (p.metodo || 'pix') === mtd &&
       p.status === 'pending' && p.expires_at > agora);
@@ -235,7 +234,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
 
     const pag = {
       id: DB.proximoId(),
-      barbershop_id: shop.id,
+      barbershop_id: shopId,
       plan_id: plano.id,
       billing_period: dias,
       installments: nParcFinal,
@@ -274,6 +273,56 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     db.payments.push(pag);
     DB.salvar();
     return pagamentoPublico(pag);
+  }
+
+  /**
+   * Cria a cobrança do dono logado (wrapper de sessão sobre montarCobranca).
+   * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias, parcelável).
+   */
+  async function criarCobrancaPlano(planId, periodo, parcelas, metodo, cardData) {
+    const { shop } = exigirDonoLocal();
+    return montarCobranca(shop.id, planId, periodo, parcelas, metodo, cardData);
+  }
+
+  /**
+   * Job de assinatura: quando os 10 dias grátis terminam, o sistema gera
+   * automaticamente a cobrança do plano escolhido (PIX mensal), marca a
+   * assinatura como expirada (bloqueia o acesso pago) e avisa o dono.
+   * Idempotente: só processa assinaturas ainda em 'trial'.
+   */
+  async function cobrarTrialsVencidos() {
+    const db = DB._d();
+    const hoje = DB.hojeISO();
+    const vencidos = db.subscriptions.filter(s =>
+      s.status === 'trial' && s.trial_ends_at && s.trial_ends_at < hoje);
+    let geradas = 0;
+    for (const sub of vencidos) {
+      try {
+        const cobranca = await montarCobranca(sub.barbershop_id, sub.plan_id, 'mensal', 1, 'pix');
+        sub.status = 'expirada';
+        sub.updated_at = agoraISO();
+
+        const loja = db.barbershops.find(b => b.id === sub.barbershop_id);
+        const internos = window.__CC_INTERNAL || {};
+        if (loja && loja.owner_user_id && typeof internos.notificar === 'function') {
+          const valor = String(((cobranca.amount_cents || 0) / 100).toFixed(2)).replace('.', ',');
+          internos.notificar({
+            user_id: loja.owner_user_id,
+            barbershop_id: loja.id,
+            type: 'assinatura',
+            title: 'Seus 10 dias grátis terminaram',
+            message: 'Geramos a cobrança do plano ' + (cobranca.plan_name || '') +
+              ' (R$ ' + valor + '). Pague o PIX para continuar usando os recursos pagos.'
+          });
+        }
+        DB.salvar();
+        geradas++;
+      } catch (e) {
+        console.error('[assinatura][job] falha ao cobrar trial ' + sub.barbershop_id + ':',
+          (e && (e.error || e.message)) || e);
+      }
+    }
+    return { geradas };
   }
 
   /** Consulta a situação de uma cobrança (polling da tela). */
@@ -422,6 +471,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * dentro do prazo — acesso encerra ao fim do período).
    */
   function acessoLiberado(shopId) {
+    if (typeof window.API.modoGratuito === 'function' && window.API.modoGratuito()) return true;
     const db = DB._d();
     const hoje = DB.hojeISO();
     const sub = db.subscriptions.find(s => s.barbershop_id == shopId);
@@ -441,4 +491,9 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     processarEventoWebhook,
     acessoLiberado
   });
+
+  /* Internos do job de assinatura (fora do roteador RPC). */
+  window.__CC_INTERNAL = window.__CC_INTERNAL || {};
+  window.__CC_INTERNAL.cobrarTrialsVencidos = cobrarTrialsVencidos;
+  window.__CC_INTERNAL.criarCobrancaParaLoja = montarCobranca;
 })();
