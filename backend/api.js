@@ -3348,13 +3348,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* ================= SUPORTE (página extra mantida) ================= */
 
   function criarTicket(salaoId, assunto, mensagem) {
-    const user = sessao();
+    /* [SEGURANÇA] Só o dono pode abrir chamado e apenas para o PRÓPRIO
+       salão — o salaoId do cliente é validado contra o salão da sessão
+       (evita abrir chamado em nome de outra loja). */
+    const { user, shop } = exigirDono();
+    if (salaoId != null && String(salaoId) !== String(shop.id)) {
+      err(403, 'Você só pode abrir chamado para o seu próprio salão.');
+    }
+    const texto = String(mensagem || '').trim();
+    if (!texto) err(400, 'Escreva sua mensagem.');
     const t = {
       id: DB.proximoId(),
-      salao_id: String(salaoId),
+      salao_id: String(shop.id),
       user_id: user.id,
-      subject: String(assunto || 'Outro'),
-      message: String(mensagem || '').trim(),
+      subject: String(assunto || 'Outro').slice(0, 120),
+      message: texto,
       status: 'aberto',
       created_at: agoraISO(),
       updated_at: agoraISO()
@@ -3365,7 +3373,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function ticketsDoSalao(salaoId) {
-    return DB._d().tickets.filter(t => t.salao_id == salaoId).slice().reverse();
+    /* [SEGURANÇA] Isolamento por loja: o dono só lê os chamados do seu
+       próprio salão, independentemente do salaoId informado. */
+    const { shop } = exigirDono();
+    if (salaoId != null && String(salaoId) !== String(shop.id)) {
+      err(403, 'Acesso restrito aos chamados do seu salão.');
+    }
+    return DB._d().tickets.filter(t => t.salao_id == shop.id).slice().reverse();
   }
 
   function nomeLoja(id) {

@@ -285,44 +285,43 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
   }
 
   /**
-   * Job de assinatura: quando os 10 dias grátis terminam, o sistema gera
-   * automaticamente a cobrança do plano escolhido (PIX mensal), marca a
-   * assinatura como expirada (bloqueia o acesso pago) e avisa o dono.
-   * Idempotente: só processa assinaturas ainda em 'trial'.
+   * Job de assinatura: quando os 10 dias grátis terminam, a assinatura é
+   * marcada como 'expirada' (bloqueia o acesso pago) e o dono é avisado para
+   * escolher, na tela Assinatura, o plano que deseja renovar. A assinatura é
+   * mensal e a cobrança só é gerada quando ele escolhe o plano
+   * (criarCobrancaPlano). Idempotente: só processa assinaturas em 'trial'.
    */
-  async function cobrarTrialsVencidos() {
+  function vencerTrialsExpirados() {
     const db = DB._d();
     const hoje = DB.hojeISO();
     const vencidos = db.subscriptions.filter(s =>
       s.status === 'trial' && s.trial_ends_at && s.trial_ends_at < hoje);
-    let geradas = 0;
+    let vencidosCount = 0;
     for (const sub of vencidos) {
       try {
-        const cobranca = await montarCobranca(sub.barbershop_id, sub.plan_id, 'mensal', 1, 'pix');
         sub.status = 'expirada';
         sub.updated_at = agoraISO();
 
         const loja = db.barbershops.find(b => b.id === sub.barbershop_id);
         const internos = window.__CC_INTERNAL || {};
         if (loja && loja.owner_user_id && typeof internos.notificar === 'function') {
-          const valor = String(((cobranca.amount_cents || 0) / 100).toFixed(2)).replace('.', ',');
           internos.notificar({
             user_id: loja.owner_user_id,
             barbershop_id: loja.id,
             type: 'assinatura',
             title: 'Seus 10 dias grátis terminaram',
-            message: 'Geramos a cobrança do plano ' + (cobranca.plan_name || '') +
-              ' (R$ ' + valor + '). Pague o PIX para continuar usando os recursos pagos.'
+            message: 'Escolha o plano que deseja renovar na tela Assinatura. ' +
+              'A assinatura é mensal e a cobrança é gerada na hora que você escolher.'
           });
         }
         DB.salvar();
-        geradas++;
+        vencidosCount++;
       } catch (e) {
-        console.error('[assinatura][job] falha ao cobrar trial ' + sub.barbershop_id + ':',
+        console.error('[assinatura][job] falha ao vencer trial ' + sub.barbershop_id + ':',
           (e && (e.error || e.message)) || e);
       }
     }
-    return { geradas };
+    return { vencidos: vencidosCount };
   }
 
   /** Consulta a situação de uma cobrança (polling da tela). */
@@ -494,6 +493,6 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
 
   /* Internos do job de assinatura (fora do roteador RPC). */
   window.__CC_INTERNAL = window.__CC_INTERNAL || {};
-  window.__CC_INTERNAL.cobrarTrialsVencidos = cobrarTrialsVencidos;
+  window.__CC_INTERNAL.vencerTrialsExpirados = vencerTrialsExpirados;
   window.__CC_INTERNAL.criarCobrancaParaLoja = montarCobranca;
 })();

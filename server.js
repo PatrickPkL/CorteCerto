@@ -885,23 +885,24 @@ function bancoRemoto() {
     setInterval(enviarLembretesAmanha, 30 * 60 * 1000);
   }
 
-  /* Job de assinatura: ao terminar os 10 dias grátis de uma loja, gera a
-     cobrança do plano escolhido e bloqueia o acesso pago até o pagamento.
-     Roda no boot e a cada 30 minutos. */
+  /* Job de assinatura: ao terminar os 10 dias grátis de uma loja, marca a
+     assinatura como expirada e avisa o dono para escolher o plano que deseja
+     renovar (a cobrança é gerada quando ele escolhe). Roda no boot e a cada
+     30 minutos. */
   {
-    async function cobrarTrialsVencidos() {
+    async function vencerTrialsExpirados() {
       try {
         const internos = global.__CC_INTERNAL || {};
-        if (typeof internos.cobrarTrialsVencidos === 'function') {
-          const r = await internos.cobrarTrialsVencidos();
-          if (r && r.geradas) console.log('[assinatura] cobranças geradas após o trial: ' + r.geradas);
+        if (typeof internos.vencerTrialsExpirados === 'function') {
+          const r = await internos.vencerTrialsExpirados();
+          if (r && r.vencidos) console.log('[assinatura] trials vencidos processados: ' + r.vencidos);
         }
       } catch (e) {
         console.error('[assinatura][job]', e);
       }
     }
-    cobrarTrialsVencidos();
-    setInterval(cobrarTrialsVencidos, 30 * 60 * 1000);
+    vencerTrialsExpirados();
+    setInterval(vencerTrialsExpirados, 30 * 60 * 1000);
   }
 
   Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)
