@@ -32,9 +32,12 @@ if (_temSsl) {
     database: (_p.pathname || '').replace(/^\//, ''),
     user: decodeURIComponent(_p.username || ''),
     password: decodeURIComponent(_p.password || ''),
-    // [SEGURANÇA] Verifica certificado SSL (MITM protection)
-    // Banco local .pg não tem ssl= na URL → intocado; afeta só cloud
-    ssl: { rejectUnauthorized: true }
+    /* [SEGURANÇA] A conexão continua SEMPRE criptografada. Hosts gerenciados
+       (Render/Neon) usam certificado self-signed, então por padrão NÃO
+       validamos a cadeia — igual ao knexfile.js (migrações). Para exigir a
+       validação estrita, defina PGSSL_STRICT=1 e use um CA confiável.
+       Banco local .pg não tem ssl= na URL → intocado; afeta só cloud. */
+    ssl: { rejectUnauthorized: process.env.PGSSL_STRICT === '1' }
   };
 } else {
   _conn = _url;
