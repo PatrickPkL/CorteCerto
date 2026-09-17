@@ -95,6 +95,12 @@ function json(res, status, obj) {
   res.end(corpo);
 }
 
+// [SEGURANÇA] Helper para mascarar e-mail em logs
+function mascararEmail(e) {
+  const [u, d] = String(e || '').split('@');
+  return (u && u[0] ? u[0] : '') + '***@' + (d || '');
+}
+
 /* ---------------- rate-limit ---------------- */
 const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
@@ -106,12 +112,17 @@ const AUTH_FAIL_MAX = 5;
 const AUTH_FAIL_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_BLOCK_MS = 15 * 60 * 1000;
 
+// [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além de IP
+const _failedAuthByIdent = new Map();
+const AUTH_FAIL_MAX_IDENT = 10;
+const AUTH_BLOCK_MS_IDENT = 30 * 60 * 1000; // 30 minutos
+
 /* Métodos RPC que exigem sessão válida (segunda camada de defesa) */
 const _authRequired = new Set([
   'criarAgendamento', 'listarAgendamentos', 'atualizarAgendamento',
   'excluirAgendamento', 'meusAgendamentos', 'getAgendamento',
   'listarClientes', 'getCliente', 'criarCliente', 'atualizarCliente', 'agendamentosDoCliente',
-  'dashboardStats', 'exportarCSV',
+  'dashboardStats', 'exportarCSV', 'gerarRelatorio', 'gerarRelatorioDiario',
   'minhaLoja', 'atualizarLoja', 'excluirLoja',
   'criarServico', 'atualizarServico', 'excluirServico',
   'criarProfissional', 'atualizarProfissional', 'desativarProfissional',
@@ -126,13 +137,14 @@ const _authRequired = new Set([
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
   'definirLogo', 'definirCapa',
-  'galeriaDaLoja', 'adicionarGaleria', 'removerGaleria',
-  'servicosDaLoja', 'profissionaisDaLoja', 'horariosDaLoja',
+  'adicionarGaleria', 'removerGaleria',
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
-  'ativarTrial',
+  'ativarTrial', 'assinarComTrial',
   'criarCobrancaPlano', 'statusCobranca', 'listarMinhasCobrancas',
   'confirmarCobrancaDemo', 'simularCobranca',
   'criarReview', 'minhasReviews',
+  'denunciarPerfil', 'minhasDenuncias',
+  'bloquearCliente', 'desbloquearCliente', 'clienteBloqueado',
   'logout'
 ]);
 
@@ -144,10 +156,13 @@ const _authRequired = new Set([
    REST próprias com needAuth() + rate-limit. */
 const _RPC_BLOQUEADOS = new Set([
   'err', '_auditLog', 'processarEventoWebhook',
+  'definirModoGratuito',
   'superAdminLogin', 'superAdminAuth', 'superAdminLogout',
   'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
-  'saTickets', 'saResponderTicket'
+  'saTickets', 'saResponderTicket',
+  'saListarDenuncias', 'saResolverDenuncia',
+  'saListarPlanos', 'saAtualizarPrecosPlano', 'saObterConfig', 'saDefinirSiteGratis'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -218,7 +233,8 @@ function handleRpc(req, res) {
   let corpo = '';
   req.on('data', c => {
     corpo += c;
-    if (corpo.length > 2e6) req.destroy();
+    // [SEGURANÇA] Reduzido de 2MB para 500KB — galeria envia 1 foto por chamada
+    if (corpo.length > 500 * 1024) req.destroy();
   });
   req.on('end', () => {
     let metodo;
@@ -254,6 +270,17 @@ function handleRpc(req, res) {
        Sanitiza __proto__/prototype/constructor em payloads aninhados. */
     const argList = Array.isArray(args) ? args.map(a => sanitizarParams(a, 0)) : [];
 
+    // [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além do IP
+    const ident = (args && args[0] && (args[0].email || args[0].ident || args[0].cpf)) || null;
+    if (ident) {
+      const identKey = 'ident:' + String(ident).toLowerCase().trim();
+      const recIdent = _failedAuthByIdent.get(identKey);
+      if (recIdent && Date.now() < recIdent.blockedUntil) {
+        return json(res, 429, { ok: false, error: 'Muitas tentativas. Aguarde ' +
+          Math.ceil((recIdent.blockedUntil - Date.now()) / 60000) + ' min.' });
+      }
+    }
+
     /* segunda camada: métodos autenticados exigem token válido */
     if (_authRequired.has(metodo)) {
       const tk = req.headers['x-cc-token'] || null;
@@ -279,7 +306,7 @@ function handleRpc(req, res) {
     global.__CC_HTTP = true;
     const ip = req.socket.remoteAddress || '0.0.0.0';
     const ts = new Date().toISOString();
-    const argsStr = JSON.stringify(Array.isArray(args) ? args : []).slice(0, 200);
+    // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
 
     /* brute-force guard para verifyCode */
     if (metodo === 'verifyCode') {
@@ -317,9 +344,21 @@ function handleRpc(req, res) {
                   prev.blockedUntil = 0;
                 }
                 _failedAuth.set(ip, prev);
+                // [SEGURANÇA] Incrementa tbm por identidade (e-mail/CPF)
+                if (ident && metodo === 'verifyCode') {
+                  const identKey = 'ident:' + String(ident).toLowerCase().trim();
+                  const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
+                  recIdent.count++;
+                  if (recIdent.count >= AUTH_FAIL_MAX_IDENT) {
+                    recIdent.blockedUntil = Date.now() + AUTH_BLOCK_MS_IDENT;
+                  }
+                  _failedAuthByIdent.set(identKey, recIdent);
+                }
               }
-              if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=' + argsStr, e);
-              json(res, st, { ok: false, status: st, error: (e && e.error) || 'Erro interno.' });
+              // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
+              if (st >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + st, 'args=[REDACTED]', e);
+              json(res, st, Object.assign({ ok: false, status: st, error: (e && e.error) || 'Erro interno.' },
+                (e && e.code) ? { code: e.code } : null));
             })
           .finally(() => {
             /* limpa o contexto HTTP somente depois de a Promise resolver —
@@ -348,9 +387,21 @@ function handleRpc(req, res) {
           prev.blockedUntil = 0;
         }
         _failedAuth.set(ip, prev);
+        // [SEGURANÇA] Incrementa tambem por identidade (e-mail/CPF)
+        if (ident && metodo === 'verifyCode') {
+          const identKey = 'ident:' + String(ident).toLowerCase().trim();
+          const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
+          recIdent.count++;
+          if (recIdent.count >= AUTH_FAIL_MAX_IDENT) {
+            recIdent.blockedUntil = Date.now() + AUTH_BLOCK_MS_IDENT;
+          }
+          _failedAuthByIdent.set(identKey, recIdent);
+        }
       }
-      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=' + argsStr, e);
-      const saida = json(res, status, { ok: false, status, error: (e && e.error) || 'Erro interno.' });
+      // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
+      if (status >= 500) console.error('[rpc][ERR]', ts, 'method=' + metodo, 'ip=' + ip, 'status=' + status, 'args=[REDACTED]', e);
+      const saida = json(res, status, Object.assign({ ok: false, status, error: (e && e.error) || 'Erro interno.' },
+        (e && e.code) ? { code: e.code } : null));
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
       return saida;
@@ -419,6 +470,36 @@ function handleSuperAdmin(req, res, pathname, url) {
     return;
   }
 
+  /* GET /api/super-admin/config — configurações globais da plataforma */
+  if (rota === 'config' && !idParam && req.method === 'GET') {
+    try { const r = API.saObterConfig(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/config — liga/desliga o modo grátis do site */
+  if (rota === 'config' && !idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saDefinirSiteGratis(dados.site_gratis);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/planos — planos e preços */
+  if (rota === 'planos' && !idParam && req.method === 'GET') {
+    try { const r = API.saListarPlanos(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/plano/:id/precos — atualiza preços do plano */
+  if (rota === 'plano' && idParam && parts[2] === 'precos' && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saAtualizarPrecosPlano(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
   /* GET /api/super-admin/lojas */
   if (rota === 'lojas' && req.method === 'GET' && !idParam) {
     try { const r = API.saListarLojas(); json(res, 200, { ok: true, data: r }); }
@@ -469,6 +550,27 @@ function handleSuperAdmin(req, res, pathname, url) {
   if (rota === 'ticket' && idParam && req.method === 'PUT') {
     return readBody().then(dados => {
       const r = API.saResponderTicket(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/denuncias?status=...&tipo=... */
+  if (rota === 'denuncias' && req.method === 'GET') {
+    try {
+      var qs = new URL(url, 'http://localhost').searchParams;
+      var r = API.saListarDenuncias({
+        status: qs.get('status') || 'todos',
+        tipo: qs.get('tipo') || 'todos'
+      });
+      json(res, 200, { ok: true, data: r });
+    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/denuncia/:id — atualiza status/nota */
+  if (rota === 'denuncia' && idParam && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saResolverDenuncia(idParam, dados);
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
   }
@@ -584,7 +686,8 @@ function handleWebhookAbacate(req, res, url) {
     catch (e) { return json(res, 400, { ok: false, error: 'JSON inválido.' }); }
     try {
       const r = API.processarEventoWebhook(ev);
-      console.log('[webhook] ' + (ev.event || '?') + ' → ' + JSON.stringify(r));
+      // [SEGURANÇA] Não logar dados do evento (podem conter PII)
+      console.log('[webhook] event=' + (ev.event || '?') + ' ok=' + !r.ignored);
       return json(res, 200, { ok: true, data: r });
     } catch (e) {
       console.error('[webhook]', e);
@@ -735,11 +838,112 @@ function bancoRemoto() {
     }
   }
 
+  /* Auto-migração: aplica migrações pendentes ANTES de carregar o schema.
+     Só roda quando MIGRATION_DATABASE_URL está configurada (role privilegiada,
+     necessária para criar tipos/roles/RLS); desligue com AUTO_MIGRATE=0.
+     Sem isso, tabelas novas (ex.: reports) faltam e o boot morre em
+     "relation ... does not exist". Mantém o deploy em dia sem passo manual. */
+  if (process.env.MIGRATION_DATABASE_URL && process.env.AUTO_MIGRATE !== '0') {
+    /* Guard: o deploy é remoto mas MIGRATION_DATABASE_URL aponta para o host
+       local (127.0.0.1/localhost) — erro clássico de copiar o .env.example.
+       Em vez de um ECONNREFUSED sem contexto, orientamos sobre como corrigir. */
+    if (bancoRemoto()) {
+      let migHost = null;
+      try { migHost = new URL(process.env.MIGRATION_DATABASE_URL).hostname; } catch (e) { /* não é uma URL */ }
+      if (migHost === '127.0.0.1' || migHost === 'localhost' || migHost === '::1') {
+        console.error('[migrate] MIGRATION_DATABASE_URL aponta para "' + migHost +
+          ':5432", mas o banco do app é remoto (Render/Neon).');
+        console.error('[migrate] Configure MIGRATION_DATABASE_URL com a "Internal Database URL" do Postgres');
+        console.error('[migrate] no painel do Render (mesmo host e usuário dono do DATABASE_URL de produção).');
+        process.exit(1);
+      }
+    }
+    try {
+      const knexFactory = require('knex');
+      const cfg = require('./knexfile').production;
+      const dbMig = knexFactory({
+        client: cfg.client,
+        connection: cfg.connection,
+        migrations: cfg.migrations,
+        pool: { min: 0, max: 1 }
+      });
+      const res = await dbMig.migrate.latest();
+      const lote = Array.isArray(res) ? res[0] : res;
+      const aplicadas = Array.isArray(res) && Array.isArray(res[1]) ? res[1] : [];
+      console.log('[migrate] schema OK (lote ' + lote +
+        (aplicadas.length ? ', ' + aplicadas.length + ' migração(ões) aplicada(s)' : ', nada pendente') + ').');
+      await dbMig.destroy();
+    } catch (e) {
+      console.error('[migrate] falha ao aplicar migrações:', (e && (e.message || e)) || e);
+      process.exit(1);
+    }
+  }
+
   try {
     await boot.init();
   } catch (e) {
     console.error('[boot] Falha ao carregar o banco de dados:', e);
     process.exit(1);
+  }
+
+  /* Job diário dos relatórios: padrão de TODOS os planos pagos.
+     Ao virar o dia (00:00) grava o snapshot de faturamento por loja;
+     no boot de um dia novo também cobre o dia anterior (catch-up). */
+  {
+    async function garantirRelatoriosDiarios() {
+      try {
+        const hoje = global.DB.hojeISO();
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.gerarDiariosParaData === 'function') {
+          internos.gerarDiariosParaData(hoje);
+          console.log('[relatorios] snapshot diário atualizado (' + hoje + ')');
+        }
+      } catch (e) {
+        console.error('[relatorios][job]', e);
+      }
+    }
+    garantirRelatoriosDiarios();
+    setInterval(garantirRelatoriosDiarios, 60 * 1000);
+  }
+
+  /* Job de lembretes por e-mail (Gmail): envia 1 dia antes e no dia do
+     agendamento. As marcas persistidas (lembrete_email_em /
+     lembrete_dia_email_em) evitam reenvio; roda no boot e a cada 30
+     minutos, sem depender de o dono abrir o painel. */
+  {
+    async function enviarLembretesAmanha() {
+      try {
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.gerarLembretesAmanha === 'function') {
+          const r = internos.gerarLembretesAmanha();
+          if (r && r.enviados) console.log('[lembretes] e-mails de lembrete enviados: ' + r.enviados);
+        }
+      } catch (e) {
+        console.error('[lembretes][job]', e);
+      }
+    }
+    enviarLembretesAmanha();
+    setInterval(enviarLembretesAmanha, 30 * 60 * 1000);
+  }
+
+  /* Job de assinatura: ao terminar os 10 dias grátis de uma loja, marca a
+     assinatura como expirada e avisa o dono para escolher o plano que deseja
+     renovar (a cobrança é gerada quando ele escolhe). Roda no boot e a cada
+     30 minutos. */
+  {
+    async function vencerTrialsExpirados() {
+      try {
+        const internos = global.__CC_INTERNAL || {};
+        if (typeof internos.vencerTrialsExpirados === 'function') {
+          const r = await internos.vencerTrialsExpirados();
+          if (r && r.vencidos) console.log('[assinatura] trials vencidos processados: ' + r.vencidos);
+        }
+      } catch (e) {
+        console.error('[assinatura][job]', e);
+      }
+    }
+    vencerTrialsExpirados();
+    setInterval(vencerTrialsExpirados, 30 * 60 * 1000);
   }
 
   Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)
@@ -751,7 +955,8 @@ function bancoRemoto() {
     console.log('  Banco de dados   : PostgreSQL (cortecerto)');
     console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
     if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      console.log('  E-mail (código)  : Gmail real (' + process.env.GMAIL_USER + ')');
+      // [SEGURANÇA] Mascarar e-mail no log de boot
+      console.log('  E-mail (código)  : Gmail real (' + mascararEmail(process.env.GMAIL_USER) + ')');
     } else {
       console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
     }

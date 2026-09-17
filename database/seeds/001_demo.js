@@ -34,12 +34,11 @@ function fmtDataBR(iso) {
 
 exports.seed = async function (knex) {
   // ---------- plans ----------
-  const plans = [
-    { id: uuid(4), name: 'Free', price_monthly: 0, price_per_employee: 0, max_professionals: 0, features: ['Painel somente leitura', 'Perfil da loja', 'Upgrade a qualquer momento'], permissions: [], is_free: true, active: true },
-    { id: uuid(1), name: 'Autonomo', price_monthly: 9.90, price_per_employee: 0, max_professionals: 1, features: ['1 profissional', 'Link de agendamento', 'Relatório básico'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria'], active: true },
-    { id: uuid(2), name: 'Salao', price_monthly: 19.90, price_per_employee: 10, max_professionals: 10, features: ['Até 10 profissionais', 'Multi-funcionário', 'Resumo financeiro'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes'], active: true },
-    { id: uuid(3), name: 'Salao Pro', price_monthly: 26.90, price_per_employee: 0, max_professionals: null, features: ['Tudo do Salão', 'Profissionais ilimitados', 'Relatórios avançados'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true }
-  ];
+const plans = [
+  { id: uuid(1), name: 'Autonomo', price_monthly: 9.90, price_annual: 118.00, price_per_employee: 0, max_professionals: 1, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+  { id: uuid(2), name: 'Salao', price_monthly: 19.90, price_annual: 199.99, price_per_employee: 10, max_professionals: 5, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+  { id: uuid(3), name: 'Salao Pro', price_monthly: 25.99, price_annual: 249.99, price_per_employee: 0, max_professionals: null, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+];
 
   // ---------- users (dados sensíveis cifrados) ----------
   const mkUser = (id, role, name, email, phone, verified, created) => {

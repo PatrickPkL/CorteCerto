@@ -411,11 +411,28 @@ document.addEventListener('DOMContentLoaded', () => {
   let logs = [];
   let assinatura = null;
   let clientes = [];
+  let planos = [];
+
+  /* Relatório (RF-070): a resposta vem filtrada pelo backend conforme
+     o plano (todos os planos pagos liberam o nível completo). O frontend
+     apenas renderiza os campos que chegaram. */
+  let relatorio = null;
+  let relatorioErro = null;
+  let relatorioDiario = null;
+  let relatorioDiarioErro = null;
 
   function consultarTudo() {
     try { stats = API.dashboardStats('year'); } catch (e) { stats = null; }
     try { logs = API.meusLogsDeAcesso() || []; } catch (e) { logs = []; }
     try { assinatura = API.minhaAssinatura(); } catch (e) { assinatura = null; }
+    relatorio = null;
+    relatorioErro = null;
+    try { relatorio = API.gerarRelatorio('year'); } catch (e) { relatorioErro = e; }
+    relatorioDiario = null;
+    relatorioDiarioErro = null;
+    try { relatorioDiario = API.gerarRelatorioDiario(); } catch (e) { relatorioDiarioErro = e; }
+    planos = [];
+    try { planos = API.listarPlanos() || []; } catch (e) { planos = []; }
     clientes = [];
     try {
       for (let p = 1; p <= 10; p++) {
@@ -434,10 +451,506 @@ document.addEventListener('DOMContentLoaded', () => {
     const tb = document.getElementById('tabela-planos');
     if (tb) { tb.hidden = true; }
     setText('lbl-planos-sub', 'Para acompanhar as assinaturas da plataforma, entre como super-admin.');
+
+    const tabs = document.getElementById('rel-tabs');
+    if (tabs) tabs.hidden = false;
+  }
+
+  /* ---------- cards do relatório escalonado ---------- */
+  function criarCard(label, valor, delta) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const lbl = document.createElement('span');
+    lbl.className = 'stat-label';
+    lbl.textContent = label;
+    const v = document.createElement('div');
+    v.className = 'stat-value';
+    v.textContent = valor;
+    card.appendChild(lbl);
+    card.appendChild(v);
+    if (delta != null && delta !== '') {
+      const d = document.createElement('div');
+      d.className = 'stat-delta';
+      d.textContent = delta;
+      card.appendChild(d);
+    }
+    return card;
+  }
+
+  function criarTituloSecao(texto) {
+    const h = document.createElement('h3');
+    h.className = 'section-title';
+    h.textContent = texto;
+    return h;
+  }
+
+  /* Tabela de horários de pico (todos os planos pagos) */
+  function criarTabelaHorariosPico(faixas) {
+    const table = document.createElement('table');
+    table.className = 'plans-table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Faixa</th><th>Agendamentos</th></tr>';
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    faixas.forEach(h => {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.textContent = h.faixa;
+      const td2 = document.createElement('td');
+      td2.textContent = h.count;
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /* Exporta CSV dos valores já liberados pelo backend (client-side) */
+  function exportarCSVRelatorio(dados) {
+    const linhas = [
+      ['Métrica', 'Valor'],
+      ['Faturamento Total', nossoDolar(dados.faturamento)],
+      ['Total Agendamentos', dados.totalAgendamentos !== undefined ? dados.totalAgendamentos : '-'],
+      ['Ticket Médio', dados.ticketMedio !== undefined ? nossoDolar(dados.ticketMedio) : '-'],
+      ['Semana — início', (dados.semanal && dados.semanal.inicio) || '-'],
+      ['Semana — fim', (dados.semanal && dados.semanal.fim) || '-'],
+      ['Semana — faturamento', dados.semanal ? nossoDolar(dados.semanal.faturamento) : '-'],
+      ['Semana — delta %', (dados.semanal && dados.semanal.delta_faturamento_pct != null) ? dados.semanal.delta_faturamento_pct : '-'],
+      ['Mês', (dados.mensal && dados.mensal.mes) || '-'],
+      ['Mês — faturamento', dados.mensal ? nossoDolar(dados.mensal.faturamento) : '-'],
+      ['Mês — delta %', (dados.mensal && dados.mensal.delta_faturamento_pct != null) ? dados.mensal.delta_faturamento_pct : '-'],
+      ['Melhor dia', (dados.melhorDia && dados.melhorDia.data) || '-'],
+      ['Melhor dia — faturamento', dados.melhorDia ? nossoDolar(dados.melhorDia.faturamento) : '-'],
+      ['Serviço Mais Realizado', (dados.servicoMaisRealizado && dados.servicoMaisRealizado.nome) || '-'],
+      ['Profissional Mais Rentável', (dados.profissionalMaisRentavel && dados.profissionalMaisRentavel.nome) || '-']
+    ];
+    (dados.horariosPico || []).forEach(h => {
+      linhas.push(['Pico ' + h.faixa, h.count]);
+    });
+    const csv = linhas.map(l => l.map(String).join(';')).join('\r\n');
+    const nome = 'relatorio-' + (dados.start_date || new Date().toISOString().slice(0, 10)) + '.csv';
+    if (dados.atendimentosDetalhados && dados.atendimentosDetalhados.length) {
+      const detalhe = dados.atendimentosDetalhados.map(a =>
+        [a.data, a.hora, a.cliente, a.profissional, a.servicos, nossoDolar(a.valor)].join(';'));
+      const bloco = [['Data', 'Hora', 'Cliente', 'Profissional', 'Serviços', 'Valor'].join(';')].concat(detalhe);
+      baixarArquivo(nome, '\uFEFF' + [csv].concat(bloco).join('\r\n'));
+      return;
+    }
+    baixarArquivo(nome, '\uFEFF' + csv);
+  }
+
+  /* Exporta um relatório específico já liberado pelo plano (fail-closed) */
+  function exportarCSVRelatorioPorTipo(chave) {
+    const dados = relatorio;
+    if (!dados || relatorioErro) return;
+    const q = (v) => String(v == null ? '' : v);
+    const hoje = String(dados.end_date || new Date().toISOString().slice(0, 10));
+    let blocos = [];
+    let nome = 'relatorio-' + hoje + '.csv';
+    switch (chave) {
+      case 'semanal': {
+        const s = dados.semanal;
+        nome = 'relatorio-semanal-' + (s && s.fim || hoje) + '.csv';
+        blocos.push(['Métrica', 'Valor']);
+        if (s) {
+          blocos.push(['Semana — início', q(s.inicio)], ['Semana — fim', q(s.fim)],
+            ['Faturamento', nossoDolar(s.faturamento)],
+            ['Agendamentos concluídos', q(s.agendamentos ?? '')],
+            ['Delta vs semana anterior (%)', s.delta_faturamento_pct == null ? '—' : q(s.delta_faturamento_pct)]);
+        }
+        break;
+      }
+      case 'mensal': {
+        const m = dados.mensal;
+        nome = 'relatorio-mensal-' + ((m && m.mes) || hoje) + '.csv';
+        blocos.push(['Métrica', 'Valor']);
+        if (m) {
+          blocos.push(['Mês', q(m.mes)], ['Período', q(m.inicio) + ' a ' + q(m.fim)],
+            ['Faturamento', nossoDolar(m.faturamento)],
+            ['Agendamentos concluídos', q(m.agendamentos ?? '')],
+            ['Delta vs mês anterior (%)', m.delta_faturamento_pct == null ? '—' : q(m.delta_faturamento_pct)]);
+        }
+        break;
+      }
+      case 'melhorDia': {
+        nome = 'relatorio-melhor-dia-' + ((dados.melhorDia && dados.melhorDia.data) || hoje) + '.csv';
+        blocos.push(['Métrica', 'Valor']);
+        if (dados.melhorDia) {
+          blocos.push(['Melhor dia', q(dados.melhorDia.data)],
+            ['Faturamento', nossoDolar(dados.melhorDia.faturamento)],
+            ['Agendamentos', q(dados.melhorDia.agendamentos ?? '')]);
+        }
+        blocos.push([], ['Dia', 'Faturamento', 'Agendamentos']);
+        (dados.melhorDiaSerie || []).forEach(d =>
+          blocos.push([q(d.data), nossoDolar(d.faturamento), q(d.agendamentos ?? '')]));
+        break;
+      }
+      case 'detalhado': {
+        const lista = dados.atendimentosDetalhados || [];
+        nome = 'relatorio-detalhado-' + hoje + '.csv';
+        blocos.push(['Data', 'Hora', 'Cliente', 'Profissional', 'Serviços', 'Valor']);
+        lista.forEach(a =>
+          blocos.push([q(a.data), q(a.hora), q(a.cliente), q(a.profissional), q(a.servicos), nossoDolar(a.valor)]));
+        break;
+      }
+      default:
+        return;
+    }
+    var csv = '';
+    for (var i = 0; i < blocos.length; i++) {
+      if (blocos[i].length) csv += blocos[i].map(q).join(';') + '\r\n';
+    }
+    baixarArquivo(nome, '\uFEFF' + csv);
+  }
+
+  /* Aba RELATÓRIOS — gráficos reais calculados a partir dos dados do salão */
+  function renderizarRelatorios() {
+    const container = document.getElementById('pt-relatorios');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (relatorioErro || !relatorio || !relatorio.nivel) {
+      container.innerHTML = '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
+        'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      return;
+    }
+
+    let desenhou = false;
+
+    /* Faturamento por mês (agrega a série diária do período) */
+    const serie = relatorio.melhorDiaSerie || [];
+    if (serie.length) {
+      const porMes = {};
+      serie.forEach(d => {
+        const k = String(d.data || '').slice(0, 7);
+        if (!k) return;
+        porMes[k] = (porMes[k] || 0) + Number(d.faturamento || 0);
+      });
+      const chaves = Object.keys(porMes).sort().slice(-12);
+      const rot = chaves.map(rotuloMes);
+      const val = chaves.map(k => Math.round(porMes[k] * 100) / 100);
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Faturamento por mês'));
+      const cv = document.createElement('canvas');
+      cv.className = 'chart-box chart-box-chart';
+      card.appendChild(cv);
+      container.appendChild(card);
+      desenharBarras(cv, rot, val, C.brass);
+      desenhou = true;
+    }
+
+    /* Atendimentos por faixa de horário (dados reais do período) */
+    const pico = relatorio.horariosPico || [];
+    if (pico.length) {
+      const ordenado = pico.slice().sort((a, b) => String(a.faixa).localeCompare(String(b.faixa)));
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Atendimentos por faixa de horário'));
+      const cv = document.createElement('canvas');
+      cv.className = 'chart-box chart-box-chart';
+      card.appendChild(cv);
+      container.appendChild(card);
+      desenharBarras(cv, ordenado.map(p => p.faixa), ordenado.map(p => p.count), C.brassSoft);
+      desenhou = true;
+    }
+
+    if (!desenhou) {
+      const nota = document.createElement('p');
+      nota.className = 'chart-caption';
+      nota.textContent = 'Ainda não há faturamento concluído no período para exibir gráficos. ' +
+        'Eles aparecem automaticamente conforme os atendimentos forem concluídos.';
+      container.appendChild(nota);
+    }
+  }
+
+  /* [SEGURANÇA] Renderiza APENAS os campos que o backend liberou
+     para o plano (fail-closed). Plano sem assinatura recebe o banner. */
+  function renderizarRelatorio() {
+    const container = document.getElementById('pt-geral');
+    if (!container) return;
+    container.innerHTML = '';
+    if (relatorioErro || !relatorio || !relatorio.nivel) {
+      container.innerHTML = '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
+        'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      return;
+    }
+    const dados = relatorio;
+
+    const grade = document.createElement('div');
+    grade.className = 'card-row cols-2';
+
+    grade.appendChild(criarCard('Faturamento Total', nossoDolar(dados.faturamento),
+      'período: ' + dados.start_date + ' a ' + dados.end_date));
+
+    if (dados.totalAgendamentos !== undefined) {
+      grade.appendChild(criarCard('Total de Agendamentos', dados.totalAgendamentos,
+        'agendamentos concluídos no período'));
+    }
+
+    if (dados.semanal) {
+      grade.appendChild(criarCard('Semana atual (resultado)', nossoDolar(dados.semanal.faturamento),
+        dados.semanal.delta_faturamento_pct == null
+          ? 'semana anterior sem faturamento'
+          : (dados.semanal.delta_faturamento_pct >= 0 ? '+' : '') +
+            dados.semanal.delta_faturamento_pct + '% vs semana anterior'));
+    }
+
+    if (dados.ticketMedio !== undefined) {
+      grade.appendChild(criarCard('Ticket Médio', nossoDolar(dados.ticketMedio),
+        'faturamento ÷ agendamentos'));
+    }
+
+    if (dados.mensal) {
+      grade.appendChild(criarCard('Resultado mensal (' + dados.mensal.mes + ')',
+        nossoDolar(dados.mensal.faturamento),
+        (dados.mensal.delta_faturamento_pct == null
+          ? 'mês anterior sem faturamento'
+          : (dados.mensal.delta_faturamento_pct >= 0 ? '+' : '') +
+            dados.mensal.delta_faturamento_pct + '% vs ' + dados.mensal.mes_anterior) +
+          ' · ' + dados.mensal.agendamentos + ' atendimento(s)'));
+    }
+
+    container.appendChild(grade);
+
+    /* Gráfico do dia com mais lucro (Salão e superiores) */
+    if (dados.melhorDia && dados.melhorDiaSerie && dados.melhorDiaSerie.length) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Dia com mais lucro'));
+      const nota = document.createElement('p');
+      nota.className = 'chart-caption';
+      nota.textContent = 'Melhor dia: ' + dados.melhorDia.data.slice(8, 10) + '/' +
+        dados.melhorDia.data.slice(5, 7) + ' — ' + nossoDolar(dados.melhorDia.faturamento) +
+        ' (' + dados.melhorDia.agendamentos + ' atendimento(s)).';
+      card.appendChild(nota);
+      const cv = document.createElement('canvas');
+      cv.id = 'melhor-dia-chart';
+      cv.className = 'chart-box chart-box-chart';
+      card.appendChild(cv);
+      container.appendChild(card);
+      requestAnimationFrame(() => {
+        const serie = dados.melhorDiaSerie;
+        desenharBarras(cv,
+          serie.map(d => d.data.slice(8, 10) + '/' + d.data.slice(5, 7)),
+          serie.map(d => d.faturamento), C.brass);
+      });
+    }
+
+    /* Bloco completo de relatórios (todos os planos pagos) */
+    if (dados.servicoMaisRealizado) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Serviço Mais Realizado'));
+      card.appendChild(criarCard(dados.servicoMaisRealizado.nome,
+        dados.servicoMaisRealizado.count + ' atendimento(s)', ''));
+      container.appendChild(card);
+    }
+    if (dados.profissionalMaisRentavel) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Profissional Mais Rentável'));
+      card.appendChild(criarCard(dados.profissionalMaisRentavel.nome,
+        nossoDolar(dados.profissionalMaisRentavel.receita) + ' em ' +
+        dados.profissionalMaisRentavel.atendimentos + ' atendimento(s)', ''));
+      container.appendChild(card);
+    }
+
+    if (dados.comparacaoPeriodos) {
+      const cmp = dados.comparacaoPeriodos;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Comparação com período anterior'));
+      card.appendChild(criarCard('Faturamento', nossoDolar(cmp.faturamento_anterior),
+        cmp.delta_faturamento_pct == null
+          ? 'período anterior sem faturamento'
+          : (cmp.delta_faturamento_pct >= 0 ? '+' : '') + cmp.delta_faturamento_pct + '% vs anterior'));
+      card.appendChild(criarCard('Agendamentos', cmp.agendamentos_anterior,
+        cmp.delta_agendamentos_pct == null
+          ? 'período anterior sem agendamentos'
+          : (cmp.delta_agendamentos_pct >= 0 ? '+' : '') + cmp.delta_agendamentos_pct + '% vs anterior'));
+      container.appendChild(card);
+    }
+
+    if (dados.atendimentosDetalhados && dados.atendimentosDetalhados.length) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.appendChild(criarTituloSecao('Atendimentos detalhados — o cliente de cada corte'));
+      card.appendChild(criarTabelaDetalhes(dados.atendimentosDetalhados));
+      container.appendChild(card);
+    }
+
+    /* Exportar CSV — liberado para todos os planos pagos */
+    if (dados.exportar_csv) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
+      const strong = document.createElement('strong');
+      strong.textContent = 'Exportar dados do relatório';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-brass';
+      btn.textContent = 'Exportar CSV';
+      btn.onclick = () => exportarCSVRelatorio(dados);
+      card.appendChild(strong);
+      card.appendChild(btn);
+      container.appendChild(card);
+    }
+  }
+
+  function criarTabelaDetalhes(itens) {
+    const table = document.createElement('table');
+    table.className = 'rel-table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Profissional</th><th>Serviços</th><th>Valor</th></tr>';
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    itens.forEach(a => {
+      const tr = document.createElement('tr');
+      const val = (t) => { const td = document.createElement('td'); td.textContent = t; return td; };
+      tr.appendChild(val(a.data));
+      tr.appendChild(val(a.hora));
+      tr.appendChild(val(a.cliente));
+      tr.appendChild(val(a.profissional));
+      tr.appendChild(val(a.servicos));
+      const tv = val(nossoDolar(a.valor));
+      tv.className = 'mono';
+      tr.appendChild(tv);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /* Aba DIÁRIO (00:00) — padrão de todos os planos pagos */
+  function renderizarRelatorioDiario() {
+    const container = document.getElementById('pt-diario');
+    if (!container) return;
+    container.innerHTML = '';
+    if (relatorioDiarioErro || !relatorioDiario) {
+      container.innerHTML = '<div class="rel-block-note">O relatório diário (00:00) faz parte dos planos pagos. ' +
+        'Assine um plano na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      return;
+    }
+    const d = relatorioDiario;
+    const nota = document.createElement('p');
+    nota.className = 'rel-block-note';
+    nota.textContent = d.gerado_em
+      ? 'Gerado automaticamente às 00:00 (' + String(d.gerado_em).slice(0, 10) + '). Resultado padrão de todos os planos.'
+      : 'Snapshot das 00:00 ainda não gerado hoje — mostrando o cálculo em tempo real.';
+    container.appendChild(nota);
+
+    const grade = document.createElement('div');
+    grade.className = 'card-row cols-3';
+    grade.appendChild(criarCard('Faturamento do dia ' + d.data.slice(8, 10) + '/' + d.data.slice(5, 7),
+      nossoDolar(d.faturamento), 'lucro do dia (cortes concluídos)'));
+    grade.appendChild(criarCard('Atendimentos', d.agendamentos,
+      'cortes concluídos no dia'));
+    grade.appendChild(criarCard('Ticket médio', nossoDolar(d.ticket),
+      d.faixa_pico ? 'pico: ' + d.faixa_pico : 'sem pico identificado'));
+    container.appendChild(grade);
+  }
+
+  /* Aba HORÁRIOS — horários de pico (todos os planos pagos) */
+  function renderizarHorarios() {
+    const container = document.getElementById('pt-horarios');
+    if (!container) return;
+    container.innerHTML = '';
+    const faixas = (relatorio && relatorio.horariosPico) || [];
+    if (relatorioErro || !relatorio || !relatorio.nivel || !faixas.length) {
+      container.innerHTML = '<div class="rel-block-note">Sem dados de horários de pico no período. ' +
+        'Conclua atendimentos para visualizar as faixas mais movimentadas. ' +
+        'Na dúvida, veja os detalhes na aba <a href="assinatura.html">Assinatura</a>.</div>';
+      return;
+    }
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.appendChild(criarTituloSecao('Horários de pico'));
+    const sub = document.createElement('p');
+    sub.className = 'chart-caption';
+    sub.textContent = 'Faixas de 1h com mais atendimentos concluídos no período.';
+    card.appendChild(sub);
+    card.appendChild(criarTabelaHorariosPico(faixas));
+    container.appendChild(card);
+  }
+
+  /* Aba BENEFÍCIOS — mostra o que cada plano proporciona */
+  function renderizarBeneficios() {
+    const container = document.getElementById('pt-beneficios');
+    if (!container) return;
+    container.innerHTML = '';
+    const efetivo = assinatura && assinatura.plano_efetivo;
+    const atualId = efetivo ? efetivo.id : null;
+    const titulo = document.createElement('h3');
+    titulo.className = 'section-title';
+    titulo.textContent = efetivo
+      ? 'O que o seu plano inclui (' + esc(efetivo.name) + ')'
+      : 'O que cada plano inclui';
+    container.appendChild(titulo);
+
+    if (efetivo && efetivo.relatorios_resumo && efetivo.relatorios_resumo.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'rel-beneficio-list';
+      efetivo.relatorios_resumo.forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = t;
+        ul.appendChild(li);
+      });
+      container.appendChild(ul);
+    }
+
+    if (!planos.length) return;
+    const compare = document.createElement('h4');
+    compare.className = 'section-title';
+    compare.style.cssText = 'margin-top:22px;';
+    compare.textContent = 'Compare os planos';
+    container.appendChild(compare);
+
+    const ordenados = planos.slice().sort((a, b) => a.price_monthly - b.price_monthly);
+    ordenados.forEach(p => {
+      const bloco = document.createElement('div');
+      bloco.className = 'rel-plano-mini' + (String(p.id) === String(atualId) ? ' atual' : '');
+      const nome = document.createElement('h4');
+      nome.textContent = esc(p.name) + (String(p.id) === String(atualId) ? '  (seu plano)' : '');
+      bloco.appendChild(nome);
+      const preco = document.createElement('div');
+      preco.className = 'rel-plano-preco';
+      const limite = p.max_professionals == null
+        ? 'Profissionais ilimitados'
+        : (p.max_professionals > 0 ? 'Até ' + p.max_professionals + ' profissional(is)' : 'Perfil da loja');
+      preco.textContent = nossoDolar(p.price_monthly) + '/mês · ' + limite;
+      bloco.appendChild(preco);
+      const ul = document.createElement('ul');
+      ul.className = 'rel-beneficio-list';
+      const resumo = (p && p.relatorios_resumo) || [];
+      resumo.concat(p.features || []).forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = t;
+        ul.appendChild(li);
+      });
+      bloco.appendChild(ul);
+      container.appendChild(bloco);
+    });
+  }
+
+  function ativarAba(nome) {
+    const tabs = document.querySelectorAll('#rel-tabs .rel-tab');
+    tabs.forEach(tb => tb.classList.toggle('active', tb.dataset.tab === nome));
+    ['diario', 'geral', 'horarios', 'relatorios', 'beneficios'].forEach(id => {
+      const el = document.getElementById('pt-' + id);
+      if (el) el.hidden = (id !== nome);
+    });
   }
 
   function renderizarSalao() {
     const meses = ultimosMeses(12);
+
+    renderizarRelatorio();
+    renderizarRelatorioDiario();
+    renderizarHorarios();
+    renderizarRelatorios();
+    renderizarBeneficios();
 
     const totalClientes = clientes.length;
     const clientesPorMes = {};
@@ -534,6 +1047,18 @@ document.addEventListener('DOMContentLoaded', () => {
     consultarTudo();
     renderizarSalao();
     marcarAtualizacao();
+    ativarAba('diario');
+    document.getElementById('rel-tabs')?.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.rel-tab');
+      if (!btn) return;
+      renderizarRelatorio();
+      renderizarRelatorioDiario();
+      renderizarHorarios();
+      renderizarRelatorios();
+      renderizarBeneficios();
+      ativarAba(btn.dataset.tab);
+      if (btn.dataset.tab === 'relatorios') renderizarRelatorios();
+    });
     setInterval(() => {
       consultarTudo();
       renderizarSalao();

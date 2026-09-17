@@ -403,6 +403,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /* Atualização quase-tempo-real: a cada 30s revalida os horários livres
+     do dia escolhido e reflete mudanças do salão sem recarregar a página. */
+  function atualizarSlotsTempoReal() {
+    if (!svcSelecionado || !dataEscolhida || fieldHorarios.style.display === 'none') return;
+    let disp;
+    try { disp = API.disponibilidade(loja.id, dataEscolhida, duracaoAtual()); }
+    catch (e) { return; }
+    const disponiveis = disp.available_slots || [];
+
+    if (disponiveis.length) {
+      slotTimes.querySelectorAll('p').forEach(p => p.remove());
+    }
+
+    slotTimes.querySelectorAll('.slot-time').forEach(b => {
+      if (disponiveis.indexOf(b.textContent) < 0) b.remove();
+    });
+
+    const atuais = Array.from(slotTimes.querySelectorAll('.slot-time')).map(b => b.textContent);
+    disponiveis.forEach(hora => {
+      if (atuais.indexOf(hora) >= 0) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'slot-time';
+      btn.textContent = hora;
+      btn.addEventListener('click', () => {
+        slotTimes.querySelectorAll('.slot-time').forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        selecionarHorario(hora);
+      });
+      slotTimes.appendChild(btn);
+    });
+
+    disponiveis.forEach(hora => {
+      const b = Array.from(slotTimes.querySelectorAll('.slot-time')).find(x => x.textContent === hora);
+      if (b) slotTimes.appendChild(b);
+    });
+
+    if (!disponiveis.length && !slotTimes.querySelector('.slot-time')) {
+      slotTimes.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:4px 0;">Nenhum horário livre neste dia.</p>';
+    }
+
+    if (horaEscolhida && disponiveis.indexOf(horaEscolhida) < 0) {
+      horaEscolhida = null;
+      profResolvido = null;
+      hrLivreOk = false;
+      btnConfirmar.disabled = true;
+      fieldDados.style.display = 'none';
+      fieldTelefone.style.display = 'none';
+      if (profInfo) profInfo.textContent = 'O horário escolhido acabou de ser ocupado. Selecione outro.';
+      showToast('Um horário foi ocupado. Escolha outro.', 'error');
+    } else if (horaEscolhida) {
+      const b = Array.from(slotTimes.querySelectorAll('.slot-time')).find(x => x.textContent === horaEscolhida);
+      if (b) b.classList.add('active');
+    }
+
+    const faixasEl = document.getElementById('slot-faixas');
+    if (faixasEl) {
+      const range = disp.free_ranges || [];
+      faixasEl.textContent = range.length
+        ? 'Horários livres: ' + range.map(r => r.start + ' às ' + r.end).join(' · ')
+        : 'Sem horário livre neste dia.';
+    }
+  }
+
+  setInterval(atualizarSlotsTempoReal, 30000);
+
   document.querySelectorAll('.btn-agendar').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -486,7 +552,120 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(texto + url).then(() => alert('Link copiado!'));
       } else {
-        window.open('https://wa.me/?text=' + encodeURIComponent(texto + url), '_blank');
+        try { window.prompt('Copie o link:', texto + url); } catch (e) { /* noop */ }
+      }
+    });
+  }
+
+  /* ==========================================================
+     DENÚNCIA DE PERFIL (barbeiro/salão) — cliente
+     ========================================================== */
+  const modalDen = document.getElementById('modal-denunciar');
+  const formDen = document.getElementById('form-denunciar');
+  const btnDen = document.getElementById('btn-denunciar');
+  const denTarget = document.getElementById('den-target');
+  const denMotivo = document.getElementById('den-motivo');
+  const denOutroMotivo = document.getElementById('den-outro-motivo');
+  const denCampoOutro = document.getElementById('den-campo-outro');
+  const denDesc = document.getElementById('den-descricao');
+
+  function exigirSessaoDenuncia() {
+    if (Auth.usuarioAtual()) return true;
+    sessionStorage.setItem('cc_flash', JSON.stringify({
+      texto: 'Faça login para denunciar um perfil.',
+      tipo: 'error'
+    }));
+    const volta = 'salao-publico.html?id=' + encodeURIComponent(loja.id);
+    window.location.href = '../admin/login.html?next=' + encodeURIComponent(volta);
+    return false;
+  }
+
+  if (btnDen && modalDen && formDen) {
+    btnDen.addEventListener('click', () => {
+      if (!exigirSessaoDenuncia()) return;
+
+      const u = Auth.usuarioAtual();
+      /* barbeiro/dono não denuncia por aqui (usa o CRM para clientes) */
+      if (u && (u.role === 'dono' || u.role === 'barbeiro')) {
+        showToast('Denúncias de perfis de salão/barbeiro são feitas pela conta do cliente.', 'error');
+        return;
+      }
+
+      /* alvos: o próprio salão e os barbeiros ativos listados na página */
+      denTarget.innerHTML = '';
+      const opSalao = document.createElement('option');
+      opSalao.value = 'salao:' + loja.id;
+      opSalao.textContent = 'Esta barbearia (' + (loja.name || '') + ')';
+      denTarget.appendChild(opSalao);
+      profissionais.forEach(p => {
+        const op = document.createElement('option');
+        op.value = 'barbeiro:' + p.id + ':' + (p.user_id || '');
+        op.textContent = 'Um barbeiro (' + p.name + ')';
+        denTarget.appendChild(op);
+      });
+
+      denMotivo.value = '';
+      denOutroMotivo.value = '';
+      if (denCampoOutro) denCampoOutro.style.display = 'none';
+      denDesc.value = '';
+
+      abrirModal(modalDen);
+    });
+
+    /* mostra o campo "conte o motivo" quando seleciona "outro" */
+    denMotivo.addEventListener('change', () => {
+      if (!denCampoOutro) return;
+      const outro = denMotivo.value === 'outro';
+      denCampoOutro.style.display = outro ? '' : 'none';
+      if (outro) denOutroMotivo.focus();
+    });
+
+    document.getElementById('btn-fechar-modal-denunciar')
+      ?.addEventListener('click', () => fecharModal(modalDen));
+    modalDen.addEventListener('click', (e) => {
+      if (e.target === modalDen) fecharModal(modalDen);
+    });
+
+    formDen.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!exigirSessaoDenuncia()) return;
+      const alvo = (denTarget?.value || '').split(':');
+      const [tipo, id1, id2] = alvo;
+      if (!tipo || !id1) { showToast('Selecione o perfil a denunciar.', 'error'); return; }
+      let motivo = denMotivo?.value || '';
+      if (!motivo) { showToast('Selecione um motivo.', 'error'); return; }
+      if (motivo === 'outro') {
+        motivo = (denOutroMotivo?.value || '').trim();
+        if (!motivo) { showToast('Conte o motivo da denúncia.', 'error'); return; }
+      }
+
+      const payload = {
+        target_type: tipo, // 'salao' | 'barbeiro'
+        reason: motivo,
+        description: (denDesc?.value || '').trim(),
+        target_display: loja.name
+      };
+      if (tipo === 'salao') payload.target_barbershop_id = id1;
+      if (tipo === 'barbeiro') {
+        payload.target_barbershop_id = loja.id;
+        payload.target_user_id = id2 || null;
+        const prof = profissionais.find(p => String(p.id) === id1);
+        payload.target_display = prof ? prof.name : loja.name;
+      }
+
+      const btnEnv = formDen.querySelector('button[type="submit"]');
+      btnEnv.disabled = true;
+      btnEnv.textContent = 'Enviando...';
+      try {
+        API.denunciarPerfil(payload);
+        showToast('Denúncia enviada! Nossa equipe vai analisar.');
+        fecharModal(modalDen);
+        formDen.reset();
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      } finally {
+        btnEnv.disabled = false;
+        btnEnv.textContent = 'Enviar denúncia';
       }
     });
   }

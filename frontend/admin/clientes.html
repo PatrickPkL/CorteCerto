@@ -57,6 +57,11 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
         Horários
       </a></li>
+      <li class="nav-item"><a href="relatorios.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16"/><path d="M6 16l3-4 4 2 5-7"/><circle cx="18" cy="7" r="2"/></svg>
+        Relatórios
+      </a></li>
+
     </ul>
 
     <span class="nav-group-label">Sistema</span>
@@ -147,6 +152,13 @@
           <textarea id="cp-notas" rows="2" placeholder="Preferências, observações..."></textarea>
         </div>
         <button type="button" class="btn btn-outline" id="btn-cp-salvar" style="margin-top:10px;" data-feature="clientes">Salvar dados do cliente</button>
+
+        <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-outline" id="btn-cp-bloquear" style="color:var(--danger, #e74c3c); border-color:var(--danger, #e74c3c);" data-feature="clientes">Bloquear cliente</button>
+          <button type="button" class="btn btn-outline" id="btn-cp-desbloquear" style="display:none;" data-feature="clientes">Desbloquear cliente</button>
+          <button type="button" class="btn btn-outline" id="btn-cp-denunciar" style="color:var(--warn-text, #f1c40f); border-color:var(--warn-text, #f1c40f);" data-feature="clientes">Denunciar cliente</button>
+        </div>
+        <p id="cp-bloqueio-info" style="font-size:13px; color:var(--text-muted); margin-top:8px;"></p>
         <h3 class="section-title" style="margin-top:20px;">Histórico</h3>
         <table>
           <thead>
@@ -157,6 +169,35 @@
         <div style="display:flex; justify-content:flex-end; margin-top:20px;">
           <button type="button" class="btn btn-outline" id="btn-fechar-modal-cliente">Fechar</button>
         </div>
+      </div>
+    </div>
+
+    <div id="modal-denunciar-cliente" style="display:none;">
+      <div class="card" style="width:440px;">
+        <h3 class="section-title" style="border-bottom-color:var(--warn-text, #f1c40f);">Denunciar cliente</h3>
+        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
+          A denúncia é enviada com sigilo para a equipe de moderação do Corte Certo.
+        </p>
+        <form id="form-denunciar-cliente">
+          <div class="field">
+            <label for="den-cli-motivo">Motivo</label>
+            <select id="den-cli-motivo" required>
+              <option value="">Selecione um motivo...</option>
+              <option value="comportamento_abusivo">Comportamento abusivo</option>
+              <option value="nao_comparecimento">Não comparecimento</option>
+              <option value="spam">Spam</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="den-cli-descricao">Detalhes (opcional)</label>
+            <textarea id="den-cli-descricao" rows="3" maxlength="2000" placeholder="Descreva o que aconteceu..."></textarea>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+            <button type="button" class="btn btn-outline" id="btn-fechar-modal-denunciar-cliente">Cancelar</button>
+            <button type="submit" class="btn btn-brass">Enviar denúncia</button>
+          </div>
+        </form>
       </div>
     </div>
 

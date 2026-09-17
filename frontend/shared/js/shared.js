@@ -426,7 +426,7 @@ function aplicarBannerPlano() {
   if (existente || !document.querySelector('.main')) return;
 
   const plano = CC.plano();
-  const nomePlano = (plano && plano.name) || 'Free';
+  const nomePlano = (plano && plano.name) || 'sem plano';
   const av = document.createElement('div');
   av.id = 'banner-upgrade-plano';
   av.className = 'card';

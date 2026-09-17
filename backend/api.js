@@ -85,7 +85,7 @@ window.API = (function () {
    *
    * O plano EFETIVO de uma loja é o da assinatura vigente (trial em
    * andamento ou período pago corrente). Fora isso (sem assinatura,
-   * expirada ou cancelada) a loja cai automaticamente no plano Free —
+   * expirada ou cancelada) a loja fica sem plano —
    * leituras continuam liberadas, escritas exigem a permissão do plano.
    */
   function planoFree() {
@@ -107,6 +107,7 @@ window.API = (function () {
       const plano = db.plans.find(p => p.id === sub.plan_id);
       if (plano) return { sub, plano };
     }
+    if (modoGratuito()) return { sub: sub || null, plano: planoGratuitoPlataforma() };
     return { sub: sub || null, plano: planoFree() };
   }
 
@@ -120,6 +121,7 @@ window.API = (function () {
   }
 
   function exigirFuncionalidade(shopId, chave, descricao) {
+    exigirAssinaturaAtiva(shopId);
     if (!temFuncionalidade(shopId, chave)) {
       const { plano } = planoEfetivo(shopId);
       const alvo = (plano && plano.name) || 'um plano pago';
@@ -131,6 +133,62 @@ window.API = (function () {
     }
   }
 
+  /* ---------------- Modo plataforma grátis (config global) ----------------
+     O super-admin pode ligar "site_gratis": nesse modo TODAS as lojas têm
+     acesso completo (funcionalidades e relatórios), sem exigir assinatura
+     ativa. Os preços cadastrados permanecem intactos para quando o modo
+     for desligado. */
+  const _PERMISSOES_COMPLETAS = ['servicos', 'profissionais', 'clientes', 'agendar',
+    'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'];
+
+  function modoGratuito() {
+    try {
+      const st = (_db().platform_settings || []).find(s => s.chave === 'site_gratis');
+      return !!(st && st.valor && st.valor.ativo);
+    } catch (e) { return false; }
+  }
+
+  function definirModoGratuito(ativo) {
+    const db = _db();
+    db.platform_settings = db.platform_settings || [];
+    let st = db.platform_settings.find(s => s.chave === 'site_gratis');
+    if (!st) {
+      st = { chave: 'site_gratis', valor: {}, updated_at: agoraISO() };
+      db.platform_settings.push(st);
+    }
+    st.valor = { ativo: !!ativo };
+    st.updated_at = agoraISO();
+    DB.salvar();
+    return { site_gratis: !!ativo };
+  }
+
+  function planoGratuitoPlataforma() {
+    return {
+      id: '__plataforma_gratis__', name: 'Grátis (plataforma)', is_free: true,
+      permissions: _PERMISSOES_COMPLETAS.slice(), features: [],
+      nivel_relatorio: 'completo', max_professionals: null,
+      price_monthly: 0, price_annual: 0, price_per_employee: 0
+    };
+  }
+
+  /* Bloqueia ações produtivas do dono quando não há assinatura ativa
+     (sistema de cobrança). Leituras seguem liberadas; o frontend redireciona
+     para a tela de assinatura ao receber code 'assinatura_necessaria'. */
+  function exigirAssinaturaAtiva(shopId) {
+    if (modoGratuito()) return;
+    let liberado = false;
+    try {
+      liberado = typeof window.API.acessoLiberado === 'function'
+        ? window.API.acessoLiberado(shopId)
+        : false;
+    } catch (e) { liberado = false; }
+    if (!liberado) {
+      throw {
+        status: 402, code: 'assinatura_necessaria',
+        error: 'Sua assinatura está inativa. Assine na aba Assinatura para liberar esta ação.'
+      };
+    }
+  }
 
   function podeVerAgendamento(user, ag) {
     if (!user) return false;
@@ -311,39 +369,70 @@ window.API = (function () {
     return { token: sessao.token, user: { id: usuario.id, name: usuario.name, role: usuario.role } };
   }
 
-  function gerarLembretesAmanha() {
-    var amanha = new Date();
-    amanha.setDate(amanha.getDate() + 1);
-    var alvo = amanha.toISOString().slice(0, 10);
-    var ags = (_db().appointments || []).filter(function(a) {
-      return a.date === alvo && (a.status === 'confirmado' || a.status === 'agendado');
+  /* Envia os lembretes por e-mail (Gmail) de uma data.
+     campoMarca: coluna persistida que registra o envio (evita reenvio).
+     quando: rótulo exibido no e-mail ("amanhã" / "hoje").
+     somenteFuturos: no dia, ignora horários que já passaram. */
+  function _enviarLembretesDe(dataAlvo, campoMarca, quando, somenteFuturos) {
+    const db = _db();
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const agoraMin = somenteFuturos ? DB.agoraMinutos() : null;
+    const ags = (db.appointments || []).filter(function(a) {
+      if (!a.starts_at || String(a.starts_at).slice(0, 10) !== dataAlvo || a[campoMarca]) return false;
+      if (a.status !== 'confirmado' && a.status !== 'pendente') return false;
+      if (somenteFuturos && DB.hhmmToMin(String(a.starts_at).slice(11, 16)) < agoraMin) return false;
+      return true;
     });
+    var enviados = 0;
     ags.forEach(function(ag) {
-      var loja = (_db().barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
-      var cli = (_db().users || []).find(function(u) { return u.id === ag.user_id; });
+      var loja = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
       if (!loja) return;
+      var cli = (db.users || []).find(function(u) { return u.id === ag.user_id; });
+      /* link exclusivo para o cliente marcar/ver o salão */
+      var linkAgenda = appUrl + '/public/salao-publico.html?id=' + encodeURIComponent(ag.barbershop_id);
       var dados = {
         salaoNome: loja.name,
         servicos: (function() {
-          var itens = (_db().appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
+          var itens = (db.appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
           return itens.length ? itens.map(function(i) { return i.name_snapshot || ''; }).join(' + ') : '';
         })(),
-        hora: ag.time,
+        hora: String(ag.starts_at || '').slice(11, 16),
         endereco: loja.address || '',
-        appUrl: process.env.APP_URL || 'http://localhost:3000'
+        appUrl: appUrl,
+        linkAgendamento: linkAgenda,
+        quando: quando
       };
-      if (cli && cli.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cli.email)) {
-        Mailer.enviarLembrete(cli.email, Object.assign({ nome: cli.name, isCliente: true }, dados))
+      var tentouEnviar = false;
+      var cliEmail = (cli && cli.email) || ag.client_email || '';
+      var cliNome = (cli && cli.name) || ag.client_name || '';
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliEmail)) {
+        Mailer.enviarLembrete(cliEmail, Object.assign({ nome: cliNome, isCliente: true }, dados))
           .catch(function() {});
+        tentouEnviar = true;
       }
-      var prof = (_db().professionals || []).find(function(p) { return p.id === ag.professional_id; });
+      var prof = (db.professionals || []).find(function(p) { return p.id === ag.professional_id; });
       if (prof && prof.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
         Mailer.enviarLembrete(prof.email, Object.assign({
           nome: prof.name, isCliente: false
         }, dados)).catch(function() {});
+        tentouEnviar = true;
+      }
+      /* marca como enviado (persistido) para o job não reenviar */
+      if (tentouEnviar) {
+        ag[campoMarca] = agoraISO();
+        enviados++;
       }
     });
-    return { enviados: ags.length };
+    if (enviados) DB.salvar();
+    return enviados;
+  }
+
+  /* Dispara os dois lembretes: 1 dia antes e no próprio dia. */
+  function gerarLembretesAmanha() {
+    var enviados = 0;
+    enviados += _enviarLembretesDe(DB.addDiasISO(1), 'lembrete_email_em', 'amanhã', false);
+    enviados += _enviarLembretesDe(DB.hojeISO(), 'lembrete_dia_email_em', 'hoje', true);
+    return { enviados: enviados };
   }
 
   /* ================= SUPER-ADMIN (v2.4) ================= */
@@ -468,6 +557,59 @@ window.API = (function () {
     sub.updated_at = agoraISO();
     DB.salvar();
     return sub;
+  }
+
+  /* ---------------- Super-admin: preços dos planos e modo grátis ---------------- */
+
+  function _numPreco(v, campo) {
+    if (v === undefined || v === null || v === '') return undefined;
+    var n = Number(v);
+    if (!isFinite(n) || n < 0) err(400, 'Valor inválido para ' + campo + '.');
+    return n;
+  }
+
+  function saListarPlanos() {
+    return (_db().plans || []).slice()
+      .sort(function(a, b) { return Number(a.price_monthly || 0) - Number(b.price_monthly || 0); })
+      .map(function(p) {
+        return {
+          id: p.id, name: p.name, is_free: !!p.is_free,
+          price_monthly: Number(p.price_monthly || 0),
+          price_annual: Number(p.price_annual || 0),
+          price_per_employee: Number(p.price_per_employee || 0),
+          max_professionals: (p.max_professionals == null) ? null : Number(p.max_professionals)
+        };
+      });
+  }
+
+  function saAtualizarPrecosPlano(planoId, dados) {
+    var p = (_db().plans || []).find(function(x) { return x.id == planoId; });
+    if (!p) err(404, 'Plano não encontrado.');
+    dados = dados || {};
+    var pm = _numPreco(dados.price_monthly, 'preço mensal');
+    var pa = _numPreco(dados.price_annual, 'preço anual');
+    var pe = _numPreco(dados.price_per_employee, 'preço por funcionário');
+    if (pm !== undefined) p.price_monthly = pm;
+    if (pa !== undefined) p.price_annual = pa;
+    if (pe !== undefined) p.price_per_employee = pe;
+    DB.salvar();
+    return {
+      ok: true, plano: {
+        id: p.id, name: p.name,
+        price_monthly: Number(p.price_monthly || 0),
+        price_annual: Number(p.price_annual || 0),
+        price_per_employee: Number(p.price_per_employee || 0)
+      }
+    };
+  }
+
+  function saObterConfig() {
+    return { site_gratis: modoGratuito() };
+  }
+
+  function saDefinirSiteGratis(ativo) {
+    if (ativo && typeof ativo === 'object') ativo = ativo.ativo;
+    return definirModoGratuito(!!ativo);
   }
 
   function saExcluirLoja(shopId) {
@@ -1423,6 +1565,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!/^\d{2}:\d{2}$/.test(hora)) err(400, 'Horário inválido.');
     if (!clientName) err(400, 'Nome do cliente é obrigatório.');
 
+    /* bloqueio: cliente bloqueado pelo salão não consegue agendar */
+    const telCli = String(payload.client_phone || '').replace(/\D/g, '');
+    const clienteBloq = (db.clients || []).find(c =>
+      c.barbershop_id === shop.id && telCli && c.phone === telCli);
+    if (clienteBloq && _clienteBloqueado(shop.id, clienteBloq.id)) {
+      err(403, 'Este cliente está bloqueado e não pode realizar novos agendamentos nesta barbearia.');
+    }
+    if (user && user.role === 'cliente') {
+      const cliPorUser = (db.clients || []).find(c =>
+        c.barbershop_id === shop.id && c.user_id === user.id);
+      if (cliPorUser && _clienteBloqueado(shop.id, cliPorUser.id)) {
+        err(403, 'Você está bloqueado nesta barbearia e não pode realizar novos agendamentos.');
+      }
+    }
+
     /* duração = soma dos serviços | informado | 30 (RF-039.2) */
     const idsServicos = Array.isArray(payload.service_ids) && payload.service_ids.length
       ? payload.service_ids.map(String)
@@ -1793,7 +1950,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       id: c.id, name: c.name, phone: c.phone || '', email: c.email || '',
       notes: c.notes || '', total_visits: c.total_visits,
       total_spent: c.total_spent, last_visit_at: c.last_visit_at,   // campo correto (DT-23)
-      user_id: c.user_id || null, created_at: c.created_at
+      user_id: c.user_id || null, created_at: c.created_at,
+      blocked: _clienteBloqueado(c.barbershop_id, c.id)
     };
   }
 
@@ -1990,6 +2148,365 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return '\uFEFF' + cab.map(campo).join(';') + '\r\n' + corpo.join('\r\n');
   }
 
+  /* ================= RELATÓRIOS ESCALONADOS (RF-070 v3.1) =================
+     Cada plano pago libera um relatório progressivamente mais completo:
+
+       Free          → sem acesso a relatórios
+       Autonomo      → basico        (faturamento total)
+       Salao         → intermediario (+ total agendamentos, ticket médio)
+       Salao Pro     → completo      (+ serviço/profissional top, horários
+                                      de pico, comparação de períodos, CSV)
+
+     [SEGURANÇA] O nível vem do plano EFETIVO da loja no backend. Campos
+     dos níveis superiores NUNCA são calculados/retornados para os
+     inferiores (fail-closed) — o frontend apenas renderiza o que chega.
+  ===================================================================== */
+
+  /* Nível de relatório do plano EFETIVO da loja.
+     Free/planos sem valor → null (sem acesso). */
+  function nivelRelatorioDe(shopId) {
+    const { plano } = planoEfetivo(shopId);
+    const nivel = plano && plano.nivel_relatorio;
+    return ['basico', 'intermediario', 'completo'].includes(nivel) ? nivel : null;
+  }
+
+  /* Gate de acesso (mesma regra usada na API e nos testes) */
+  function podeAcessarRelatorio(nivelPlano) {
+    return ['basico', 'intermediario', 'completo'].includes(nivelPlano);
+  }
+
+  /* Resolve a loja da sessão, o nível e barra planos sem relatórios */
+  function exigirNivelRelatorio() {
+    const { shop } = exigirDono();
+    exigirAssinaturaAtiva(shop.id);
+    const nivel = nivelRelatorioDe(shop.id);
+    if (!podeAcessarRelatorio(nivel)) {
+      const { plano } = planoEfetivo(shop.id);
+      throw {
+        status: 403,
+        error: 'Relatórios estão bloqueados no seu plano (' + ((plano && plano.name) || 'sem plano') +
+          '). Assine ou faça upgrade na aba Assinatura para liberar.'
+      };
+    }
+    return { shop, nivel };
+  }
+
+  /* ---- funções auxiliares ---- */
+
+  function noPeriodo(shopId, inicio, fim) {
+    return DB._d().appointments.filter(a =>
+      a.barbershop_id === shopId && a.status === 'concluido' &&
+      a.starts_at.slice(0, 10) >= inicio && a.starts_at.slice(0, 10) <= fim);
+  }
+
+  function calcularFaturamentoTotal(shopId, inicio, fim) {
+    return noPeriodo(shopId, inicio, fim)
+      .reduce((acc, a) => acc + Number(a.price_total || 0), 0);
+  }
+
+  function contarAgendamentos(shopId, inicio, fim) {
+    return noPeriodo(shopId, inicio, fim).length;
+  }
+
+  /* Resumo (textos) das funcionalidades de relatório — benefícios idênticos
+     em todos os planos pagos (v4). O nível diferencia apenas o número de
+     profissionais; relatórios completos valem para qualquer plano. */
+  function relatoriosResumoPorNivel(nivel) {
+    switch (nivel) {
+      case 'basico':
+      case 'intermediario':
+      case 'completo':
+        return [
+          'Relatório diário gerado automaticamente às 00:00',
+          'Totais financeiros: dia a dia, semana e mês',
+          'Gráfico com o dia de maior lucro no período',
+          'Relatório detalhado por atendimento (cliente, profissional, serviço, valor)',
+          'Comparação de períodos e horários de pico',
+          'Exportação dos dados em CSV'
+        ];
+      default:
+        return [
+          'Relatório diário gerado automaticamente às 00:00 (todos os planos pagos)',
+          'Assine um plano pago para liberar os relatórios'
+        ];
+    }
+  }
+
+  /* Semana corrente (últimos 7 dias) + delta da semana anterior (Autonomo+) */
+  function resumoSemanal(shopId) {
+    const hoje = DB.hojeISO();
+    const inicio = DB.addDiasISO(-6);
+    const antIni = DB.addDiasISO(-13);
+    const antFim = DB.addDiasISO(-7);
+    const fAtual = calcularFaturamentoTotal(shopId, inicio, hoje);
+    const fAnte = calcularFaturamentoTotal(shopId, antIni, antFim);
+    return {
+      inicio, fim: hoje,
+      faturamento: Math.round(fAtual * 100) / 100,
+      agendamentos: contarAgendamentos(shopId, inicio, hoje),
+      delta_faturamento_pct: fAnte > 0 ? Math.round((fAtual - fAnte) / fAnte * 1000) / 10 : null
+    };
+  }
+
+  /* Série diária por dia (para o gráfico do dia com mais lucro) */
+  function serieDias(shopId, inicio, fim) {
+    const mapa = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      const d = a.starts_at.slice(0, 10);
+      if (!mapa[d]) mapa[d] = { data: d, faturamento: 0, agendamentos: 0 };
+      mapa[d].faturamento += Number(a.price_total || 0);
+      mapa[d].agendamentos++;
+    });
+    return Object.keys(mapa).sort().map(d => ({
+      data: d,
+      faturamento: Math.round(mapa[d].faturamento * 100) / 100,
+      agendamentos: mapa[d].agendamentos
+    }));
+  }
+
+  /* Dia com o maior faturamento no período (Salão+) */
+  function melhorDiaDe(shopId, inicio, fim) {
+    const serie = serieDias(shopId, inicio, fim);
+    if (!serie.length) return null;
+    return serie.reduce((a, b) => (b.faturamento > a.faturamento ? b : a));
+  }
+
+  /* Resultado mensal (mês corrente) + delta do mês anterior (Salão+) */
+  function resumoMensal(shopId) {
+    const hoje = DB.hojeISO();
+    const inicio = hoje.slice(0, 7) + '-01';
+    const prev = new Date(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 1, 0);
+    const prevAno = prev.getFullYear();
+    const prevMes = prev.getMonth() + 1;
+    const prevLabel = prevAno + '-' + String(prevMes).padStart(2, '0');
+    const prevIni = prevLabel + '-01';
+    const prevFim = prevLabel + '-' + String(new Date(prevAno, prevMes, 0).getDate()).padStart(2, '0');
+    const fMensal = calcularFaturamentoTotal(shopId, inicio, hoje);
+    const fPrev = calcularFaturamentoTotal(shopId, prevIni, prevFim);
+    return {
+      mes: hoje.slice(0, 7), inicio, fim: hoje,
+      faturamento: Math.round(fMensal * 100) / 100,
+      agendamentos: contarAgendamentos(shopId, inicio, hoje),
+      delta_faturamento_pct: fPrev > 0 ? Math.round((fMensal - fPrev) / fPrev * 1000) / 10 : null,
+      mes_anterior: prevLabel
+    };
+  }
+
+  /* Detalhamento por atendimento: o cliente que fez aquele corte (Salão Pro) */
+  function atendimentosDetalhados(shopId, inicio, fim, limite) {
+    const db = DB._d();
+    return noPeriodo(shopId, inicio, fim)
+      .slice()
+      .sort((a, b) => b.starts_at.localeCompare(a.starts_at))
+      .slice(0, limite || 200)
+      .map(a => {
+        const prof = a.professional_id ? db.professionals.find(p => p.id === a.professional_id) : null;
+        const itens = itensDoAgendamento(a.id);
+        return {
+          id: a.id,
+          data: a.starts_at.slice(0, 10),
+          hora: a.starts_at.slice(11, 16),
+          cliente: a.client_name || '—',
+          profissional: prof ? prof.name : '—',
+          servicos: itens.map(i => i.name).join(', ') || '—',
+          valor: Math.round(Number(a.price_total || 0) * 100) / 100
+        };
+      });
+  }
+
+  function servicoMaisRealizado(shopId, inicio, fim) {
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => itensDoAgendamento(a.id).forEach(i => {
+      if (!contagem[i.name]) contagem[i.name] = { nome: i.name, count: 0, receita: 0 };
+      contagem[i.name].count++;
+      contagem[i.name].receita += Number(i.price || 0);
+    }));
+    return Object.values(contagem)
+      .sort((a, b) => b.count - a.count || b.receita - a.receita)[0] || null;
+  }
+
+  function profissionalMaisRentavel(shopId, inicio, fim) {
+    const db = DB._d();
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      if (a.professional_id == null) return;
+      if (!contagem[a.professional_id]) {
+        const p = db.professionals.find(x => x.id === a.professional_id);
+        contagem[a.professional_id] = {
+          id: a.professional_id, nome: p ? p.name : '—', receita: 0, atendimentos: 0
+        };
+      }
+      contagem[a.professional_id].receita += Number(a.price_total || 0);
+      contagem[a.professional_id].atendimentos++;
+    });
+    return Object.values(contagem).sort((a, b) => b.receita - a.receita)[0] || null;
+  }
+
+  function horariosPico(shopId, inicio, fim, limite) {
+    const contagem = {};
+    noPeriodo(shopId, inicio, fim).forEach(a => {
+      const h = Number(a.starts_at.slice(11, 13));
+      const faixa = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+      contagem[faixa] = (contagem[faixa] || 0) + 1;
+    });
+    return Object.keys(contagem)
+      .map(faixa => ({ faixa, count: contagem[faixa] }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limite || 5);
+  }
+
+  /* Job diário (00:00, padrão de todos os planos): gera/refresca o snapshot
+     de faturamento por loja para a data informada + ontem (re-catchup).
+     INTERNO — não é exposto via RPC (apenas window.__CC_INTERNAL). */
+  function gerarDiariosParaData(data) {
+    const db = DB._d();
+    const alvos = [];
+    [data || DB.hojeISO(), DB.addDiasISO(-1)].forEach(d => {
+      if (d && alvos.indexOf(d) < 0) alvos.push(d);
+    });
+    const hoje = DB.hojeISO();
+    for (const dia of alvos) {
+      const diaCorrente = dia === hoje;
+      for (const loja of db.barbershops) {
+        const idx = db.relatorios_diarios.findIndex(r =>
+          r.barbershop_id === loja.id && r.data === dia);
+        if (idx >= 0 && !diaCorrente) continue; /* dias passados fechados: mantém o snapshot */
+        const lista = db.appointments.filter(a =>
+          a.barbershop_id === loja.id && a.status === 'concluido' &&
+          a.starts_at.slice(0, 10) === dia);
+        const faturamento = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
+        const faixas = {};
+        lista.forEach(a => {
+          const h = Number(a.starts_at.slice(11, 13));
+          const f = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+          faixas[f] = (faixas[f] || 0) + 1;
+        });
+        const top = Object.keys(faixas).sort((a, b) => faixas[b] - faixas[a])[0] || null;
+        const snap = {
+          id: DB.proximoId(), barbershop_id: loja.id, data: dia,
+          faturamento: Math.round(faturamento * 100) / 100,
+          agendamentos: lista.length,
+          ticket: lista.length ? Math.round(faturamento / lista.length * 100) / 100 : null,
+          faixa_pico: top,
+          created_at: agoraISO()
+        };
+        if (idx >= 0) db.relatorios_diarios[idx] = snap;
+        else db.relatorios_diarios.push(snap);
+      }
+    }
+    DB.salvar();
+    return db.relatorios_diarios.filter(r => alvos.indexOf(r.data) >= 0).length;
+  }
+
+  /* Janela imediatamente anterior ao período atual (comparação) */
+  function janelaPeriodoAnterior(periodo) {
+    switch (periodo) {
+      case 'today': return { inicio: DB.addDiasISO(-1), fim: DB.addDiasISO(-1) };
+      case 'week': return { inicio: DB.addDiasISO(-13), fim: DB.addDiasISO(-7) };
+      case 'year': return { inicio: DB.addDiasISO(-729), fim: DB.addDiasISO(-365) };
+      case 'month':
+      default: return { inicio: DB.addDiasISO(-59), fim: DB.addDiasISO(-30) };
+    }
+  }
+
+  function comparacaoPeriodos(shopId, periodo) {
+    const atual = janelaPeriodo(periodo);
+    const anterior = janelaPeriodoAnterior(periodo);
+    const fAtual = calcularFaturamentoTotal(shopId, atual.inicio, atual.fim);
+    const fAnter = calcularFaturamentoTotal(shopId, anterior.inicio, anterior.fim);
+    const aAtual = contarAgendamentos(shopId, atual.inicio, atual.fim);
+    const aAnter = contarAgendamentos(shopId, anterior.inicio, anterior.fim);
+    const pct = (atualVal, antVal) =>
+      antVal > 0 ? Math.round((atualVal - antVal) / antVal * 1000) / 10 : null;
+    return {
+      periodo_anterior: anterior,
+      faturamento_anterior: Math.round(fAnter * 100) / 100,
+      agendamentos_anterior: aAnter,
+      delta_faturamento_pct: pct(fAtual, fAnter),
+      delta_agendamentos_pct: pct(aAtual, aAnter)
+    };
+  }
+
+  /* [SEGURANÇA] Endpoint principal: devolve SOMENTE os campos que o
+     nível do plano autoriza (fail-closed no backend).
+     Acumulativo: básico ⊂ intermediário ⊂ completo. */
+  function gerarRelatorio(periodo) {
+    const { shop, nivel } = exigirNivelRelatorio();
+    const { inicio, fim } = janelaPeriodo(periodo || 'month');
+
+    const resultado = {
+      nivel, period: periodo || 'month', start_date: inicio, end_date: fim
+    };
+
+    // --- NÍVEL BÁSICO (Autônomo E Superior) ---
+    const faturamento = calcularFaturamentoTotal(shop.id, inicio, fim);
+    resultado.faturamento = Math.round(faturamento * 100) / 100;
+    resultado.lucro = resultado.faturamento;              // lucro = faturamento (sem custos cadastrados)
+    resultado.totalAgendamentos = contarAgendamentos(shop.id, inicio, fim);
+    resultado.semanal = resumoSemanal(shop.id);           // resultado lucrativo da semana
+
+    // --- NÍVEL INTERMEDIÁRIO (Salão E Superior) ---
+    if (nivel === 'intermediario' || nivel === 'completo') {
+      resultado.ticketMedio = resultado.totalAgendamentos > 0
+        ? Math.round(faturamento / resultado.totalAgendamentos * 100) / 100
+        : 0;
+      resultado.melhorDia = melhorDiaDe(shop.id, inicio, fim);   // dia com mais lucro
+      resultado.melhorDiaSerie = serieDias(shop.id, inicio, fim); // série do gráfico
+      resultado.mensal = resumoMensal(shop.id);                   // resultado mensal
+    }
+
+    // --- NÍVEL COMPLETO (apenas Salão Pro) ---
+    if (nivel === 'completo') {
+      resultado.servicoMaisRealizado = servicoMaisRealizado(shop.id, inicio, fim);
+      resultado.profissionalMaisRentavel = profissionalMaisRentavel(shop.id, inicio, fim);
+      resultado.horariosPico = horariosPico(shop.id, inicio, fim, 5);
+      resultado.comparacaoPeriodos = comparacaoPeriodos(shop.id, periodo || 'month');
+      resultado.atendimentosDetalhados = atendimentosDetalhados(shop.id, inicio, fim, 200);
+      resultado.exportar_csv = true;
+    }
+
+    return resultado;
+  }
+
+  /* Relatório DIÁRIO — padrão de todos os planos pagos. Usa o snapshot
+     gerado às 00:00 (job) e cai para cálculo em tempo real se ainda
+     não existir (ex.: servidor acaba de subir). */
+  function gerarRelatorioDiario(data) {
+    const { shop, nivel } = exigirNivelRelatorio();
+    const dia = data || DB.hojeISO();
+    const reg = DB._d().relatorios_diarios.find(r =>
+      r.barbershop_id === shop.id && r.data === dia);
+    if (reg) {
+      return {
+        data: reg.data,
+        faturamento: Number(reg.faturamento || 0),
+        agendamentos: reg.agendamentos || 0,
+        ticket: reg.ticket != null ? Number(reg.ticket) : 0,
+        faixa_pico: reg.faixa_pico || null,
+        gerado_em: reg.created_at || null, nivel
+      };
+    }
+    const lista = DB._d().appointments.filter(a =>
+      a.barbershop_id === shop.id && a.status === 'concluido' &&
+      a.starts_at.slice(0, 10) === dia);
+    const fat = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
+    const faixas = {};
+    lista.forEach(a => {
+      const h = Number(a.starts_at.slice(11, 13));
+      const f = String(h).padStart(2, '0') + ':00–' + String(h + 1).padStart(2, '0') + ':00';
+      faixas[f] = (faixas[f] || 0) + 1;
+    });
+    const top = Object.keys(faixas).sort((a, b) => faixas[b] - faixas[a])[0] || null;
+    return {
+      data: dia,
+      faturamento: Math.round(fat * 100) / 100,
+      agendamentos: lista.length,
+      ticket: lista.length ? Math.round(fat / lista.length * 100) / 100 : 0,
+      faixa_pico: top,
+      gerado_em: null, nivel
+    };
+  }
+
   /* ================= BUSCA PÚBLICA (RF-050..054) ================= */
 
   function buscar(params) {
@@ -2144,6 +2661,203 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return r;
   }
 
+  /* ================= DENÚNCIAS E BLOQUEIOS ================= */
+
+  const MOTIVOS_DENUNCIA = [
+    'conteudo_inadequado', 'descricao_falsa', 'precos_enganosos',
+    'comportamento_abusivo', 'nao_comparecimento', 'spam', 'outro'
+  ];
+  const TIPOS_ALVO = ['salao', 'barbeiro', 'cliente'];
+
+  function isMembroEquipe(user) {
+    return user && (user.role === 'dono' || user.role === 'barbeiro');
+  }
+
+  /* Denúncia de perfil — regras por papel:
+     - cliente logado         → denuncia salão OU barbeiro (página pública)
+     - dono/barbeiro (equipe) → denuncia cliente (CRM) */
+  function denunciarPerfil(dados) {
+    dados = dados || {};
+    const user = sessao(); // exige login para denunciar (evita abuso anônimo)
+    const targetType = String(dados.target_type || '').toLowerCase();
+    const motivo = String(dados.reason || '').toLowerCase();
+    const descricao = String(dados.description || '').trim().slice(0, 2000);
+
+    if (TIPOS_ALVO.indexOf(targetType) === -1) err(400, 'Tipo de alvo inválido.');
+    if (MOTIVOS_DENUNCIA.indexOf(motivo) === -1) err(400, 'Motivo da denúncia inválido.');
+
+    const db = DB._d();
+    let targetUserId = dados.target_user_id ? String(dados.target_user_id) : null;
+    let targetBarbershopId = dados.target_barbershop_id ? String(dados.target_barbershop_id) : null;
+    let targetClientId = dados.target_client_id ? String(dados.target_client_id) : null;
+    let targetDisplay = String(dados.target_display || '');
+
+    /* ---------- regras por papel/alvo ---------- */
+    if (targetType === 'salao') {
+      if (isMembroEquipe(user)) err(403, 'Equipe do salão não pode denunciar outro salão.');
+      if (!targetBarbershopId) err(400, 'Informe o salão denunciado.');
+    } else if (targetType === 'barbeiro') {
+      if (isMembroEquipe(user)) err(403, 'Equipe do salão não pode denunciar barbeiros.');
+      if (!targetUserId) err(400, 'Informe o barbeiro denunciado.');
+      // barbeiro alvo precisa pertencer a um salão (profissional ou dono)
+      const prof = db.professionals.find(p => p.user_id == targetUserId);
+      const dono = db.barbershops.find(b => b.owner_user_id == targetUserId);
+      if (!prof && !dono) err(400, 'Barbeiro não encontrado.');
+      if (!targetDisplay) targetDisplay = (prof && prof.name) || (dono && dono.name) || '';
+    } else if (targetType === 'cliente') {
+      if (!isMembroEquipe(user)) err(403, 'Apenas a equipe do salão pode denunciar clientes.');
+      const { shop } = exigirEquipe();
+      targetBarbershopId = shop.id;
+      if (!targetClientId) err(400, 'Informe o cliente denunciado.');
+      const c = db.clients.find(x => x.id == targetClientId && x.barbershop_id === shop.id);
+      if (!c) err(404, 'Cliente não encontrado.');
+      targetUserId = c.user_id || null;
+      targetDisplay = c.name;
+    }
+
+    /* impede auto-denúncia (não pode denunciar a si mesmo) */
+    if (targetUserId && targetUserId === user.id) err(400, 'Você não pode denunciar a si mesmo.');
+
+    const r = {
+      id: DB.proximoId(),
+      reporter_user_id: user.id,
+      reporter_role: user.role,
+      reporter_name: user.name,
+      target_type: targetType,
+      target_user_id: targetUserId,
+      target_barbershop_id: targetBarbershopId,
+      target_client_id: targetClientId,
+      target_display: targetDisplay,
+      reason: motivo,
+      description: descricao,
+      status: 'pendente',
+      status_note: null,
+      created_at: agoraISO(),
+      updated_at: agoraISO()
+    };
+    db.reports = db.reports || [];
+    db.reports.push(r);
+    DB.salvar();
+    _auditLog(user.id, 'denunciar_perfil', { target_type: targetType, target_id: targetUserId || targetBarbershopId || targetClientId, reason: motivo });
+    return { ok: true, id: r.id, status: r.status };
+  }
+
+  /* Minhas denúncias (o denunciante vê o que enviou) */
+  function minhasDenuncias() {
+    const user = sessao();
+    return (_db().reports || [])
+      .filter(r => r.reporter_user_id === user.id)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(denunciaPublica);
+  }
+
+  function denunciaPublica(r) {
+    return {
+      id: r.id,
+      target_type: r.target_type,
+      target_display: r.target_display,
+      reason: r.reason,
+      description: r.description,
+      status: r.status,
+      created_at: r.created_at
+    };
+  }
+
+  /* ---------- bloqueio de cliente pelo salão (barbeiro/dono) ---------- */
+
+  function _clienteBloqueado(shopId, clientId) {
+    return !!(_db().blocked_clients || []).find(b =>
+      b.barbershop_id == shopId && b.client_id == clientId);
+  }
+
+  function bloquearCliente(clientId) {
+    const { shop } = exigirEquipe();
+    const db = DB._d();
+    const c = db.clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    if (!_clienteBloqueado(shop.id, c.id)) {
+      db.blocked_clients = db.blocked_clients || [];
+      db.blocked_clients.push({ barbershop_id: shop.id, client_id: c.id, created_at: agoraISO() });
+    }
+    DB.salvar();
+    _auditLog(sessao().id, 'bloquear_cliente', { client_id: c.id, client_name: c.name });
+    return { ok: true, bloqueado: true };
+  }
+
+  function desbloquearCliente(clientId) {
+    const { shop } = exigirEquipe();
+    const db = DB._d();
+    const c = db.clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    db.blocked_clients = (db.blocked_clients || []).filter(b =>
+      !(b.barbershop_id == shop.id && b.client_id == c.id));
+    DB.salvar();
+    _auditLog(sessao().id, 'desbloquear_cliente', { client_id: c.id, client_name: c.name });
+    return { ok: true, bloqueado: false };
+  }
+
+  /* inclui o status de bloqueio na ficha pública do cliente (CRM) */
+  function clienteBloqueado(clientId) {
+    const { shop } = exigirEquipe();
+    const c = _db().clients.find(x => x.id == clientId && x.barbershop_id === shop.id);
+    if (!c) err(404, 'Cliente não encontrado.');
+    return { blocked: _clienteBloqueado(shop.id, c.id) };
+  }
+
+  /* ---------- super-admin: moderação de denúncias ---------- */
+
+  function saListarDenuncias(filtros) {
+    filtros = filtros || {};
+    const db = _db();
+    let lista = db.reports || [];
+    if (filtros.status && filtros.status !== 'todos') {
+      lista = lista.filter(r => r.status === filtros.status);
+    }
+    if (filtros.tipo && filtros.tipo !== 'todos') {
+      lista = lista.filter(r => r.target_type === filtros.tipo);
+    }
+    return lista
+      .slice()
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(r => {
+        const alvo = db.users.find(u => u.id === r.target_user_id);
+        const loja = db.barbershops.find(b => b.id === r.target_barbershop_id);
+        return {
+          id: r.id,
+          reporter_name: r.reporter_name,
+          reporter_role: r.reporter_role,
+          target_type: r.target_type,
+          target_display: r.target_display,
+          target_user_name: alvo ? alvo.name : null,
+          target_barbershop_name: loja ? loja.name : null,
+          reason: r.reason,
+          description: r.description,
+          status: r.status,
+          status_note: r.status_note,
+          created_at: r.created_at
+        };
+      });
+  }
+
+  function saResolverDenuncia(id, dados) {
+    dados = dados || {};
+    const db = _db();
+    const r = (db.reports || []).find(x => x.id == id);
+    if (!r) err(404, 'Denúncia não encontrada.');
+    const novoStatus = String(dados.status || '');
+    if (novoStatus && ['pendente', 'investigando', 'resolvido', 'rejeitado'].indexOf(novoStatus) === -1) {
+      err(400, 'Status inválido.');
+    }
+    if (novoStatus) r.status = novoStatus;
+    if (dados.status_note != null) r.status_note = String(dados.status_note).trim() || null;
+    r.updated_at = agoraISO();
+    DB.salvar();
+    return {
+      id: r.id, status: r.status, status_note: r.status_note,
+      target_type: r.target_type, target_display: r.target_display
+    };
+  }
+
   /* ================= ASSINATURAS E PLANOS (RF-057..061, DT-12) ================= */
 
   function listarPlanos() {
@@ -2156,8 +2870,11 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   function bonusPlano(plano) {
     return plano ? {
       id: plano.id, name: plano.name, price_monthly: plano.price_monthly,
+      price_annual: plano.price_annual,
       max_professionals: plano.max_professionals, features: plano.features,
-      permissions: plano.permissions || [], is_free: !!plano.is_free
+      permissions: plano.permissions || [], is_free: !!plano.is_free,
+      nivel_relatorio: plano.nivel_relatorio || null,
+      relatorios_resumo: relatoriosResumoPorNivel(plano.nivel_relatorio || null)
     } : null;
   }
 
@@ -2167,21 +2884,22 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const plano = db.plans.find(p => p.id === (sub && sub.plan_id));
     let liberado = false;
     try {
-      liberado = typeof window.API.acessoLiberado === 'function'
+      liberado = sub && typeof window.API.acessoLiberado === 'function'
         ? window.API.acessoLiberado(sub.barbershop_id)
         : false;
     } catch (e) { liberado = false; }
-    const efetivo = (liberado && plano) ? plano : planoFree();
+    const efetivo = (liberado && plano) ? plano
+      : (modoGratuito() ? planoGratuitoPlataforma() : (planoFree() || null));
     return {
-      id: sub.id,
+      id: sub ? sub.id : null,
       plan: bonusPlano(plano),
       plano_efetivo: bonusPlano(efetivo),
-      status: sub.status,
-      trial_ends_at: sub.trial_ends_at,
-      current_period_end: sub.current_period_end,
-      trial_usado: !!sub.trial_usado,
-      on_trial: sub.status === 'trial' && sub.trial_ends_at >= hoje,
-      days_left_in_trial: sub.trial_ends_at
+      status: sub ? sub.status : null,
+      trial_ends_at: sub ? sub.trial_ends_at : null,
+      current_period_end: sub ? sub.current_period_end : null,
+      trial_usado: !!(sub && sub.trial_usado),
+      on_trial: !!(sub && sub.status === 'trial' && sub.trial_ends_at >= hoje),
+      days_left_in_trial: (sub && sub.trial_ends_at)
         ? Math.max(0, Math.round((DB.parseISO(sub.trial_ends_at) - DB.parseISO(hoje)) / 86400000))
         : 0
     };
@@ -2189,51 +2907,53 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   function minhaAssinatura() {
     const { shop } = exigirDono();
-    let sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
-    if (!sub) {
-      sub = {
-        id: DB.proximoId(), barbershop_id: shop.id, plan_id: planoFree().id,
-        status: 'ativa', trial_ends_at: null, current_period_end: null,
-        trial_usado: false, created_at: agoraISO(), updated_at: agoraISO()
-      };
-      DB._d().subscriptions.push(sub);
-      DB.salvar();
-    }
-    return assinaturaPublica(sub);
+    /* Sem plano gratuito: loja sem assinatura fica com plano_efetivo
+       nulo até assinar (trial, PIX ou trocarPlano criam a assinatura). */
+    const sub = DB._d().subscriptions.find(s => s.barbershop_id === shop.id);
+    return assinaturaPublica(sub || null);
   }
 
   /**
-   * RF-059 — trial opcional "10 dias grátis" (uma única vez por loja).
-   * Só vale para lojas sem trial ativo e que ainda não usaram o benefício.
+   * RF-059 — "10 dias grátis" no plano escolhido (uma única vez por loja).
+   * Ao assinar, o dono entra em trial com o plano selecionado; passados os
+   * 10 dias, o job de cobrança (payments.js) gera automaticamente a cobrança
+   * do plano e o acesso pago fica bloqueado até a confirmação do pagamento.
    */
-  function ativarTrial() {
+  function assinarComTrial(planId) {
     const { shop } = exigirDono();
     const db = DB._d();
-    const salaopro = db.plans.find(p => String(p.name || '').toLowerCase() === 'salao');
-    if (!salaopro) err(500, 'Plano Salão não encontrado.');
+    const plano = db.plans.find(p => p.id == planId);
+    if (!plano) err(404, 'Plano não encontrado.');
+    if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
     const hoje = DB.hojeISO();
 
     const idx = db.subscriptions.findIndex(s => s.barbershop_id === shop.id);
-    const existe = idx >= 0;
-    const subAtual = existe ? db.subscriptions[idx] : null;
+    const subAtual = idx >= 0 ? db.subscriptions[idx] : null;
     if (subAtual && subAtual.status === 'trial' && subAtual.trial_ends_at >= hoje) {
-      err(400, 'Você já está no período de trial.');
+      err(400, 'Você já está no período de 10 dias grátis.');
     }
     if (subAtual && subAtual.trial_usado) {
-      err(409, 'O trial de 10 dias já foi utilizado por esta loja.');
+      err(409, 'Os 10 dias grátis já foram utilizados. Finalize o pagamento para ativar o plano.');
     }
 
     const sub = {
       id: subAtual ? subAtual.id : DB.proximoId(),
-      barbershop_id: shop.id, plan_id: salaopro.id,
+      barbershop_id: shop.id, plan_id: plano.id,
       status: 'trial', trial_ends_at: DB.addDiasISO(10),
       current_period_end: null, trial_usado: true,
       created_at: subAtual ? subAtual.created_at : agoraISO(), updated_at: agoraISO()
     };
-    if (existe) db.subscriptions[idx] = sub;
+    if (idx >= 0) db.subscriptions[idx] = sub;
     else db.subscriptions.push(sub);
     DB.salvar();
     return assinaturaPublica(sub);
+  }
+
+  function ativarTrial() {
+    const db = DB._d();
+    const salaopro = db.plans.find(p => String(p.name || '').toLowerCase() === 'salao');
+    if (!salaopro) err(500, 'Plano Salão não encontrado.');
+    return assinarComTrial(salaopro.id);
   }
 
   /**
@@ -2247,28 +2967,24 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!plano) err(404, 'Plano não encontrado.');
     if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
 
-    let sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
-    if (!sub) {
-      sub = {
-        id: DB.proximoId(), barbershop_id: shop.id, plan_id: plano.id,
-        status: 'ativa', trial_ends_at: null,
-        current_period_end: DB.addDiasISO(30),
-        trial_usado: true, created_at: agoraISO(), updated_at: agoraISO()
-      };
-      db.subscriptions.push(sub);
-    } else {
-      sub.plan_id = plano.id;
-      sub.trial_usado = true;
-      if (sub.status === 'trial' && sub.trial_ends_at >= DB.hojeISO()) {
-        /* mantém trial original — sem loop infinito de graça */
-      } else {
-        sub.status = 'ativa';
-        sub.current_period_end = DB.addDiasISO(30);
-      }
-      sub.updated_at = agoraISO();
+    const sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
+    const hoje = DB.hojeISO();
+    const emTrial = sub && sub.status === 'trial' && sub.trial_ends_at >= hoje;
+    const pago = sub && sub.status === 'ativa' && sub.current_period_end >= hoje;
+
+    /* Sem trial usado e sem período pago: entra nos 10 dias grátis. */
+    if (!emTrial && !pago && (!sub || !sub.trial_usado)) {
+      return assinarComTrial(plano.id);
     }
-    DB.salvar();
-    return assinaturaPublica(sub);
+    /* Troca dentro do trial mantém o prazo (DT-12); troca com plano pago
+       apenas muda o plano já contratado, sem conceder período grátis. */
+    if (emTrial || pago) {
+      sub.plan_id = plano.id;
+      sub.updated_at = agoraISO();
+      DB.salvar();
+      return assinaturaPublica(sub);
+    }
+    err(402, 'Finalize o pagamento da cobrança para reativar o acesso.');
   }
 
   function cancelarAssinatura() {
@@ -2284,6 +3000,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* ================= UPLOADS E GALERIA (RF-062..065, RNF-11) ================= */
 
   function definirLogo(dataUrl) {
+    // [SEGURANÇA] Valida tamanho do dataUrl para evitar payloads gigantes
+    if (!dataUrl || typeof dataUrl !== 'string') err(400, 'Imagem inválida.');
+    if (dataUrl.length > 1024 * 1024) err(400, 'Imagem muito grande (máx. 1MB após processamento).');
+    if (!dataUrl.startsWith('data:image/')) err(400, 'Formato de imagem inválido.');
     const { shop } = exigirDono();
     shop.logo_url = dataUrl;
     shop.updated_at = agoraISO();
@@ -2293,6 +3013,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function definirCapa(dataUrl) {
+    // [SEGURANÇA] Valida tamanho do dataUrl para evitar payloads gigantes
+    if (!dataUrl || typeof dataUrl !== 'string') err(400, 'Imagem inválida.');
+    if (dataUrl.length > 1024 * 1024) err(400, 'Imagem muito grande (máx. 1MB após processamento).');
+    if (!dataUrl.startsWith('data:image/')) err(400, 'Formato de imagem inválido.');
     const { shop } = exigirDono();
     const db = DB._d();
     let galleryId = null;
@@ -2319,9 +3043,24 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   /** Escrita restrita ao dono — corrige DT-08. */
   function adicionarGaleria(dataUrls) {
+    // [SEGURANÇA] Valida dataUrl para evitar payloads gigantes
+    if (!Array.isArray(dataUrls) || !dataUrls.length) err(400, 'Imagens inválidas.');
+    (Array.isArray(dataUrls) ? dataUrls : [dataUrls]).forEach((url, i) => {
+      if (typeof url !== 'string' || url.length > 1024 * 1024 || !url.startsWith('data:image/')) {
+        err(400, 'Imagem ' + (i + 1) + ' inválida ou muito grande.');
+      }
+    });
     const { shop } = exigirDono();
     exigirFuncionalidade(shop.id, 'galeria', 'Gerenciar galeria de fotos');
     const db = DB._d();
+
+    // [SEGURANÇA] Limite de fotos por loja para evitar abuso de armazenamento
+    const LIMITE_GALERIA = 20;
+    const fotosAtuais = db.gallery_images.filter(g => g.barbershop_id === shop.id);
+    if (fotosAtuais.length + dataUrls.length > LIMITE_GALERIA) {
+      err(400, 'Limite de ' + LIMITE_GALERIA + ' fotos por loja atingido. Remova fotos antes de adicionar.');
+    }
+
     const criadas = (Array.isArray(dataUrls) ? dataUrls : [dataUrls]).map(url => {
       const g = {
         id: DB.proximoId(), barbershop_id: shop.id, url,
@@ -2609,13 +3348,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   /* ================= SUPORTE (página extra mantida) ================= */
 
   function criarTicket(salaoId, assunto, mensagem) {
-    const user = sessao();
+    /* [SEGURANÇA] Só o dono pode abrir chamado e apenas para o PRÓPRIO
+       salão — o salaoId do cliente é validado contra o salão da sessão
+       (evita abrir chamado em nome de outra loja). */
+    const { user, shop } = exigirDono();
+    if (salaoId != null && String(salaoId) !== String(shop.id)) {
+      err(403, 'Você só pode abrir chamado para o seu próprio salão.');
+    }
+    const texto = String(mensagem || '').trim();
+    if (!texto) err(400, 'Escreva sua mensagem.');
     const t = {
       id: DB.proximoId(),
-      salao_id: String(salaoId),
+      salao_id: String(shop.id),
       user_id: user.id,
-      subject: String(assunto || 'Outro'),
-      message: String(mensagem || '').trim(),
+      subject: String(assunto || 'Outro').slice(0, 120),
+      message: texto,
       status: 'aberto',
       created_at: agoraISO(),
       updated_at: agoraISO()
@@ -2626,7 +3373,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function ticketsDoSalao(salaoId) {
-    return DB._d().tickets.filter(t => t.salao_id == salaoId).slice().reverse();
+    /* [SEGURANÇA] Isolamento por loja: o dono só lê os chamados do seu
+       próprio salão, independentemente do salaoId informado. */
+    const { shop } = exigirDono();
+    if (salaoId != null && String(salaoId) !== String(shop.id)) {
+      err(403, 'Acesso restrito aos chamados do seu salão.');
+    }
+    return DB._d().tickets.filter(t => t.salao_id == shop.id).slice().reverse();
   }
 
   function nomeLoja(id) {
@@ -2771,6 +3524,12 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true };
   }
 
+  /* Funções internas fora do roteador RPC (usadas pelo job diário do server.js) */
+  window.__CC_INTERNAL = window.__CC_INTERNAL || {};
+  window.__CC_INTERNAL.gerarDiariosParaData = gerarDiariosParaData;
+  window.__CC_INTERNAL.gerarLembretesAmanha = gerarLembretesAmanha;
+  window.__CC_INTERNAL.notificar = notificar;
+
   /* ================= API pública ================= */
 
   return {
@@ -2815,7 +3574,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     listarClientes, getCliente, criarCliente, atualizarCliente, agendamentosDoCliente,
 
     // dashboard
-    dashboardStats, exportarCSV,
+    dashboardStats, exportarCSV, gerarRelatorio, gerarRelatorioDiario,
 
     // busca
     buscar, sugestoes,
@@ -2823,8 +3582,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // reviews
     reviewsDaLoja, criarReview, minhasReviews,
 
+    // denúncias e bloqueios
+    denunciarPerfil, minhasDenuncias,
+    bloquearCliente, desbloquearCliente, clienteBloqueado,
+
     // assinatura
     listarPlanos, minhaAssinatura, trocarPlano, cancelarAssinatura, ativarTrial,
+    assinarComTrial,
 
     // uploads / galeria
     definirLogo, definirCapa,
@@ -2852,10 +3616,15 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // magic link / lembretes
     verificarMagicLink, gerarLembretesAmanha,
 
+    // plataforma / assinatura (só o flag público; setters são internos)
+    modoGratuito,
+
     // super-admin
     superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
-    saTickets, saResponderTicket
+    saTickets, saResponderTicket,
+    saListarDenuncias, saResolverDenuncia,
+    saListarPlanos, saAtualizarPrecosPlano, saObterConfig, saDefinirSiteGratis
   };
 })();

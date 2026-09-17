@@ -441,7 +441,8 @@ window.Auth = (function () {
         Mailer.enviarBoasVindas({
           email: usuario.email, nome: usuario.name,
           nomeSalao: p.salon_name || (barbearia && barbearia.name) || 'Seu salão',
-          trialDias: 7
+          trialDias: 7,
+          shopId: barbearia && barbearia.id
         }).catch(function(e) { console.error('[onboarding] falha:', e); });
       }
       DB.salvar();
@@ -526,20 +527,23 @@ window.Auth = (function () {
       });
     });
 
-    /* assinatura base Free (RF-058 v3): novo cadastro começa sem
-       benefícios; trial de 10 dias é opcional (API.ativarTrial) */
+    /* assinatura base (RF-058 v3): novo cadastro começa sem benefícios
+       (trial de 10 dias é opcional via API.ativarTrial). Sem plano
+       gratuito, a loja fica sem assinatura até assinar um plano pago. */
     const planoFree = db.plans.find(p => p.is_free);
-    db.subscriptions.push({
-      id: DB.proximoId(),
-      barbershop_id: loja.id,
-      plan_id: planoFree ? planoFree.id : (db.plans.find(p => p.name === 'Free') || { is_free: true, id: null }).id,
-      status: 'ativa',
-      trial_ends_at: null,
-      current_period_end: null,
-      trial_usado: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
+    if (planoFree) {
+      db.subscriptions.push({
+        id: DB.proximoId(),
+        barbershop_id: loja.id,
+        plan_id: planoFree.id,
+        status: 'ativa',
+        trial_ends_at: null,
+        current_period_end: null,
+        trial_usado: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
 
     return loja;
   }

@@ -20,8 +20,8 @@
 Ao confirmar: subscription.status='ativa', plan_id do plano
     pago e current_period_end estendido em +30 dias (mensal) ou
     +365 dias (anual), a partir do fim do período vigente,
-    preservando trial em andamento. O total anual é SEMPRE
-    12× o valor mensal (sem desconto).
+    preservando trial em andamento. O total anual usa o preço
+    anual próprio do plano (price_annual) — não é 12× o mensal.
     ============================================================ */
 
 (function () {
@@ -150,8 +150,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * cobrança de 12× o valor mensal). A opção de parcelar só é
    * aceita no período anual (parcelas de 1 a 12).
    */
-  async function criarCobrancaPlano(planId, periodo, parcelas, metodo) {
-    const { shop } = exigirDonoLocal();
+async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
@@ -166,14 +165,19 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     const nParc = anual
       ? Math.min(12, Math.max(1, parseInt(parcelas, 10) || 12))
       : 1;
-    const quantidade = anual ? 12 : 1;
-    /* Sem desconto: o plano anual custa exatamente 12× o valor mensal. */
-    const totalCents = Math.round(Number(plano.price_monthly || 0) * quantidade * 100);
+    /* Preço por período. Anual usa o preço anual próprio do plano
+       (price_annual) quando disponível; senão cai para 12× o mensal. */
+    const baseTotal = anual
+      ? (plano.price_annual != null && Number(plano.price_annual) > 0
+          ? Number(plano.price_annual)
+          : Number(plano.price_monthly || 0) * 12)
+      : Number(plano.price_monthly || 0);
+    const totalCents = Math.round(baseTotal * 100);
 
     /* pendente reutilizável? */
     const agora = agoraMsISO();
     const existente = db.payments.find(p =>
-      p.barbershop_id === shop.id && p.plan_id === plano.id &&
+      p.barbershop_id === shopId && p.plan_id === plano.id &&
       p.billing_period === dias && (p.installments || 1) === nParc &&
       (p.metodo || 'pix') === mtd &&
       p.status === 'pending' && p.expires_at > agora);
@@ -181,7 +185,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
 
     const pag = {
       id: DB.proximoId(),
-      barbershop_id: shop.id,
+      barbershop_id: shopId,
       plan_id: plano.id,
       billing_period: dias,
       installments: nParc,
@@ -212,6 +216,55 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     db.payments.push(pag);
     DB.salvar();
     return pagamentoPublico(pag);
+  }
+
+  /**
+   * Cria a cobrança do dono logado (wrapper de sessão sobre montarCobranca).
+   * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias, parcelável).
+   */
+  async function criarCobrancaPlano(planId, periodo, parcelas, metodo) {
+    const { shop } = exigirDonoLocal();
+    return montarCobranca(shop.id, planId, periodo, parcelas, metodo);
+  }
+
+  /**
+   * Job de assinatura: quando os 10 dias grátis terminam, a assinatura é
+   * marcada como 'expirada' (bloqueia o acesso pago) e o dono é avisado para
+   * escolher, na tela Assinatura, o plano que deseja renovar. A assinatura é
+   * mensal e a cobrança só é gerada quando ele escolhe o plano
+   * (criarCobrancaPlano). Idempotente: só processa assinaturas em 'trial'.
+   */
+  function vencerTrialsExpirados() {
+    const db = DB._d();
+    const hoje = DB.hojeISO();
+    const vencidos = db.subscriptions.filter(s =>
+      s.status === 'trial' && s.trial_ends_at && s.trial_ends_at < hoje);
+    let vencidosCount = 0;
+    for (const sub of vencidos) {
+      try {
+        sub.status = 'expirada';
+        sub.updated_at = agoraISO();
+
+        const loja = db.barbershops.find(b => b.id === sub.barbershop_id);
+        const internos = window.__CC_INTERNAL || {};
+        if (loja && loja.owner_user_id && typeof internos.notificar === 'function') {
+          internos.notificar({
+            user_id: loja.owner_user_id,
+            barbershop_id: loja.id,
+            type: 'assinatura',
+            title: 'Seus 10 dias grátis terminaram',
+            message: 'Escolha o plano que deseja renovar na tela Assinatura. ' +
+              'A assinatura é mensal e a cobrança é gerada na hora que você escolher.'
+          });
+        }
+        DB.salvar();
+        vencidosCount++;
+      } catch (e) {
+        console.error('[assinatura][job] falha ao vencer trial ' + sub.barbershop_id + ':',
+          (e && (e.error || e.message)) || e);
+      }
+    }
+    return { vencidos: vencidosCount };
   }
 
   /** Consulta a situação de uma cobrança (polling da tela). */
@@ -360,6 +413,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * dentro do prazo — acesso encerra ao fim do período).
    */
   function acessoLiberado(shopId) {
+    if (typeof window.API.modoGratuito === 'function' && window.API.modoGratuito()) return true;
     const db = DB._d();
     const hoje = DB.hojeISO();
     const sub = db.subscriptions.find(s => s.barbershop_id == shopId);
@@ -379,4 +433,9 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     processarEventoWebhook,
     acessoLiberado
   });
+
+  /* Internos do job de assinatura (fora do roteador RPC). */
+  window.__CC_INTERNAL = window.__CC_INTERNAL || {};
+  window.__CC_INTERNAL.vencerTrialsExpirados = vencerTrialsExpirados;
+  window.__CC_INTERNAL.criarCobrancaParaLoja = montarCobranca;
 })();

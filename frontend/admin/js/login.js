@@ -154,6 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!fluxo) return;
     try {
       const r = Auth.verifyCode(fluxo.phone, inputCodigo.value);
+      /* flash antigo (ex.: "faça login para denunciar") não deve
+         aparecer depois do login bem-sucedido */
+      sessionStorage.removeItem('cc_flash');
       showToast(r.user.role === 'dono'
         ? 'Bem-vindo de volta, ' + r.user.name.split(' ')[0] + '!'
         : 'Login realizado com sucesso!');

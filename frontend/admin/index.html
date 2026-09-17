@@ -57,6 +57,11 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
         Horários
       </a></li>
+      <li class="nav-item"><a href="relatorios.html">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16"/><path d="M6 16l3-4 4 2 5-7"/><circle cx="18" cy="7" r="2"/></svg>
+        Relatórios
+      </a></li>
+
     </ul>
 
     <span class="nav-group-label">Sistema</span>
@@ -129,6 +134,17 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px;"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
           Exportar CSV
         </button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3 class="section-title">Seu link de agendamento</h3>
+      <p style="color:var(--text-muted);font-size:13px;margin:0 0 10px 0;">Envie este link para seus clientes agendarem online, 24 horas por dia.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="link-agendamento" type="text" readonly style="flex:1;min-width:220px;font-family:monospace;font-size:13px;">
+        <button class="btn btn-outline" id="btn-copiar-link" type="button">Copiar link</button>
+        <button class="btn btn-outline" id="btn-compartilhar-link" type="button">Compartilhar</button>
+        <a class="btn btn-outline" id="btn-abrir-link" href="../public/catalogo.html" target="_blank" rel="noopener">Abrir</a>
       </div>
     </div>
 

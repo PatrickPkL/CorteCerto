@@ -14,17 +14,32 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  /* motivo do redirecionamento (ação bloqueada por falta de assinatura) */
+  try {
+    const aviso = sessionStorage.getItem('cc_assinatura_aviso');
+    if (aviso) {
+      sessionStorage.removeItem('cc_assinatura_aviso');
+      showToast(aviso, 'error');
+    }
+  } catch (e) { /* sessionStorage indisponível */ }
+
   function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
   function setHTML(id, v) { const el = document.getElementById(id); if (el) el.innerHTML = v; }
 
   const STATUS_LABEL = {
-    trial: ['badge-pendente', 'Em trial'],
+    trial: ['badge-pendente', '10 dias grátis'],
     ativa: ['badge-confirmado', 'Ativa'],
-    cancelada: ['badge-cancelado', 'Cancelada']
+    cancelada: ['badge-cancelado', 'Cancelada'],
+    expirada: ['badge-cancelado', 'Expirada']
   };
 
   let planos = [];
   try { planos = API.listarPlanos(); } catch (e) { /* noop */ }
+
+  /* Ao expirar os 10 dias grátis, rola até a lista de planos uma vez por
+     carregamento, para o dono escolher qual plano deseja renovar (a
+     cobrança só é gerada depois que ele escolhe). */
+  let escolhaJaRolada = false;
 
   function render() {
     let sub;
@@ -33,35 +48,76 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const [cls, label] = STATUS_LABEL[sub.status] || ['', sub.status];
+    const [cls, label] = STATUS_LABEL[sub.status] || ['', 'Sem assinatura'];
     setHTML('st-status', '<span class="badge ' + cls + '">' + label + '</span>');
     setText('st-plano', sub.plano_efetivo ? sub.plano_efetivo.name : (sub.plan ? sub.plan.name : '—'));
     setText('st-preco', sub.plano_efetivo ? DB.fmtBRL(sub.plano_efetivo.price_monthly) + '/mês' : '—');
 
-    const ofertaTrial = document.getElementById('box-trial-oferta');
-    if (ofertaTrial) ofertaTrial.hidden = !!sub.on_trial || !!sub.trial_usado;
+    let liberado = false;
+    try { liberado = !!API.acessoLiberado(loja.id); } catch (e) { liberado = false; }
+
+    const podeTrial = !sub.trial_usado && !sub.on_trial;
 
     if (sub.on_trial) {
+      const valorPlano = sub.plan ? DB.fmtBRL(sub.plan.price_monthly) + '/mês' : '—';
       setText('st-cobranca', DB.fmtDataBR(sub.trial_ends_at));
-      setText('st-cobranca-nota', 'trial ativo — assine para continuar');
-      setHTML('st-trial', 'Trial termina em <strong>' + sub.days_left_in_trial +
-        ' dia(s)</strong> (' + DB.fmtDataBR(sub.trial_ends_at) + '). Assine um plano para continuar após o trial.');
+      setText('st-cobranca-nota', 'último dia do teste — cobrança no dia seguinte');
+      setHTML('st-trial', 'Você está testando o plano <strong>' +
+        esc(sub.plan ? sub.plan.name : '') + '</strong> por <strong>' + sub.days_left_in_trial +
+        ' dia(s)</strong> (termina em ' + DB.fmtDataBR(sub.trial_ends_at) + '). No <strong>11º dia</strong> ' +
+        'a cobrança mensal de ' + valorPlano + ' é gerada. Pode trocar o plano de teste quando quiser — ' +
+        'é só escolher abaixo.');
       document.getElementById('box-trial').hidden = false;
     } else {
       const venceu = sub.current_period_end && sub.current_period_end < DB.hojeISO();
       setText('st-cobranca', sub.current_period_end ? DB.fmtDataBR(sub.current_period_end) : '—');
-      setText('st-cobranca-nota', venceu ? 'período encerrado — renove o plano'
+      setText('st-cobranca-nota', venceu ? 'período encerrado — escolha um plano para renovar'
                                          : 'renovação ao pagar o PIX');
       document.getElementById('box-trial').hidden = true;
     }
 
+    /* Aviso: escolha o plano que você quer testar nos 10 dias grátis */
+    const boxEscolher = document.getElementById('box-escolher');
+    if (boxEscolher) {
+      boxEscolher.hidden = !podeTrial;
+      if (podeTrial) {
+        setHTML('st-escolher', 'Escolha abaixo o plano que você quer <strong>testar por 10 dias ' +
+          'grátis</strong>. Depois do teste a assinatura é mensal e a cobrança só é gerada quando ' +
+          'você confirmar qual plano quer renovar.');
+      }
+    }
+
+    const devePagar = !liberado && !sub.on_trial && !!(sub.plan || sub.trial_usado);
+    const boxPend = document.getElementById('box-pendente');
+    if (boxPend) {
+      boxPend.hidden = !devePagar;
+      if (devePagar) {
+        setHTML('st-pendente', 'Seus <strong>10 dias grátis terminaram</strong>. Escolha abaixo o ' +
+          'plano que deseja renovar e pague o PIX para reativar o acesso. A assinatura é mensal.');
+      }
+    }
+
     renderPlanos(sub);
     renderHistorico(sub);
+
+    /* Assinatura expirada: rola até os planos para o dono escolher qual
+       renovar (a cobrança é gerada só na escolha de um plano). */
+    if (devePagar && !escolhaJaRolada) {
+      escolhaJaRolada = true;
+      setTimeout(() => {
+        const alvo = document.getElementById('lista-planos');
+        if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+    }
   }
 
   /* ---------- cards de planos ---------- */
   function opcoesParcelas(plano) {
-    const total = Math.round(plano.price_monthly * 12 * 100) / 100;
+    const total = Math.round(
+      ((plano.price_annual != null && Number(plano.price_annual) > 0
+        ? Number(plano.price_annual)
+        : Number(plano.price_monthly) * 12) * 100)
+    ) / 100;
     const opcoes = [1, 2, 3, 6, 12].map(n => {
       const valor = Math.round((total / n) * 100) / 100;
       const rotulo = n === 1 ? ' (à vista)'
@@ -79,12 +135,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#lista-planos .plan-card').forEach(card => {
       const plano = planos.find(p => String(p.id) === card.dataset.plano);
       if (!plano) return;
+      const base = anual
+        ? (plano.price_annual != null && Number(plano.price_annual) > 0
+          ? Number(plano.price_annual) : Number(plano.price_monthly) * 12)
+        : Number(plano.price_monthly);
+      const riscado = card.querySelector('.plan-preco-riscado');
       const valorEl = card.querySelector('.plan-preco-valor');
       const unidEl = card.querySelector('.plan-preco-unidade');
       const nota = card.querySelector('.plan-anual-nota');
       const parc = card.querySelector('.plan-parcelas');
-      valorEl.textContent = anual ? DB.fmtBRL(plano.price_monthly * 12) : DB.fmtBRL(plano.price_monthly);
-      unidEl.textContent = anual ? '/ano' : '/mês';
+      if (riscado) {
+        /* card em trial: preço cheio riscado + R$ 0,00 nos 10 primeiros dias */
+        riscado.textContent = DB.fmtBRL(base);
+        if (valorEl) valorEl.textContent = 'R$ 0,00';
+        if (unidEl) unidEl.textContent = 'nos primeiros 10 dias';
+        const depois = card.querySelector('.plan-preco-depois');
+        if (depois) depois.textContent = 'Depois ' + DB.fmtBRL(base) +
+          (anual ? '/ano' : '/mês') + ' · cancele quando quiser';
+        return;
+      }
+      if (valorEl) valorEl.textContent = DB.fmtBRL(base);
+      if (unidEl) unidEl.textContent = anual ? '/ano' : '/mês';
       if (nota) nota.hidden = !anual;
       if (parc) parc.hidden = !anual;
     });
@@ -94,31 +165,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('lista-planos');
     if (!box) return;
 
+    const podeTrial = !subAtual.trial_usado && !subAtual.on_trial;
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;
+      const anualBase = p.price_annual != null && Number(p.price_annual) > 0
+        ? Number(p.price_annual)
+        : Number(p.price_monthly) * 12;
       const limite = p.max_professionals == null
         ? 'Profissionais ilimitados'
         : 'Até ' + p.max_professionals + ' profissional(is)';
       const feats = (p.features || []).map(f => '<li>' + esc(f) + '</li>').join('');
-      const botao = p.is_free
-        ? '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
-            (atual ? 'Plano atual' : 'Plano base') + '</button>'
-        : '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
-            (atual ? 'Renovar' : 'Assinar agora') + '</button>';
-      return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '">' +
+
+      let botao;
+      if (p.is_free) {
+        botao = '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
+          (atual ? 'Plano atual' : 'Plano base') + '</button>';
+      } else if (podeTrial) {
+        botao = '<button type="button" class="btn btn-brass btn-assinar-trial" data-id="' + p.id + '">' +
+          'Começar 10 dias grátis</button>';
+      } else if (subAtual.on_trial) {
+        const emTeste = subAtual.plan && subAtual.plan.id === p.id;
+        botao = emTeste
+          ? '<button type="button" class="btn" disabled>Em teste agora</button>'
+          : '<button type="button" class="btn btn-brass btn-trocar-plano" data-id="' + p.id + '">' +
+            'Trocar para este plano</button>';
+      } else {
+        botao = '<button type="button" class="btn btn-brass btn-assinar" data-id="' + p.id + '">' +
+          (atual ? 'Renovar' : 'Assinar agora') + '</button>';
+      }
+
+      const preco = podeTrial
+        ? '<div class="plan-preco mono">' +
+            '<span class="plan-preco-riscado">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
+            '<span class="plan-preco-valor">R$ 0,00</span>' +
+            '<small class="plan-preco-unidade">nos primeiros 10 dias</small>' +
+          '</div>' +
+          '<div class="plan-preco-depois">Depois ' + DB.fmtBRL(anual ? anualBase : p.price_monthly) +
+            (anual ? '/ano' : '/mês') + ' · cancele quando quiser</div>'
+        : '<div class="plan-preco mono">' +
+            '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
+            '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
+          '</div>' +
+          '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · parcelas a partir de ' +
+            DB.fmtBRL(Math.round(anualBase / 12 * 100) / 100) + '/mês</div>' +
+          '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
+            '<label>Parcelar em</label>' +
+            '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
+          '</div>';
+
+      return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '"' +
+          (podeTrial ? ' data-trial="1"' : '') + '>' +
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
-        '<div class="plan-preco mono">' +
-          '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? p.price_monthly * 12 : p.price_monthly) + '</span>' +
-          '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
-        '</div>' +
-        '<div class="plan-anual-nota"' + (anual ? '' : ' hidden') + '>12 meses · mesmo valor mensal (' +
-          DB.fmtBRL(p.price_monthly) + '/mês)</div>' +
-        '<div class="plan-parcelas"' + (anual ? '' : ' hidden') + '>' +
-          '<label>Parcelar em</label>' +
-          '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
-        '</div>' +
+        preco +
         '<ul class="plan-feats"><li>' + limite + '</li>' + feats + '</ul>' +
         botao +
       '</div>';
@@ -131,6 +231,43 @@ document.addEventListener('DOMContentLoaded', () => {
           ? Number(btn.closest('.plan-card').querySelector('.plan-parcelas-sel').value) || 12
           : 1;
         if (plano) abrirPagamento(plano, periodoGlobal, parcelas);
+      });
+    });
+
+    box.querySelectorAll('.btn-assinar-trial').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plano = planos.find(p => String(p.id) === btn.dataset.id);
+        if (!plano) return;
+        if (!confirm('Começar 10 dias grátis no plano ' + plano.name +
+          '? Depois do período você escolhe qual plano quer renovar e paga o PIX.')) return;
+        try {
+          API.assinarComTrial(plano.id);
+          showToast('10 dias grátis ativados no plano ' + plano.name + '!', 'success');
+          render();
+          montarShellAdmin();
+        } catch (e) {
+          showToast(msgErro(e), 'error');
+          render();
+        }
+      });
+    });
+
+    /* durante o teste, troca o plano testado mantendo os dias restantes */
+    box.querySelectorAll('.btn-trocar-plano').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plano = planos.find(p => String(p.id) === btn.dataset.id);
+        if (!plano) return;
+        if (!confirm('Passar a testar o plano ' + plano.name +
+          '? Os dias de teste que restam continuam os mesmos.')) return;
+        try {
+          API.trocarPlano(plano.id);
+          showToast('Agora você está testando o plano ' + plano.name + '.', 'success');
+          render();
+          montarShellAdmin();
+        } catch (e) {
+          showToast(msgErro(e), 'error');
+          render();
+        }
       });
     });
   }
@@ -329,18 +466,11 @@ function fecharPagamento() {
     }
   });
 
-  /* ---------- trial opcional (10 dias) ---------- */
-  document.getElementById('btn-ativar-trial')?.addEventListener('click', () => {
-    if (!confirm('Ativar o trial de 10 dias do plano Salão? Válido uma única vez por loja.')) return;
-    try {
-      API.ativarTrial();
-      showToast('Trial ativado! Plano Salão liberado por 10 dias.', 'success');
-      render();
-      montarShellAdmin();
-    } catch (err3) {
-      showToast(msgErro(err3), 'error');
-      render();
-    }
+  /* ---------- fim dos 10 dias: leva o dono a escolher o plano a renovar ---------- */
+  document.getElementById('btn-pagar-pendente')?.addEventListener('click', () => {
+    const alvo = document.getElementById('lista-planos');
+    if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast('Escolha abaixo o plano que você quer renovar.', 'info');
   });
 
   /* ---------- seletor global Mensal/Anual ---------- */

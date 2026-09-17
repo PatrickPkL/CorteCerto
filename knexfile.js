@@ -19,7 +19,9 @@ const MIGRATION_URL =
 /* Hosts gerenciados (Render/Neon) pedem SSL self-signed; o pg moderno
    trata "sslmode=require/ssl=true" como verify-full e exige cert válido.
    Parseamos a URL nós mesmos e repassamos ssl com rejectUnauthorized:false
-   para não depender da versão do pg-connection-string no servidor. */
+   (criptografado, sem validar a cadeia por padrão) para não depender da
+   versão do pg-connection-string no servidor. Com PGSSL_STRICT=1 exige a
+   validação estrita (requer CA confiável). */
 const TEM_SSL = /(ssl=true|sslmode)/i.test(MIGRATION_URL);
 const CONN = TEM_SSL
   ? (function () {
@@ -30,7 +32,7 @@ const CONN = TEM_SSL
         database: (p.pathname || '').replace(/^\//, ''),
         user: decodeURIComponent(p.username || ''),
         password: decodeURIComponent(p.password || ''),
-        ssl: { rejectUnauthorized: false }
+        ssl: { rejectUnauthorized: process.env.PGSSL_STRICT === '1' }
       };
     })()
   : MIGRATION_URL;

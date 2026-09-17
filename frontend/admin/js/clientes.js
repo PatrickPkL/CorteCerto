@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tbody.innerHTML = clientes.map(c =>
       '<tr>' +
-        '<td>' + esc(c.name) + '</td>' +
+        '<td>' + esc(c.name) + ' ' + (c.blocked ? '<span class="badge-status st-cancelado">Bloqueado</span>' : '') + '</td>' +
         '<td class="mono">' + esc(c.phone || '—') + '</td>' +
         '<td>' + esc(c.email || '—') + '</td>' +
         '<td>' + (c.last_visit_at ? DB.fmtDataBR(String(c.last_visit_at).slice(0, 10)) : '—') + '</td>' +
@@ -77,6 +77,20 @@ document.addEventListener('DOMContentLoaded', () => {
     setVal('cp-email', c.email || '');
     document.getElementById('cp-notas').value = c.notes || '';
 
+    /* estado de bloqueio do cliente */
+    let bloqueado = false;
+    try { bloqueado = !!(API.clienteBloqueado(c.id) || {}).blocked; } catch (e) { /* noop */ }
+    const btnBloquear = document.getElementById('btn-cp-bloquear');
+    const btnDesbloquear = document.getElementById('btn-cp-desbloquear');
+    const infoBloqueio = document.getElementById('cp-bloqueio-info');
+    if (btnBloquear) btnBloquear.style.display = bloqueado ? 'none' : '';
+    if (btnDesbloquear) btnDesbloquear.style.display = bloqueado ? '' : 'none';
+    if (infoBloqueio) {
+      infoBloqueio.textContent = bloqueado
+        ? 'Este cliente está bloqueado e não pode agendar nesta barbearia.'
+        : '';
+    }
+
     renderHistorico(c.id);
     abrirModal(modal);
   }
@@ -117,6 +131,68 @@ document.addEventListener('DOMContentLoaded', () => {
     fecharModal(modal));
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) fecharModal(modal);
+  });
+
+  /* ---------- bloqueio / denúncia de cliente ---------- */
+  const modalDenCli = document.getElementById('modal-denunciar-cliente');
+
+  document.getElementById('btn-cp-bloquear')?.addEventListener('click', () => {
+    if (!clienteAtual) return;
+    if (!confirm('Bloquear ' + clienteAtual.name + '? O cliente não poderá agendar nesta barbearia.')) return;
+    try {
+      API.bloquearCliente(clienteAtual.id);
+      showToast('Cliente bloqueado.');
+      abrirPerfil(clienteAtual.id);
+    } catch (e) { showToast(msgErro(e), 'error'); }
+  });
+
+  document.getElementById('btn-cp-desbloquear')?.addEventListener('click', () => {
+    if (!clienteAtual) return;
+    try {
+      API.desbloquearCliente(clienteAtual.id);
+      showToast('Cliente desbloqueado.');
+      abrirPerfil(clienteAtual.id);
+    } catch (e) { showToast(msgErro(e), 'error'); }
+  });
+
+  document.getElementById('btn-cp-denunciar')?.addEventListener('click', () => {
+    if (!clienteAtual || !modalDenCli) return;
+    document.getElementById('den-cli-motivo').value = '';
+    document.getElementById('den-cli-descricao').value = '';
+    abrirModal(modalDenCli);
+  });
+
+  document.getElementById('btn-fechar-modal-denunciar-cliente')?.addEventListener('click', () =>
+    fecharModal(modalDenCli));
+  modalDenCli?.addEventListener('click', (e) => {
+    if (e.target === modalDenCli) fecharModal(modalDenCli);
+  });
+
+  document.getElementById('form-denunciar-cliente')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!clienteAtual) return;
+    const motivo = document.getElementById('den-cli-motivo').value;
+    const descricao = document.getElementById('den-cli-descricao').value.trim();
+    if (!motivo) { showToast('Selecione um motivo.', 'error'); return; }
+    const btnEnv = e.target.querySelector('button[type="submit"]');
+    btnEnv.disabled = true;
+    btnEnv.textContent = 'Enviando...';
+    try {
+      API.denunciarPerfil({
+        target_type: 'cliente',
+        target_client_id: clienteAtual.id,
+        target_user_id: clienteAtual.user_id || null,
+        reason: motivo,
+        description: descricao
+      });
+      showToast('Denúncia enviada! Nossa equipe vai analisar.');
+      fecharModal(modalDenCli);
+    } catch (err) {
+      showToast(msgErro(err), 'error');
+    } finally {
+      btnEnv.disabled = false;
+      btnEnv.textContent = 'Enviar denúncia';
+    }
   });
 
   render();
