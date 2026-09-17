@@ -838,6 +838,33 @@ function bancoRemoto() {
     }
   }
 
+  /* Auto-migração: aplica migrações pendentes ANTES de carregar o schema.
+     Só roda quando MIGRATION_DATABASE_URL está configurada (role privilegiada,
+     necessária para criar tipos/roles/RLS); desligue com AUTO_MIGRATE=0.
+     Sem isso, tabelas novas (ex.: reports) faltam e o boot morre em
+     "relation ... does not exist". Mantém o deploy em dia sem passo manual. */
+  if (process.env.MIGRATION_DATABASE_URL && process.env.AUTO_MIGRATE !== '0') {
+    try {
+      const knexFactory = require('knex');
+      const cfg = require('./knexfile').production;
+      const dbMig = knexFactory({
+        client: cfg.client,
+        connection: cfg.connection,
+        migrations: cfg.migrations,
+        pool: { min: 0, max: 1 }
+      });
+      const res = await dbMig.migrate.latest();
+      const lote = Array.isArray(res) ? res[0] : res;
+      const aplicadas = Array.isArray(res) && Array.isArray(res[1]) ? res[1] : [];
+      console.log('[migrate] schema OK (lote ' + lote +
+        (aplicadas.length ? ', ' + aplicadas.length + ' migração(ões) aplicada(s)' : ', nada pendente') + ').');
+      await dbMig.destroy();
+    } catch (e) {
+      console.error('[migrate] falha ao aplicar migrações:', (e && (e.message || e)) || e);
+      process.exit(1);
+    }
+  }
+
   try {
     await boot.init();
   } catch (e) {
