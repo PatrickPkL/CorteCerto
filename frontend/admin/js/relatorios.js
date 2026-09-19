@@ -611,8 +611,12 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = '';
 
     if (relatorioErro || !relatorio || !relatorio.nivel) {
-      container.innerHTML = '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
-        'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
+      container.innerHTML = motivo
+        ? '<div class="rel-block-note">' + esc(motivo) +
+          ' <a href="assinatura.html">Ver planos</a></div>'
+        : '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
+          'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
       return;
     }
 
@@ -672,8 +676,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = '';
     if (relatorioErro || !relatorio || !relatorio.nivel) {
-      container.innerHTML = '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
-        'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
+      container.innerHTML = motivo
+        ? '<div class="rel-block-note">' + esc(motivo) +
+          ' <a href="assinatura.html">Ver planos</a></div>'
+        : '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
+          'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
       return;
     }
     const dados = relatorio;
@@ -829,8 +837,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     container.innerHTML = '';
     if (relatorioDiarioErro || !relatorioDiario) {
-      container.innerHTML = '<div class="rel-block-note">O relatório diário (00:00) faz parte dos planos pagos. ' +
-        'Assine um plano na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+      const motivo = relatorioDiarioErro && (relatorioDiarioErro.error || relatorioDiarioErro.message);
+      container.innerHTML = motivo
+        ? '<div class="rel-block-note">' + esc(motivo) +
+          ' <a href="assinatura.html">Ver planos</a></div>'
+        : '<div class="rel-block-note">O relatório diário (00:00) faz parte dos planos pagos. ' +
+          'Assine um plano na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
       return;
     }
     const d = relatorioDiario;
@@ -859,9 +871,13 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = '';
     const faixas = (relatorio && relatorio.horariosPico) || [];
     if (relatorioErro || !relatorio || !relatorio.nivel || !faixas.length) {
-      container.innerHTML = '<div class="rel-block-note">Sem dados de horários de pico no período. ' +
-        'Conclua atendimentos para visualizar as faixas mais movimentadas. ' +
-        'Na dúvida, veja os detalhes na aba <a href="assinatura.html">Assinatura</a>.</div>';
+      const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
+      container.innerHTML = motivo
+        ? '<div class="rel-block-note">' + esc(motivo) +
+          ' <a href="assinatura.html">Ver planos</a></div>'
+        : '<div class="rel-block-note">Sem dados de horários de pico no período. ' +
+          'Conclua atendimentos para visualizar as faixas mais movimentadas. ' +
+          'Na dúvida, veja os detalhes na aba <a href="assinatura.html">Assinatura</a>.</div>';
       return;
     }
     const card = document.createElement('div');

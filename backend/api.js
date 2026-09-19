@@ -461,11 +461,11 @@ window.API = (function () {
     var cfg = ensureSuperAdmin();
     var email = String(dados.email || '').toLowerCase().trim();
     var senha = String(dados.senha || '').trim();
-    if (email !== cfg.email) err(401, 'Credenciais inválidas.');
+    if (email !== cfg.email) err(401, 'E-mail ou senha incorretos.');
     if (!bcrypt) err(500, 'Módulo bcrypt não disponível.');
     var ok;
     try { ok = bcrypt.compareSync(senha, cfg.hash); } catch(e) { ok = false; }
-    if (!ok) err(401, 'Credenciais inválidas.');
+    if (!ok) err(401, 'E-mail ou senha incorretos.');
     var crypto = require('crypto');
     var token = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
     _db().superadmin_sessions = (_db().superadmin_sessions || []).filter(function(s) {
@@ -1724,6 +1724,11 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const tel = String(dados.client_phone || '').replace(/\D/g, '');
     let c = null;
     if (tel) c = db.clients.find(x => x.barbershop_id == shopId && x.phone === tel);
+    if (!c && dados.client_email) {
+      const em = String(dados.client_email).toLowerCase().trim();
+      c = db.clients.find(x => x.barbershop_id == shopId &&
+        String(x.email || '').toLowerCase().trim() === em);
+    }
     if (!c && dados.client_name) {
       c = db.clients.find(x => x.barbershop_id == shopId &&
         x.name.toLowerCase().trim() === String(dados.client_name).toLowerCase().trim());

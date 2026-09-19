@@ -200,7 +200,7 @@ const MAP = [
   {
     colecao: 'clients', tabela: 'clients', pk: 'id', dateOut: 'local',
     toPg: (c) => ({
-      id: c.id, barbershop_id: c.barbershop_id, name: c.name, phone: c.phone || '',
+      id: c.id, barbershop_id: c.barbershop_id, name: c.name, phone: c.phone ? c.phone : null,
       email: c.email || '', notes: c.notes || '', total_visits: c.total_visits || 0,
       total_spent: c.total_spent || 0, last_visit_at: toPgDate(c.last_visit_at), user_id: c.user_id || null,
       created_at: toPgDate(c.created_at) || new Date(), updated_at: toPgDate(c.updated_at) || new Date()

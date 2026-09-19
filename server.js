@@ -444,7 +444,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = API.superAdminLogin(dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, (e && e.status) || 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* rotas autenticadas abaixo */
@@ -453,28 +453,28 @@ function handleSuperAdmin(req, res, pathname, url) {
   /* POST /api/super-admin/logout */
   if (rota === 'logout' && req.method === 'POST') {
     try { const r = API.superAdminLogout(token); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/dashboard */
   if (rota === 'dashboard' && req.method === 'GET') {
     try { const r = API.saDashboard(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/relatorios */
   if (rota === 'relatorios' && req.method === 'GET') {
     try { const r = API.saRelatorios(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/config — configurações globais da plataforma */
   if (rota === 'config' && !idParam && req.method === 'GET') {
     try { const r = API.saObterConfig(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -489,7 +489,7 @@ function handleSuperAdmin(req, res, pathname, url) {
   /* GET /api/super-admin/planos — planos e preços */
   if (rota === 'planos' && !idParam && req.method === 'GET') {
     try { const r = API.saListarPlanos(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -504,21 +504,21 @@ function handleSuperAdmin(req, res, pathname, url) {
   /* GET /api/super-admin/lojas */
   if (rota === 'lojas' && req.method === 'GET' && !idParam) {
     try { const r = API.saListarLojas(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/usuarios */
   if (rota === 'usuarios' && req.method === 'GET') {
     try { const r = API.saListarUsuarios(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/loja/:id */
   if (rota === 'loja' && idParam && parts[2] === undefined && req.method === 'GET') {
     try { const r = API.saDetalheLoja(idParam); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -527,13 +527,13 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = API.saAtualizarPlano(idParam, dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* DELETE /api/super-admin/loja/:id */
   if (rota === 'loja' && idParam && parts[2] === undefined && req.method === 'DELETE') {
     try { const r = API.saExcluirLoja(idParam); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -543,7 +543,7 @@ function handleSuperAdmin(req, res, pathname, url) {
       var qs = new URL(url, 'http://localhost').searchParams;
       var r = API.saTickets({ status: qs.get('status') || 'todos' });
       json(res, 200, { ok: true, data: r });
-    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    } catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -552,7 +552,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = API.saResponderTicket(idParam, dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* GET /api/super-admin/denuncias?status=...&tipo=... */
@@ -564,7 +564,7 @@ function handleSuperAdmin(req, res, pathname, url) {
         tipo: qs.get('tipo') || 'todos'
       });
       json(res, 200, { ok: true, data: r });
-    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    } catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -573,7 +573,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = API.saResolverDenuncia(idParam, dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* ---------------- bot atendente + chats (super-admin) ---------------- */
@@ -581,7 +581,7 @@ function handleSuperAdmin(req, res, pathname, url) {
   /* GET /api/super-admin/bot — config atual */
   if (rota === 'bot' && !idParam && req.method === 'GET') {
     try { const r = Bot.saBotConfig(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -590,7 +590,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = Bot.saBotSalvar(dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* POST /api/super-admin/bot/verificar — testa a config (sem salvar) */
@@ -598,7 +598,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = Bot.saBotVerificar(dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* POST /api/super-admin/bot/testar — dispara processamento manual */
@@ -606,7 +606,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = Bot.saBotTestar(dados);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   /* GET /api/super-admin/bot/historico */
@@ -614,21 +614,21 @@ function handleSuperAdmin(req, res, pathname, url) {
     try {
       const r = Bot.saBotHistorico();
       json(res, 200, { ok: true, data: r });
-    } catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    } catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* DELETE /api/super-admin/bot/historico */
   if (rota === 'bot' && idParam === 'historico' && req.method === 'DELETE') {
     try { const r = Bot.saBotLimparHistorico(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
   /* GET /api/super-admin/chats */
   if (rota === 'chats' && !idParam && req.method === 'GET') {
     try { const r = Bot.saChatsListar(); json(res, 200, { ok: true, data: r }); }
-    catch (e) { json(res, 500, { ok: false, error: e.message || 'Erro.' }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
     return;
   }
 
@@ -637,7 +637,7 @@ function handleSuperAdmin(req, res, pathname, url) {
     return readBody().then(dados => {
       const r = Bot.saChatsResponder(idParam, dados.texto);
       json(res, 200, { ok: true, data: r });
-    }).catch(e => json(res, 400, { ok: false, error: e.message || 'Erro.' }));
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
   json(res, 404, { ok: false, error: 'Rota super-admin não encontrada.' });

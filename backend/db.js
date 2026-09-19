@@ -110,6 +110,11 @@ window.DB = (function () {
 
   async function syncAll() {
     if (!_loaded) return;
+    // [FIXBug6] Uma falha em UMA coleção (ex.: violação de constraint)
+    // NÃO pode abortar o lote: senão pagamentos/assinaturas/agendamentos
+    // escritos no mesmo ciclo se perdem para sempre (e o restart volta
+    // ao estado antigo). Cada coleção é persistida isoladamente; a que
+    // falhar fica pendente (não atualiza _orig) e retenta no próximo salvar.
     for (const m of pg_map.MAP) {
       const cur = db[m.colecao] || [];
       const prev = _orig[m.colecao];
@@ -117,8 +122,13 @@ window.DB = (function () {
       const curJson = JSON.stringify(cur);
       if (curJson !== prevJson) {
         const snap = _deep(cur);
-        await writeCol(m, snap, prev || []);
-        _orig[m.colecao] = snap;
+        try {
+          await writeCol(m, snap, prev || []);
+          _orig[m.colecao] = snap;
+        } catch (e) {
+          console.error('[db][sync] falha persistindo coleção "' + m.colecao + '":',
+            (e && (e.message || e.code)) || e);
+        }
       }
     }
   }
@@ -176,16 +186,17 @@ window.DB = (function () {
     await asAdmin(async trx => {
       if (removed.length) {
         const pkCols = _pkCols(m.pk);
-        const cond = pkCols.map(c => {
-          if (pkCols.length === 1) return `"${c}" = ANY(?::uuid[])`;
-          return `("${c}") IN (${removed.map(() => pkCols.map(() => '?::uuid').join(',')).join('),(')})`;
-        }).join('');
+        const casts = (pg_map.CASTS[m.tabela] || {});
+        // escolhe o cast do elemento para o array de pk (padrão uuid;
+        // pk de texto — ex.: platform_settings.chave — sem cast)
+        const elemTipo = c => (casts[c] === 'text' ? 'text' : 'uuid');
         let sql, binds;
         if (pkCols.length === 1) {
-          sql = `DELETE FROM "${m.tabela}" WHERE ${cond}`;
+          sql = `DELETE FROM "${m.tabela}" WHERE "${pkCols[0]}" = ANY(?::${elemTipo(pkCols[0])}[])`;
           binds = [removed.map(r => String(r[pkCols[0]]))];
         } else {
-          sql = `DELETE FROM "${m.tabela}" WHERE ${cond}`;
+          const tpl = pkCols.map(c => '?::' + elemTipo(c)).join(', ');
+          sql = `DELETE FROM "${m.tabela}" WHERE ("${pkCols.join('", "')}") IN (${removed.map(() => '(' + tpl + ')').join(', ')})`;
           binds = removed.flatMap(r => pkCols.map(c => String(r[c])));
         }
         await trx.raw(sql, binds);
