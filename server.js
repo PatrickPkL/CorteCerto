@@ -62,6 +62,16 @@ function escreverBootErro(motivo, detalhe) {
   } catch (e) { /* diagnóstico não pode quebrar mais ainda */ }
 }
 
+/* Timeout em operações de boot que podem travar (ex.: conexão IPv6 que
+   não responde): em vez de "inicializando..." para sempre, vira erro visível. */
+function comTimeout(prom, ms, msg) {
+  let t;
+  const timer = new Promise((_, rej) => {
+    t = setTimeout(() => rej(new Error(msg || ('timeout de ' + ms + 'ms'))), ms);
+  });
+  return Promise.race([prom, timer]).finally(() => clearTimeout(t));
+}
+
 let MODULOS_BOOT = null;
 try {
   MODULOS_BOOT = require('./backend/boot');
@@ -941,13 +951,27 @@ function bancoRemoto() {
   }
 
   try {
-    await boot.init();
+    await comTimeout(boot.init(), 240000,
+      '[boot] boot.init excedeu 240s (conexao com o banco travou?)');
   } catch (e) {
     console.error('[boot] Falha ao carregar o banco de dados:', e);
     escreverBootErro('Falha ao carregar o banco de dados (boot.init):', (e && e.stack) || (e && (e.message || e)) || e);
     global.__CC_BOOT_ERROR = 'Falha ao carregar o banco de dados: ' + ((e && ((e.message || e))) || e);
     return;
   }
+
+  /* A partir daqui a aplicação JÁ responde — jobs e bot rodam em
+     paralelo e NUNCA podem segurar o boot. (Antes, Bot.start() vinha
+     antes do flag; se ele travasse, ficava "inicializando..." para sempre.) */
+  global.__CC_BOOT_READY = true;
+  try { fs.writeFileSync(path.join(__dirname, 'boot-error.log'), ''); } catch (e) { /* opcional */ }
+
+  /* Vigia: se algo segurar o boot, registra para diagnóstico em boot-error.log */
+  setInterval(() => {
+    if (global.__CC_BOOT_READY || global.__CC_BOOT_ERROR) return;
+    try { fs.appendFileSync(path.join(__dirname, 'boot-error.log'),
+      '[' + new Date().toISOString() + '] boot ainda nao pronto...\n', 'utf8'); } catch (e) { /* opcional */ }
+  }, 30000);
 
   /* Job diário dos relatórios: padrão de TODOS os planos pagos.
      Ao virar o dia (00:00) grava o snapshot de faturamento por loja;
@@ -1009,9 +1033,8 @@ function bancoRemoto() {
     setInterval(vencerTrialsExpirados, 30 * 60 * 1000);
   }
 
-  Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)
-  global.__CC_BOOT_READY = true; // libera o handler para servir a aplicação
-  try { fs.writeFileSync(path.join(__dirname, 'boot-error.log'), ''); } catch (e) { /* opcional */ }
+  try { Promise.resolve(Bot.start()).catch(e => console.error('[boot][bot]', (e && (e.message || e)) || e)); }
+  catch (e) { console.error('[boot][bot]', (e && (e.message || e)) || e); }
   console.log('');
   console.log('  Corte Certo rodando:');
   console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
