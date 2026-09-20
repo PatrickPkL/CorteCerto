@@ -235,13 +235,13 @@ document.addEventListener('DOMContentLoaded', function () {
       feats.value = (plano.features || []).join('\n');
       perms.value = (plano.permissions || []).join('\n');
     }
-    modal.hidden = false;
+    modal.classList.add('show');
     if (btnSalvarPlano) { btnSalvarPlano.disabled = false; btnSalvarPlano.textContent = 'Salvar plano'; }
     setTimeout(function () { nome.focus(); }, 0);
   }
 
   function fecharModal() {
-    if (modal) modal.hidden = true;
+    if (modal) modal.classList.remove('show');
     planoEditando = null;
   }
 
@@ -289,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(function () { showToast('Erro ao salvar plano.', 'error'); })
       .then(function () {
-        if (btnSalvarPlano && !modal.hidden) {
+        if (btnSalvarPlano && modal.classList.contains('show')) {
           btnSalvarPlano.disabled = false;
           btnSalvarPlano.textContent = 'Salvar plano';
         }
