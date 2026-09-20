@@ -123,10 +123,16 @@
 
       <!-- FUNCIONÁRIO / DEPENDENTE -->
       <div id="painel-depend" style="display:none;">
-        <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
-          Entre com as credenciais criadas pelo dono da empresa. Você precisará
-          do <strong>Código Único</strong> da empresa para acessar agenda e clientes.</p>
+        <div class="login-tabs">
+          <div class="login-tab active" id="tab-dep-entrar">Entrar</div>
+          <div class="login-tab" id="tab-dep-criar">Criar conta</div>
+        </div>
+
         <form id="form-dep-login">
+          <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
+            Use seu <strong>login e senha</strong>. Se a sua conta ainda não foi
+            vinculada, o <strong>Código Único</strong> da empresa é opcional nesta
+            etapa — você informa ele em seguida.</p>
           <div class="field">
             <label for="dep-login">Login (e-mail)</label>
             <input type="email" id="dep-login" placeholder="funcionario@empresa.com.br" required autocomplete="username">
@@ -136,14 +142,42 @@
             <input type="password" id="dep-senha" placeholder="••••••••" required autocomplete="current-password">
           </div>
           <div class="field">
-            <label for="dep-codigo">Código Único da empresa</label>
-            <input type="text" id="dep-codigo" placeholder="Ex: 7KXQ9M2A" required
+            <label for="dep-codigo">Código Único da empresa <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
+            <input type="text" id="dep-codigo" placeholder="Ex: 7KXQ9M2A"
                    style="text-transform:uppercase; font-family:monospace; letter-spacing:2px;">
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar</button>
           <p style="text-align:center; margin-top:12px; font-size:13.5px;">
             Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
           </p>
+        </form>
+
+        <form id="form-dep-cadastro" style="display:none;">
+          <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
+            Crie sua conta de funcionário. Depois de entrar, você vincula sua conta
+            ao salão informando o <strong>Código Único</strong> da empresa.</p>
+          <div class="field">
+            <label for="dep-cad-nome">Nome completo</label>
+            <input type="text" id="dep-cad-nome" placeholder="Seu nome" required>
+          </div>
+          <div class="field">
+            <label for="dep-cad-email">E-mail (login)</label>
+            <input type="email" id="dep-cad-email" placeholder="funcionario@empresa.com.br" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="dep-cad-senha">Senha</label>
+            <input type="password" id="dep-cad-senha" placeholder="•••••••• (mín. 6 caracteres)" minlength="6" required autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="dep-cad-tel">Telefone (com DDD) <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
+            <input type="tel" id="dep-cad-tel" placeholder="(71) 99999-0000">
+          </div>
+          <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
+            <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
+            Li e aceito a <a href="../public/privacidade.html" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
+            e os <a href="../public/termos.html" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
+          </label>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta de funcionário</button>
         </form>
       </div>
 

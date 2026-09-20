@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!usuario) return;
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {
+    /* dependente com conta criada por autoatendimento e ainda sem vínculo */
+    if (usuario.role === 'dependente' && telaVinculoPendente()) return;
     showToast('Nenhum salão vinculado a esta conta.', 'error');
     setTimeout(() => { window.location.href = 'login.html'; }, 1200);
     return;

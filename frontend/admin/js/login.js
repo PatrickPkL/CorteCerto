@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   ligarTabs('tab-cli', 'form-cli-login', 'form-cli-cadastro');
   ligarTabs('tab-dono', 'form-dono-login', 'form-dono-cadastro');
+  ligarTabs('tab-dep', 'form-dep-login', 'form-dep-cadastro');
 
   /* ---------- etapa do código (compartilhada) ---------- */
   const etapaCodigo = document.getElementById('etapa-codigo');
@@ -151,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  /* login do FUNCIONÁRIO/DEPENDENTE — Login + Senha + Código Único */
+  /* login do FUNCIONÁRIO/DEPENDENTE — Login + Senha (Código Único opcional) */
   document.getElementById('form-dep-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
     try {
@@ -161,12 +162,49 @@ document.addEventListener('DOMContentLoaded', () => {
         codigo_unico: document.getElementById('dep-codigo').value
       });
       sessionStorage.removeItem('cc_flash');
+      if (r.link_pendente) {
+        showToast('Conta criada mas ainda sem vínculo. Informe o Código Único da empresa.', 'success');
+        window.location.href = 'agendamentos.html';
+        return;
+      }
       showToast('Bem-vindo, ' + (r.user.name ? r.user.name.split(' ')[0] : 'funcionário') + '!');
       setTimeout(() => { window.location.href = destinoPosLogin(r.user); }, 700);
     } catch (erro) {
       showToast(msgErro(erro), 'error');
       const s = document.getElementById('dep-senha');
       if (s) { s.value = ''; s.focus(); }
+    }
+  });
+
+  /* cadastro do FUNCIONÁRIO/DEPENDENTE (autoatendimento, sem código) */
+  const formDepCad = document.getElementById('form-dep-cadastro');
+  formDepCad?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const aceite = formDepCad.querySelector('input[name=aceite_privacidade]');
+    try {
+      API.criarContaDependente({
+        name: document.getElementById('dep-cad-nome').value,
+        email: document.getElementById('dep-cad-email').value,
+        senha: document.getElementById('dep-cad-senha').value,
+        phone: document.getElementById('dep-cad-tel').value,
+        aceite_privacidade: aceite ? aceite.checked : false
+      });
+      showToast('Conta criada! Agora entre com seu e-mail e senha.', 'success');
+      const tE = document.getElementById('tab-dep-entrar');
+      const tC = document.getElementById('tab-dep-criar');
+      const fE = document.getElementById('form-dep-login');
+      const fC = document.getElementById('form-dep-cadastro');
+      if (tE) tE.classList.add('active');
+      if (tC) tC.classList.remove('active');
+      if (fE) fE.style.display = '';
+      if (fC) fC.style.display = 'none';
+      const edit = document.getElementById('dep-login');
+      if (edit) edit.value = document.getElementById('dep-cad-email').value;
+      const senha = document.getElementById('dep-senha');
+      if (senha) senha.value = document.getElementById('dep-cad-senha').value;
+      formDepCad.reset();
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
     }
   });
 

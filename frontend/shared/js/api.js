@@ -158,6 +158,26 @@
     return r;
   };
 
+  /* Vincula a conta já logada ao Código Único (dependente/cliente). */
+  API.vincularDependente = function (dados) {
+    const r = rpc('vincularDependente', [dados]);
+    if (r && r.user) {
+      localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
+      localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
+    }
+    return r;
+  };
+
+  /* Deixa de ser dependente (vira cliente) e sincroniza a sessão local. */
+  API.sairDeDependente = function () {
+    const r = rpc('sairDeDependente', []);
+    if (r && r.ok) {
+      if (r.user) localStorage.setItem(KEY_USER, JSON.stringify(r.user));
+      localStorage.removeItem(KEY_LOJA);
+    }
+    return r;
+  };
+
   /* ---------------- Auth (espelho do backend) ---------------- */
 
   function limpar() {

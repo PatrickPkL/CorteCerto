@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  const usuario = exigirLogin('cliente');
+  const usuario = exigirLogin(['cliente', 'dependente']);
   if (!usuario) return;
 
   /* sincroniza com o servidor antes de renderizar: o cache do navegador
@@ -54,7 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const [y, m] = String(usuario.created_at).slice(0, 7).split('-');
     const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
       'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-    desde.textContent = 'Cliente desde ' + (meses[Number(m) - 1] || m) + ' de ' + y;
+    desde.textContent = (usuario.role === 'dependente' ? 'Conta criada em ' : 'Cliente desde ') +
+      (meses[Number(m) - 1] || m) + ' de ' + y;
   }
 
   /* ---------- dados ---------- */
@@ -333,6 +334,50 @@ document.addEventListener('DOMContentLoaded', () => {
       '</a>' +
       '<button class="btn btn-danger btn-fav-remover" data-shop="' + l.id + '">Remover</button>' +
     '</div>';
+  }
+
+  /* ---------- dependência de empresa (dependente) ---------- */
+  const cardDep = document.getElementById('card-dependencia');
+  const vincDiv = document.getElementById('dependencia-vinculado');
+  const pendDiv = document.getElementById('dependencia-pendente');
+
+  if (usuario.role === 'dependente' && cardDep) {
+    cardDep.style.display = '';
+    const lojaDep = Auth.salaoDoUsuario(usuario);
+
+    if (lojaDep) {
+      vincDiv.style.display = '';
+      pendDiv.style.display = 'none';
+      const nomeEmp = document.getElementById('dep-empresa-nome');
+      if (nomeEmp) nomeEmp.textContent = lojaDep.name;
+
+      document.getElementById('btn-deixar-dependente')
+        ?.addEventListener('click', () => {
+          if (!confirm('Deixar de ser dependente de "' + lojaDep.name + '"? Sua conta continua existindo como cliente.')) return;
+          try {
+            API.sairDeDependente();
+            showToast('Você deixou de ser dependente. Sua conta agora é de cliente.', 'success');
+            setTimeout(() => { window.location.href = 'perfil.html'; }, 900);
+          } catch (err2) {
+            showToast(msgErro(err2), 'error');
+          }
+        });
+    } else {
+      vincDiv.style.display = 'none';
+      pendDiv.style.display = '';
+      document.getElementById('btn-vincular-perfil')
+        ?.addEventListener('click', () => {
+          const campo = document.getElementById('perfil-dep-codigo');
+          try {
+            API.vincularDependente({ codigo_unico: campo.value });
+            showToast('Vínculo realizado com sucesso!', 'success');
+            setTimeout(() => { window.location.href = 'perfil.html'; }, 900);
+          } catch (err2) {
+            showToast(msgErro(err2), 'error');
+            campo.select();
+          }
+        });
+    }
   }
 
   /* ---------- configurações da conta ---------- */

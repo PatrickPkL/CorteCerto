@@ -128,47 +128,75 @@ document.addEventListener('DOMContentLoaded', () => {
   popularFiltros();
   render();
 
-  /* geolocation: lojas perto de mim */
+  /* geolocation: lojas perto de mim (consentimento em banner no rodapé) */
   var btnGeo = document.getElementById('btn-proximas');
+  var consentBanner = document.getElementById('consent-banner');
+  var CHAVE_GEO = 'cc_geo_consent';
+  var CHAVE_GEO_NEGADO = 'cc_geo_negar';
+
+  function buscarLojas() {
+    btnGeo.disabled = true;
+    btnGeo.textContent = 'Buscando...';
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      try {
+        var res = API.lojasProximas({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          raio: 30
+        });
+        grid.innerHTML = res.items.map(cardLoja).join('');
+        if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
+        showToast(res.items.length + ' barbearia(s) encontrada(s) perto de você!');
+      } catch (e) {
+        showToast(msgErro(e), 'error');
+      }
+      btnGeo.disabled = false;
+      btnGeo.textContent = 'Lojas perto de mim';
+    }, function(err) {
+      showToast('Não foi possível obter sua localização.', 'error');
+      btnGeo.disabled = false;
+      btnGeo.textContent = 'Lojas perto de mim';
+    }, { timeout: 10000 });
+  }
+
+  function mostrarBannerConsentimento() {
+    if (consentBanner) {
+      consentBanner.hidden = false;
+      requestAnimationFrame(() => consentBanner.classList.add('show'));
+    }
+  }
+
+  function esconderBannerConsentimento() {
+    if (consentBanner) {
+      consentBanner.classList.remove('show');
+      setTimeout(() => { consentBanner.hidden = true; }, 300);
+    }
+  }
+
+  document.getElementById('btn-aceitar-geo')?.addEventListener('click', function() {
+    esconderBannerConsentimento();
+    localStorage.setItem(CHAVE_GEO, '1');
+    buscarLojas();
+  });
+
+  document.getElementById('btn-negar-geo')?.addEventListener('click', function() {
+    esconderBannerConsentimento();
+    localStorage.setItem(CHAVE_GEO_NEGADO, '1');
+    showToast('Acesso à localização negado. Use a busca por cidade.', 'error');
+  });
+
   if (btnGeo) {
     btnGeo.addEventListener('click', function() {
       if (!navigator.geolocation) {
         showToast('Geolocalização não suportada.', 'error');
         return;
       }
-      function buscarLojas() {
-        btnGeo.disabled = true;
-        btnGeo.textContent = 'Buscando...';
-        navigator.geolocation.getCurrentPosition(function(pos) {
-        try {
-          var res = API.lojasProximas({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            raio: 30
-          });
-          grid.innerHTML = res.items.map(cardLoja).join('');
-          if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
-          showToast(res.items.length + ' barbearia(s) encontrada(s) perto de você!');
-        } catch (e) {
-          showToast(msgErro(e), 'error');
-        }
-        btnGeo.disabled = false;
-        btnGeo.textContent = 'Lojas perto de mim';
-      }, function(err) {
-        showToast('Não foi possível obter sua localização.', 'error');
-        btnGeo.disabled = false;
-        btnGeo.textContent = 'Lojas perto de mim';
-      }, { timeout: 10000 });
-      }
-      if (localStorage.getItem('cc_geo_consent')) {
+      if (localStorage.getItem(CHAVE_GEO)) {
         buscarLojas();
+      } else if (localStorage.getItem(CHAVE_GEO_NEGADO)) {
+        mostrarBannerConsentimento();
       } else {
-        if (confirm('O Corte Certo deseja acessar sua localização para encontrar barbearias perto de você. Você pode revogar este acesso a qualquer momento nas configurações do navegador. Continuar?')) {
-          localStorage.setItem('cc_geo_consent', '1');
-          buscarLojas();
-        } else {
-          showToast('Acesso à localização negado. Use a busca por CEP.', 'error');
-        }
+        mostrarBannerConsentimento();
       }
     });
   }

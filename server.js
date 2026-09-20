@@ -159,6 +159,7 @@ const _authRequired = new Set([
   'criarServico', 'atualizarServico', 'excluirServico',
   'criarProfissional', 'atualizarProfissional', 'desativarProfissional',
   'meuCodigoEmpresa', 'listarDependentes', 'criarDependente', 'excluirDependente',
+  'vincularDependente', 'sairDeDependente', 'desvincularDependente',
   'salvarHorariosLoja', 'atualizarLinhaHorario',
   'listarExcecoes', 'criarExcecao', 'excluirExcecao',
   'minhaAssinatura', 'trocarPlano', 'cancelarAssinatura',
@@ -195,7 +196,8 @@ const _RPC_BLOQUEADOS = new Set([
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
   'saTickets', 'saResponderTicket',
   'saListarDenuncias', 'saResolverDenuncia',
-  'saListarPlanos', 'saAtualizarPrecosPlano', 'saObterConfig', 'saDefinirSiteGratis'
+  'saListarPlanos', 'saAtualizarPrecosPlano', 'saCriarPlano', 'saEditarPlano', 'saExcluirPlano',
+  'saObterConfig', 'saDefinirSiteGratis'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -531,6 +533,29 @@ function handleSuperAdmin(req, res, pathname, url) {
       const r = API.saAtualizarPrecosPlano(idParam, dados);
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* POST /api/super-admin/planos — cria plano (CRUD de planos) */
+  if (rota === 'planos' && !idParam && req.method === 'POST') {
+    return readBody().then(dados => {
+      const r = API.saCriarPlano(dados);
+      json(res, 201, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* PUT /api/super-admin/plano/:id — edita dados do plano (CRUD) */
+  if (rota === 'plano' && idParam && parts[2] === undefined && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saEditarPlano(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* DELETE /api/super-admin/plano/:id — exclui plano (se não estiver em uso) */
+  if (rota === 'plano' && idParam && parts[2] === undefined && req.method === 'DELETE') {
+    try { const r = API.saExcluirPlano(idParam); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, (e && e.status) || 409, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
+    return;
   }
 
   /* GET /api/super-admin/lojas */

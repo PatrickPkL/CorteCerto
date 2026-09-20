@@ -144,6 +144,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const unidEl = card.querySelector('.plan-preco-unidade');
       const nota = card.querySelector('.plan-anual-nota');
       const parc = card.querySelector('.plan-parcelas');
+      if (plano.is_free) {
+        const compare = plano.price_compare != null ? Number(plano.price_compare) : 0;
+        if (riscado) riscado.textContent = DB.fmtBRL(compare);
+        if (valorEl) valorEl.textContent = 'R$ 0,00';
+        if (unidEl) unidEl.textContent = 'sempre';
+        const depois = card.querySelector('.plan-preco-depois');
+        if (depois) depois.textContent = 'De ' + DB.fmtBRL(compare) +
+          (compare > 0 ? ' por R$ 0,00' : '') + ' · sem cartão, sem surpresa';
+        return;
+      }
       if (riscado) {
         /* card em trial: preço cheio riscado + R$ 0,00 nos 10 primeiros dias */
         riscado.textContent = DB.fmtBRL(base);
@@ -169,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;
+      const isFree = !!p.is_free;
       const anualBase = p.price_annual != null && Number(p.price_annual) > 0
         ? Number(p.price_annual)
         : Number(p.price_monthly) * 12;
@@ -178,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const feats = (p.features || []).map(f => '<li>' + esc(f) + '</li>').join('');
 
       let botao;
-      if (p.is_free) {
+      if (isFree) {
         botao = '<button type="button" class="btn" disabled title="Plano base gratuito — assine para liberar recursos">' +
           (atual ? 'Plano atual' : 'Plano base') + '</button>';
       } else if (podeTrial) {
@@ -195,15 +206,26 @@ document.addEventListener('DOMContentLoaded', () => {
           (atual ? 'Renovar' : 'Assinar agora') + '</button>';
       }
 
-      const preco = podeTrial
-        ? '<div class="plan-preco mono">' +
+      let preco;
+      if (isFree) {
+        const compare = p.price_compare != null ? Number(p.price_compare) : 0;
+        preco = '<div class="plan-preco mono">' +
+            '<span class="plan-preco-riscado">' + DB.fmtBRL(compare) + '</span>' +
+            '<span class="plan-preco-valor">R$ 0,00</span>' +
+            '<small class="plan-preco-unidade">sempre</small>' +
+          '</div>' +
+          '<div class="plan-preco-depois">De ' + DB.fmtBRL(compare) +
+            (compare > 0 ? ' por R$ 0,00' : '') + ' · sem cartão, sem surpresa</div>';
+      } else if (podeTrial) {
+        preco = '<div class="plan-preco mono">' +
             '<span class="plan-preco-riscado">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
             '<span class="plan-preco-valor">R$ 0,00</span>' +
             '<small class="plan-preco-unidade">nos primeiros 10 dias</small>' +
           '</div>' +
           '<div class="plan-preco-depois">Depois ' + DB.fmtBRL(anual ? anualBase : p.price_monthly) +
-            (anual ? '/ano' : '/mês') + ' · cancele quando quiser</div>'
-        : '<div class="plan-preco mono">' +
+            (anual ? '/ano' : '/mês') + ' · cancele quando quiser</div>';
+      } else {
+        preco = '<div class="plan-preco mono">' +
             '<span class="plan-preco-valor">' + DB.fmtBRL(anual ? anualBase : p.price_monthly) + '</span>' +
             '<small class="plan-preco-unidade">' + (anual ? '/ano' : '/mês') + '</small>' +
           '</div>' +
@@ -213,9 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
             '<label>Parcelar em</label>' +
             '<select class="plan-parcelas-sel">' + opcoesParcelas(p) + '</select>' +
           '</div>';
+      }
 
       return '<div class="card plan-card' + (atual ? ' plan-card-highlight' : '') + '" data-plano="' + p.id + '"' +
-          (podeTrial ? ' data-trial="1"' : '') + '>' +
+          (isFree ? ' data-free="1"' : podeTrial ? ' data-trial="1"' : '') + '>' +
         (atual ? '<span class="plan-badge">Plano atual</span>' : '') +
         '<h3 class="plan-nome">' + esc(p.name) + '</h3>' +
         preco +

@@ -469,3 +469,82 @@
   .profile-tabs { gap: 0; }
   .profile-tab { padding: 10px 14px; font-size: 13px; }
 }
+
+/* ---------- Banner de consentimento (localização / política) ---------- */
+.consent-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  width: min(560px, calc(100vw - 32px));
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 16px 18px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: auto;
+}
+.consent-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.consent-banner-texto { font-size: 13.5px; line-height: 1.5; margin: 0; color: rgba(237,231,218,0.85); }
+.consent-banner-texto a { color: var(--brass); }
+.consent-banner-acoes { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .consent-banner-acoes { justify-content: stretch; }
+  .consent-banner-acoes .btn { flex: 1; justify-content: center; }
+}
+
+/* ---------- Responsividade (mobile-first) ---------- */
+@media (max-width: 900px) {
+  .public-main { padding: 32px 20px 64px; }
+}
+
+@media (max-width: 700px) {
+  .public-header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 16px;
+  }
+  .public-nav { flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .public-nav .nav-ola { display: none; }
+  .public-main { padding: 24px 16px 56px; }
+  .public-hero h1 { font-size: 27px; }
+  .public-hero p { font-size: 14px; }
+  .public-search { flex-direction: column; }
+  .public-search .search-box { max-width: 100%; }
+  .public-search select { max-width: 100%; width: 100%; }
+
+  /* galeria */
+  .gallery-photo { height: 240px; }
+  .gallery-arrow { width: 34px; height: 34px; }
+  .gallery-arrow svg { width: 17px; height: 17px; }
+
+  /* header de salão */
+  .salon-header-info .card { min-width: 0; width: 100%; }
+
+  /* linhas de serviço viram colunas no mobile */
+  .service-row-public { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .service-row-public .svc-right { width: 100%; justify-content: space-between; }
+
+  /* cards lado a lado viram coluna */
+  .card-row.cols-2 { grid-template-columns: 1fr; }
+  .card-row.cols-3 { grid-template-columns: 1fr; }
+
+  /* modais ocupam quase a tela toda */
+  [id^="modal-"] .card,
+  .modal-overlay .card {
+    width: calc(100vw - 24px) !important;
+    max-width: 420px;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  /* tabelas rolam horizontalmente em vez de quebrar o layout */
+  .card table, .card-row table { display: block; overflow-x: auto; white-space: nowrap; }
+}

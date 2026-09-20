@@ -50,6 +50,19 @@
     <p>Tente mudar a cidade, o serviço ou o termo de busca.</p>
   </div>
 </main>
+
+<div class="consent-banner" id="consent-banner" role="dialog" aria-live="polite" hidden>
+  <p class="consent-banner-texto">
+    Para encontrar barbearias perto de você, o Corte Certo gostaria de acessar sua
+    localização. Você pode revogar este acesso a qualquer momento nas configurações
+    do navegador. Saiba mais na nossa
+    <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.
+  </p>
+  <div class="consent-banner-acoes">
+    <button type="button" class="btn btn-outline" id="btn-negar-geo">Agora não</button>
+    <button type="button" class="btn btn-brass" id="btn-aceitar-geo">Permitir localização</button>
+  </div>
+</div>
 <script src="../shared/js/db.js"></script>
 <script src="../shared/js/api.js"></script>
 <script src="../shared/js/shared.js"></script>

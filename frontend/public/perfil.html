@@ -149,6 +149,28 @@
       </div>
     </div>
 
+    <div class="card" id="card-dependencia" style="margin-top:20px; display:none;">
+      <h3 class="section-title">Dependência de empresa</h3>
+      <div id="dependencia-vinculado" style="display:none;">
+        <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">
+          Sua conta está vinculada à empresa <strong id="dep-empresa-nome">—</strong>.
+          Você acessa a agenda e os clientes dessa empresa.</p>
+        <button class="btn btn-outline" id="btn-deixar-dependente" type="button"
+          style="border-color:#e5484d; color:#e5484d;">Deixar de ser dependente</button>
+      </div>
+      <div id="dependencia-pendente" style="display:none;">
+        <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">
+          Sua conta ainda não está vinculada a uma empresa. Informe o
+          <strong>Código Único</strong> para trabalhar na agenda e nos clientes do salão.</p>
+        <div class="field" style="max-width:320px;">
+          <label for="perfil-dep-codigo">Código Único da empresa</label>
+          <input type="text" id="perfil-dep-codigo" placeholder="Ex: 7KXQ9M2A" required
+            style="text-transform:uppercase; font-family:monospace; letter-spacing:2px;">
+        </div>
+        <button class="btn btn-primary" id="btn-vincular-perfil" type="button">Vincular</button>
+      </div>
+    </div>
+
     <div class="card" style="margin-top:20px;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
         <div>

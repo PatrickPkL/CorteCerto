@@ -472,7 +472,7 @@ window.API = (function () {
       return s.email !== email;
     });
     _db().superadmin_sessions.push({
-      token: token, email: email,
+      id: DB.proximoId(), token: token, email: email,
       created_at: agoraISO(),
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     });
@@ -582,13 +582,121 @@ window.API = (function () {
       .sort(function(a, b) { return Number(a.price_monthly || 0) - Number(b.price_monthly || 0); })
       .map(function(p) {
         return {
-          id: p.id, name: p.name, is_free: !!p.is_free,
+          id: p.id, name: p.name, is_free: !!p.is_free, active: !!p.active,
           price_monthly: Number(p.price_monthly || 0),
           price_annual: Number(p.price_annual || 0),
           price_per_employee: Number(p.price_per_employee || 0),
-          max_professionals: (p.max_professionals == null) ? null : Number(p.max_professionals)
+          price_compare: p.price_compare != null ? Number(p.price_compare) : null,
+          max_professionals: (p.max_professionals == null) ? null : Number(p.max_professionals),
+          max_dependents: (p.max_dependents == null) ? null : Number(p.max_dependents),
+          features: (p.features || []),
+          permissions: (p.permissions || []),
+          nivel_relatorio: p.nivel_relatorio || null
         };
       });
+  }
+
+  function _planoCompleto(p) {
+    return {
+      id: p.id, name: p.name, is_free: !!p.is_free, active: !!p.active,
+      price_monthly: Number(p.price_monthly || 0),
+      price_annual: Number(p.price_annual || 0),
+      price_per_employee: Number(p.price_per_employee || 0),
+      price_compare: p.price_compare != null ? Number(p.price_compare) : null,
+      max_professionals: (p.max_professionals == null) ? null : Number(p.max_professionals),
+      max_dependents: (p.max_dependents == null) ? null : Number(p.max_dependents),
+      features: (p.features || []),
+      permissions: (p.permissions || []),
+      nivel_relatorio: p.nivel_relatorio || null
+    };
+  }
+
+  function saCriarPlano(dados) {
+    dados = dados || {};
+    if (!dados.name || !String(dados.name).trim()) err(400, 'Informe o nome do plano.');
+    const db = _db();
+    const nome = String(dados.name).trim();
+    if (db.plans.some(x => String(x.name || '').toLowerCase() === nome.toLowerCase())) {
+      err(409, 'Já existe um plano com este nome.');
+    }
+    const pm = _numPreco(dados.price_monthly, 'preço mensal');
+    const novo = {
+      id: DB.proximoId(),
+      name: nome,
+      price_monthly: pm === undefined ? 0 : pm,
+      price_annual: _numPreco(dados.price_annual, 'preço anual'),
+      price_per_employee: _numPreco(dados.price_per_employee, 'preço por funcionário'),
+      price_compare: _numPreco(dados.price_compare, 'preço de comparação'),
+      max_professionals: dados.max_professionals == null || dados.max_professionals === '' || dados.max_professionals === 'ilimitado'
+        ? null : Number(dados.max_professionals),
+      max_dependents: dados.max_dependents == null || dados.max_dependents === '' || dados.max_dependents === 'ilimitado'
+        ? null : Number(dados.max_dependents),
+      features: Array.isArray(dados.features) ? dados.features : [],
+      permissions: Array.isArray(dados.permissions) ? dados.permissions : [],
+      is_free: !!dados.is_free,
+      active: dados.active == null ? true : !!dados.active,
+      nivel_relatorio: dados.nivel_relatorio || null,
+      created_at: agoraISO()
+    };
+    db.plans.push(novo);
+    DB.salvar();
+    return { ok: true, plano: _planoCompleto(novo) };
+  }
+
+  /* Atualiza dados de um PLANO (nome, preços, limites, features) —
+     não confundir com saAtualizarPlano(shopId, dados) da assinatura. */
+  function saEditarPlano(planoId, dados) {
+    const p = (_db().plans || []).find(function(x) { return x.id == planoId; });
+    if (!p) err(404, 'Plano não encontrado.');
+    dados = dados || {};
+
+    if (dados.name != null) {
+      const nome = String(dados.name).trim();
+      if (!nome) err(400, 'Informe o nome do plano.');
+      if (_db().plans.some(x => x.id != p.id &&
+          String(x.name || '').toLowerCase() === nome.toLowerCase())) {
+        err(409, 'Já existe um plano com este nome.');
+      }
+      p.name = nome;
+    }
+
+    ['price_monthly', 'price_annual', 'price_per_employee', 'price_compare'].forEach(function(k) {
+      const v = _numPreco(dados[k], k.replace('_', ' '));
+      if (v !== undefined) p[k] = v;
+    });
+
+    if (dados.max_professionals !== undefined) {
+      p.max_professionals = (dados.max_professionals === '' || dados.max_professionals == null)
+        ? null : Number(dados.max_professionals);
+    }
+    if (dados.max_dependents !== undefined) {
+      p.max_dependents = (dados.max_dependents === '' || dados.max_dependents == null)
+        ? null : Number(dados.max_dependents);
+    }
+    if (Array.isArray(dados.features)) p.features = dados.features;
+    if (Array.isArray(dados.permissions)) p.permissions = dados.permissions;
+    if (dados.is_free !== undefined) p.is_free = !!dados.is_free;
+    if (dados.active !== undefined) p.active = !!dados.active;
+    if (dados.nivel_relatorio !== undefined) p.nivel_relatorio = dados.nivel_relatorio || null;
+
+    DB.salvar();
+    return { ok: true, plano: _planoCompleto(p) };
+  }
+
+  /* Remove o plano: só se nenhuma assinatura ou cobrança o referencia. */
+  function saExcluirPlano(planoId) {
+    const db = _db();
+    const idx = db.plans.findIndex(function(x) { return x.id == planoId; });
+    if (idx < 0) err(404, 'Plano não encontrado.');
+    const p = db.plans[idx];
+    const emUsoSub = (db.subscriptions || []).some(s => s.plan_id == p.id);
+    const emUsoPag = (db.payments || []).some(pg => pg.plan_id == p.id);
+    if (emUsoSub || emUsoPag) {
+      err(409, 'Este plano está em uso por assinaturas ou cobranças. Não é possível excluí-lo.');
+    }
+    db.plans.splice(idx, 1);
+    DB.salvar();
+    return { ok: true, id: p.id };
   }
 
   function saAtualizarPrecosPlano(planoId, dados) {
@@ -598,16 +706,19 @@ window.API = (function () {
     var pm = _numPreco(dados.price_monthly, 'preço mensal');
     var pa = _numPreco(dados.price_annual, 'preço anual');
     var pe = _numPreco(dados.price_per_employee, 'preço por funcionário');
+    var pc = _numPreco(dados.price_compare, 'preço de comparação');
     if (pm !== undefined) p.price_monthly = pm;
     if (pa !== undefined) p.price_annual = pa;
     if (pe !== undefined) p.price_per_employee = pe;
+    if (pc !== undefined) p.price_compare = pc;
     DB.salvar();
     return {
       ok: true, plano: {
         id: p.id, name: p.name,
         price_monthly: Number(p.price_monthly || 0),
         price_annual: Number(p.price_annual || 0),
-        price_per_employee: Number(p.price_per_employee || 0)
+        price_per_employee: Number(p.price_per_employee || 0),
+        price_compare: p.price_compare != null ? Number(p.price_compare) : null
       }
     };
   }
@@ -1225,7 +1336,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true, id: alvo.id };
   }
 
-  /* login público do funcionário — exige o Código Único da empresa */
+  /* login público do funcionário — o Código Único é opcional:
+     · conta criada pelo dono (já vinculada) → senha + código;
+     · conta criada por autoatendimento (sem vínculo) → login+senha
+       entram sem código e o app leva o usuário a vincular com o código. */
   const _loginDepFalhas = new Map();
   const LOGIN_DEP_MAX = 5;
   const LOGIN_DEP_BLOQUEIO_MS = 15 * 60 * 1000;
@@ -1236,11 +1350,11 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const senha = String((dados && dados.senha) || '');
     const codigo = String((dados && dados.codigo_unico) || '').trim().toUpperCase();
 
-    if (!login || !senha || !codigo) {
-      err(400, 'Informe login, senha e o código único da empresa.');
+    if (!login || !senha) {
+      err(400, 'Informe login e senha.');
     }
 
-    const chave = codigo + '|' + login;
+    const chave = codigo ? (codigo + '|' + login) : ('sem-codigo|' + login);
     const falha = _loginDepFalhas.get(chave);
     if (falha && Date.now() < falha.bloqueioAte) {
       const min = Math.ceil((falha.bloqueioAte - Date.now()) / 60000);
@@ -1255,17 +1369,57 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       _loginDepFalhas.set(chave, rec);
       err(401, 'Login, senha ou código único incorretos.');
     };
-
-    const loja = db.barbershops.find(b =>
-      b.codigo_unico && b.codigo_unico.toUpperCase() === codigo);
-    if (!loja) return negar();
+    const negarSemCodigo = () => {
+      const rec = _loginDepFalhas.get('sem-codigo|' + login) || { conta: 0, bloqueioAte: 0 };
+      rec.conta++;
+      if (rec.conta >= LOGIN_DEP_MAX) rec.bloqueioAte = Date.now() + LOGIN_DEP_BLOQUEIO_MS;
+      _loginDepFalhas.set('sem-codigo|' + login, rec);
+      err(401, 'Login ou senha incorretos.');
+    };
 
     const usuario = db.users.find(u =>
       u.role === 'dependente' &&
-      u.barbershop_id === loja.id &&
-      String(u.email || '').toLowerCase() === login);
-    if (!usuario) return negar();
-    if (!Auth.verificarSenha(senha, usuario.password_hash)) return negar();
+      String(u.email || '').toLowerCase() === login) || null;
+
+    if (!usuario || !Auth.verificarSenha(senha, usuario.password_hash)) {
+      return codigo ? negar() : negarSemCodigo();
+    }
+
+    if (codigo) {
+      const loja = db.barbershops.find(b =>
+        b.codigo_unico && b.codigo_unico.toUpperCase() === codigo);
+      if (!loja) return negar();
+      /* já vinculado a outra empresa: código errado para esta conta */
+      if (usuario.barbershop_id && usuario.barbershop_id !== loja.id) return negar();
+
+      if (usuario.barbershop_id == null) {
+        const { limite, ativos } = cotaDependentes(loja.id);
+        if (limite === 0) {
+          err(402, 'Sua assinatura está inativa. Assine um plano para vincular funcionários.');
+        }
+        if (ativos.length >= limite) {
+          err(409, 'Já está no número de dependentes desta conta');
+        }
+        usuario.barbershop_id = loja.id;
+        _auditLog(usuario.id, 'vincular_dependente', { barbershop_id: loja.id, via: 'codigo_login' });
+      }
+
+      _loginDepFalhas.delete(chave);
+      Auth.criarSessao(usuario.id);
+      _auditLog(usuario.id, 'login_sucesso');
+      return {
+        token: localStorage.getItem('token'),
+        user: Auth.publicUser(usuario),
+        barbershop: Auth.salaoDoUsuario(usuario),
+        link_pendente: false
+      };
+    }
+
+    /* sem código: só permite entrar em contas ainda não vinculadas —
+       o app então leva o usuário a vincular com o Código Único */
+    if (usuario.barbershop_id) {
+      err(400, 'Informe o Código Único da empresa para entrar como funcionário.');
+    }
 
     _loginDepFalhas.delete(chave);
     Auth.criarSessao(usuario.id);
@@ -1273,8 +1427,130 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return {
       token: localStorage.getItem('token'),
       user: Auth.publicUser(usuario),
-      barbershop: Auth.salaoDoUsuario(usuario)
+      barbershop: null,
+      link_pendente: true
     };
+  }
+
+  /* Autoatendimento do funcionário/dependente: cria a conta normalmente
+     (nome, e-mail, senha) SEM exigir o Código Único. O vínculo com a
+     empresa acontece depois (login sem código ou vincularDependente). */
+  function criarContaDependente(dados) {
+    const db = DB._d();
+
+    const nome = String((dados && dados.name) || '').trim();
+    if (nome.length < 2) err(400, 'Informe seu nome completo.');
+
+    const login = String((dados && (dados.login || dados.email)) || '').trim().toLowerCase();
+    if (!login || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)) {
+      err(400, 'Informe um e-mail válido.');
+    }
+
+    const senha = String((dados && dados.senha) || '');
+    if (senha.length < 6) err(400, 'A senha precisa ter ao menos 6 caracteres.');
+
+    if (!dados || !(dados.aceite_privacidade || dados.aceiteTermos)) {
+      err(400, 'O aceite da Política de Privacidade e Termos de Uso é obrigatório.');
+    }
+
+    const existente = db.users.find(u => String(u.email || '').toLowerCase() === login);
+    if (existente) {
+      if (existente.role === 'dono' || existente.role === 'barbeiro') {
+        err(409, 'Este e-mail já pertence a outra conta (dono/barbeiro).');
+      }
+      if (existente.role === 'dependente') {
+        err(409, 'Já existe uma conta de funcionário com este e-mail.');
+      }
+      err(409, 'Este e-mail já está cadastrado. Entre com a sua conta e vincule o Código Único.');
+    }
+
+    const agora = DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos());
+    const conta = {
+      id: DB.proximoId(),
+      role: 'dependente',
+      name: nome,
+      email: login,
+      phone: String((dados && dados.phone) || '').replace(/\D/g, ''),
+      verified: 1,
+      password_hash: Auth.hashSenha(senha),
+      barbershop_id: null,
+      consentimentos: [{ tipo: 'privacidade', data: new Date().toISOString(), versao: '1.0' }],
+      created_at: agora,
+      prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
+    };
+    db.users.push(conta);
+    _auditLog(conta.id, 'criar_conta_dependente', { nome: conta.name });
+    DB.salvar();
+    return { ok: true, id: conta.id, link_pendente: true };
+  }
+
+  /* Vincula a conta já logada (dependente ou cliente) ao Código Único. */
+  function vincularDependente(dados) {
+    const user = sessao();
+    const db = DB._d();
+    const codigo = String((dados && dados.codigo_unico) || '').trim().toUpperCase();
+    if (!codigo) err(400, 'Informe o código único da empresa.');
+
+    const loja = db.barbershops.find(b =>
+      b.codigo_unico && b.codigo_unico.toUpperCase() === codigo);
+    if (!loja) err(404, 'Código único não encontrado.');
+
+    const conta = db.users.find(u => u.id === user.id);
+    if (!conta) err(404, 'Conta não encontrada.');
+    if (conta.role !== 'dependente' && conta.role !== 'cliente') {
+      err(403, 'Sua conta não pode ser vinculada como funcionário.');
+    }
+    if (conta.barbershop_id) {
+      err(409, 'Esta conta já está vinculada a uma empresa.');
+    }
+
+    const { limite, ativos } = cotaDependentes(loja.id);
+    if (limite === 0) {
+      err(402, 'A empresa está com a assinatura inativa. Não é possível vincular funcionários agora.');
+    }
+    if (ativos.length >= limite) {
+      err(409, 'A empresa já está no número de dependentes desta conta');
+    }
+
+    conta.role = 'dependente';
+    conta.barbershop_id = loja.id;
+    _auditLog(conta.id, 'vincular_dependente', { barbershop_id: loja.id, via: 'painel' });
+    DB.salvar();
+    return {
+      ok: true,
+      user: Auth.publicUser(conta),
+      barbershop: Auth.salaoDoUsuario(conta),
+      link_pendente: false
+    };
+  }
+
+  /* O próprio dependente pode deixar de ser dependente (vira cliente). */
+  function sairDeDependente() {
+    const user = sessao();
+    const db = DB._d();
+    const conta = db.users.find(u => u.id === user.id);
+    if (!conta || conta.role !== 'dependente') {
+      err(400, 'Esta conta não é de um dependente.');
+    }
+    const shopId = conta.barbershop_id;
+    conta.role = 'cliente';
+    conta.barbershop_id = null;
+    _auditLog(conta.id, 'desvincular_dependente', { barbershop_id: shopId, via: 'proprio' });
+    DB.salvar();
+    return { ok: true, user: Auth.publicUser(conta) };
+  }
+
+  /* O dono pode desligar (desvincular) um dependente da loja mantendo a conta. */
+  function desvincularDependente(id) {
+    const { shop, user } = exigirDono();
+    const db = DB._d();
+    const alvo = db.users.find(u => u.id == id && u.role === 'dependente' && u.barbershop_id === shop.id);
+    if (!alvo) err(404, 'Funcionário não encontrado nesta empresa.');
+    alvo.role = 'cliente';
+    alvo.barbershop_id = null;
+    _auditLog(user.id, 'desvincular_dependente', { dependente_id: alvo.id, via: 'dono' });
+    DB.salvar();
+    return { ok: true, id: alvo.id };
   }
 
   function atualizarProfissional(id, patch) {
@@ -3103,7 +3379,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return plano ? {
       id: plano.id, name: plano.name, price_monthly: plano.price_monthly,
       price_annual: plano.price_annual,
-      max_professionals: plano.max_professionals, features: plano.features,
+      price_compare: plano.price_compare != null ? Number(plano.price_compare) : null,
+      max_professionals: plano.max_professionals,
+      max_dependents: plano.max_dependents,
+      features: plano.features,
       permissions: plano.permissions || [], is_free: !!plano.is_free,
       nivel_relatorio: plano.nivel_relatorio || null,
       relatorios_resumo: relatoriosResumoPorNivel(plano.nivel_relatorio || null)
@@ -3780,7 +4059,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
     // dependentes / funcionários
     meuCodigoEmpresa, listarDependentes, criarDependente, excluirDependente,
-    loginDependente,
+    loginDependente, criarContaDependente, vincularDependente,
+    sairDeDependente, desvincularDependente,
 
     // horários
     horariosDaLoja, salvarHorariosLoja, atualizarLinhaHorario,
@@ -3862,6 +4142,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
     saTickets, saResponderTicket,
     saListarDenuncias, saResolverDenuncia,
-    saListarPlanos, saAtualizarPrecosPlano, saObterConfig, saDefinirSiteGratis
+    saListarPlanos, saAtualizarPrecosPlano, saCriarPlano, saEditarPlano, saExcluirPlano,
+    saObterConfig, saDefinirSiteGratis
   };
 })();

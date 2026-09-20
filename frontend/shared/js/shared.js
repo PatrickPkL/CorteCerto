@@ -306,6 +306,66 @@ function destinoPosLogin(usuario) {
   return usuario.role === 'dono' ? 'index.html' : '../public/perfil.html';
 }
 
+/* Dependente com conta criada por autoatendimento mas ainda SEM vínculo
+   (link_pendente): bloqueia a página e leva a informar o Código Único
+   da empresa. Retorna true quando exibiu a tela (o caller não segue). */
+function telaVinculoPendente() {
+  const u = Auth.usuarioAtual();
+  if (!u || u.role !== 'dependente') return false;
+  if (Auth.salaoDoUsuario(u)) return false;
+
+  const raiz = document.querySelector('.main') || document.body;
+  raiz.innerHTML = '';
+  raiz.style.cssText = 'display:flex; align-items:flex-start; justify-content:center; padding:32px 16px;';
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.cssText = 'width:100%; max-width:440px; padding:24px;';
+  card.innerHTML =
+    '<h2 style="margin-top:0;">Vincular ao salão</h2>' +
+    '<p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">' +
+    'Sua conta ainda não está vinculada a nenhuma empresa. Informe o ' +
+    '<strong>Código Único</strong> que você recebeu do dono do salão para ' +
+    'começar a usar agenda e clientes.</p>';
+
+  const form = document.createElement('form');
+  form.innerHTML =
+    '<div class="field">' +
+      '<label for="vinculo-codigo">Código Único da empresa</label>' +
+      '<input type="text" id="vinculo-codigo" placeholder="Ex: 7KXQ9M2A" required ' +
+      'style="text-transform:uppercase; font-family:monospace; letter-spacing:2px;">' +
+    '</div>' +
+    '<button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Vincular</button>' +
+    '<p style="text-align:center; margin-top:14px; font-size:13.5px;">' +
+      '<a href="#" id="btn-sair-vinculo" style="color:var(--brass);">Sair e entrar com outra conta</a>' +
+    '</p>';
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const campo = form.querySelector('#vinculo-codigo');
+    try {
+      API.vincularDependente({ codigo_unico: campo.value });
+      showToast('Vínculo realizado com sucesso!', 'success');
+      setTimeout(() => { window.location.reload(); }, 700);
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
+      campo.select();
+    }
+  });
+
+  const sair = form.querySelector('#btn-sair-vinculo');
+  sair.addEventListener('click', (e) => {
+    e.preventDefault();
+    Auth.logout();
+    showToast('Você saiu da sua conta.');
+    setTimeout(() => { window.location.href = 'login.html'; }, 600);
+  });
+
+  card.appendChild(form);
+  raiz.appendChild(card);
+  return true;
+}
+
 /* Área de autenticação no header público (#nav-auth) */
 function renderNavAuth() {
   const slot = document.getElementById('nav-auth');

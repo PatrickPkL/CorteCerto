@@ -111,11 +111,14 @@
     <div class="card" style="margin-bottom:16px;">
       <h3 class="section-title">Como funciona</h3>
       <p style="color:var(--text-muted);font-size:13.5px;margin:0 0 10px 0;">
-        Crie um <strong>login (e-mail)</strong> e uma <strong>senha</strong> para cada funcionário.
-        Ele entra em <code>login.html</code> pela opção <strong>Funcionário / Dependente</strong>
-        informando <strong>Login + Senha + Código Único</strong> da empresa (o código aparece no painel Início).
+        Crie um <strong>login (e-mail)</strong> e uma <strong>senha</strong> para cada funcionário
+        aqui, ou o próprio funcionário pode criar a conta pela opção
+        <strong>Funcionário / Dependente</strong> do <code>login.html</code> e vincular à
+        empresa informando o <strong>Código Único</strong> (o código aparece no painel Início).
         O funcionário acessa a <strong>agenda e os clientes</strong> da empresa — os
-        <strong>relatórios financeiros/gerenciais ficam bloqueados</strong> para esse perfil.</p>
+        <strong>relatórios financeiros/gerenciais ficam bloqueados</strong> para esse perfil.
+        Use <strong>Desligar</strong> para remover o vínculo (a conta continua existindo);
+        use <strong>Remover</strong> para apagar a conta em definitivo.</p>
       <div id="cota-plano" style="font-weight:600; font-size:13.5px;"></div>
     </div>
 
@@ -144,7 +147,7 @@
       <h3 class="section-title">Funcionários cadastrados</h3>
       <table>
         <thead>
-          <tr><th>Funcionário</th><th>Login (e-mail)</th><th>Criado em</th><th style="width:90px;"></th></tr>
+          <tr><th>Funcionário</th><th>Login (e-mail)</th><th>Criado em</th><th style="width:190px;"></th></tr>
         </thead>
         <tbody id="tb-funcionarios"></tbody>
       </table>

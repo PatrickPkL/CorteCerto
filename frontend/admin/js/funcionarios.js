@@ -57,6 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
       criado.innerHTML = fmtDataHoraBR(dep.created_at) || '—';
       const acoes = document.createElement('td');
 
+      const btnDesligar = document.createElement('button');
+      btnDesligar.type = 'button';
+      btnDesligar.className = 'btn btn-outline';
+      btnDesligar.style.cssText = 'padding:6px 10px;font-size:12.5px;';
+      btnDesligar.textContent = 'Desligar';
+      btnDesligar.title = 'Remove o vínculo com a empresa (a conta continua existindo)';
+      btnDesligar.addEventListener('click', () => desligar(dep));
+      acoes.appendChild(btnDesligar);
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn btn-outline';
@@ -89,6 +98,17 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(msgErro(erro), 'error');
     }
   });
+
+  function desligar(dep) {
+    if (!window.confirm('Desligar "' + dep.name + '" (' + dep.email + ')? A conta continua existindo, mas perde o acesso à agenda e clientes da empresa.')) return;
+    try {
+      API.desvincularDependente(dep.id);
+      showToast('Funcionário desligado.');
+      carregar();
+    } catch (e) {
+      showToast(msgErro(e), 'error');
+    }
+  }
 
   function remover(dep) {
     if (!window.confirm('Remover o acesso de "' + dep.name + '" (' + dep.email + ')?')) return;

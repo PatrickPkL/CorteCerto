@@ -102,6 +102,50 @@
   }
   .sa-loading { text-align: center; color: #888; padding: 32px 0; }
 
+  .sa-btn-novo {
+    padding: 10px 18px; background: #b8863b; border: none; border-radius: 6px;
+    color: #0c0c0c; font-weight: 600; font-size: .9rem; cursor: pointer;
+    transition: filter .2s;
+  }
+  .sa-btn-novo:hover { filter: brightness(1.1); }
+  .sa-btn-perigo {
+    padding: 6px 12px; background: transparent; border: 1px solid #e74c3c;
+    color: #e74c3c; border-radius: 6px; font-size: .8rem; cursor: pointer;
+    transition: background .2s;
+  }
+  .sa-btn-perigo:hover { background: rgba(231,76,60,.15); }
+
+  .sa-modal-wrap {
+    position: fixed; inset: 0; background: rgba(0,0,0,.65);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px; z-index: 50; overflow-y: auto;
+  }
+  .sa-modal {
+    background: #161616; border: 1px solid #333; border-radius: 12px;
+    padding: 24px; width: 100%; max-width: 620px;
+  }
+  .sa-modal h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 16px; }
+  .sa-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .sa-form-grid .full { grid-column: 1 / -1; }
+  .sa-form-group { display: flex; flex-direction: column; gap: 6px; }
+  .sa-form-group label { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: .4px; }
+  .sa-form-group input[type="text"],
+  .sa-form-group input[type="number"],
+  .sa-form-group textarea {
+    width: 100%; padding: 9px 10px; background: #0c0c0c; border: 1px solid #333;
+    border-radius: 6px; color: #f0f0f0; font-size: .9rem; outline: none;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .sa-form-group input:focus, .sa-form-group textarea:focus { border-color: #b8863b; }
+  .sa-form-group textarea { resize: vertical; min-height: 70px; }
+  .sa-modal-acoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .sa-btn-cancelar {
+    padding: 9px 16px; background: transparent; border: 1px solid #555;
+    color: #aaa; border-radius: 6px; font-size: .9rem; cursor: pointer;
+  }
+  .sa-btn-cancelar:hover { border-color: #888; color: #f0f0f0; }
+  .sa-switch-linha { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #ccc; }
+
   @media (max-width: 768px) {
     .sa-sidebar { width: 60px; }
     .sa-sidebar-brand, .sa-sidebar-nav a span, .sa-sidebar-footer a span { display: none; }
@@ -160,6 +204,7 @@
 <main class="sa-main">
   <div class="sa-header">
     <h1>Planos e preços</h1>
+    <button type="button" class="sa-btn-novo" id="btn-novo-plano">+ Novo plano</button>
   </div>
 
   <div class="sa-card">
@@ -179,7 +224,7 @@
 
   <div class="sa-card" style="padding:0; background:transparent; border:none;">
     <h2>Preços dos planos</h2>
-    <p class="sa-hint">Edite os valores mensal, anual e por funcionário de cada plano.</p>
+    <p class="sa-hint">Edite rapidamente mensal, anual, por funcionário e o preço de comparação (exibido riscado no card Free). Use "Editar" para nome, limites, recursos e permissões.</p>
     <div class="sa-table-wrap">
       <table class="sa-table">
         <thead>
@@ -188,16 +233,93 @@
             <th>Mensal (R$)</th>
             <th>Anual (R$)</th>
             <th>Por funcionário (R$)</th>
-            <th></th>
+            <th>De (R$)</th>
+            <th>Limites</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody id="tbody-planos">
-          <tr><td colspan="5" class="sa-loading">Carregando...</td></tr>
+          <tr><td colspan="7" class="sa-loading">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </main>
+
+<div class="sa-modal-wrap" id="modal-plano" hidden>
+  <div class="sa-modal">
+    <h2 id="modal-titulo">Novo plano</h2>
+    <form id="form-plano" novalidate>
+      <div class="sa-form-grid">
+        <div class="sa-form-group full">
+          <label for="f-nome">Nome do plano</label>
+          <input type="text" id="f-nome" required autocomplete="off">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-price_monthly">Mensal (R$)</label>
+          <input type="number" id="f-price_monthly" min="0" step="0.01" value="0">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-price_annual">Anual (R$)</label>
+          <input type="number" id="f-price_annual" min="0" step="0.01" value="0">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-price_per_employee">Por funcionário (R$)</label>
+          <input type="number" id="f-price_per_employee" min="0" step="0.01" value="0">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-price_compare">Preço de comparação (R$)</label>
+          <input type="number" id="f-price_compare" min="0" step="0.01" value="0">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-max_professionals">Máx. profissionais (vazio = ilimitado)</label>
+          <input type="number" id="f-max_professionals" min="1" step="1">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-max_dependents">Máx. dependentes (vazio = ilimitado)</label>
+          <input type="number" id="f-max_dependents" min="0" step="1">
+        </div>
+        <div class="sa-form-group">
+          <label for="f-nivel_relatorio">Nível de relatório (vazio = nenhum)</label>
+          <select id="f-nivel_relatorio">
+            <option value="">— nenhum —</option>
+            <option value="basico">Básico</option>
+            <option value="intermediario">Intermediário</option>
+            <option value="completo">Completo</option>
+          </select>
+        </div>
+        <div class="sa-form-group">
+          <div class="sa-switch-linha">
+            <label class="sa-switch" style="height:24px; width:44px;">
+              <input type="checkbox" id="f-is_free">
+              <span class="sa-slider" style="height:24px;"></span>
+            </label>
+            <span>Plano grátis (is_free)</span>
+          </div>
+          <div class="sa-switch-linha" style="margin-top:10px;">
+            <label class="sa-switch" style="height:24px; width:44px;">
+              <input type="checkbox" id="f-active" checked>
+              <span class="sa-slider" style="height:24px;"></span>
+            </label>
+            <span>Ativo na vitrine</span>
+          </div>
+        </div>
+        <div class="sa-form-group full">
+          <label for="f-features">Recursos (um por linha)</label>
+          <textarea id="f-features"></textarea>
+        </div>
+        <div class="sa-form-group full">
+          <label for="f-permissions">Permissões (uma por linha)</label>
+          <textarea id="f-permissions"></textarea>
+        </div>
+      </div>
+      <div class="sa-modal-acoes">
+        <button type="button" class="sa-btn-cancelar" id="btn-fechar-modal">Cancelar</button>
+        <button type="submit" class="sa-btn-salvar" id="btn-salvar-plano">Salvar plano</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="../shared/js/shared.js"></script>
 <script src="js/super-auth.js"></script>
