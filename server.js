@@ -45,10 +45,32 @@ if (!String(process.env.DB_ENCRYPT_KEY || '').trim() &&
     'dados sensíveis em claro. Defina DB_ENCRYPT_KEY no .env ' +
     'ou, APENAS em demo, CC_CRYPT_INSECURE_PLAINTEXT=1.'
   );
+  escreverBootErro('DB_ENCRYPT_KEY não configurado no servidor Hostinger.', 'Defina DB_ENCRYPT_KEY nas variáveis de ambiente do app (hPanel -> Node.js -> Environment variables).');
   process.exit(1);
 }
 
-const { API, Auth, Bot } = require('./backend/boot');
+/* Guard de boot: se alguma etapa crítica falhar, escreve o MOTIVO em
+   boot-error.log (raiz do projeto) para diagnóstico no painel do
+   Hostinger, mesmo sem acesso aos logs do processo. */
+function escreverBootErro(motivo, detalhe) {
+  try {
+    const corpo =
+      '[' + new Date().toISOString() + '] ' + String(motivo || 'erro') +
+      (detalhe ? '\n' + String(detalhe) : '') + '\n';
+    fs.appendFileSync(path.join(__dirname, 'boot-error.log'), corpo, 'utf8');
+    console.error('[boot][erro] ' + String(motivo || 'erro') + ' — detalhes em backend/boot-error.log');
+  } catch (e) { /* diagnóstico não pode quebrar mais ainda */ }
+}
+
+let MODULOS_BOOT = null;
+try {
+  MODULOS_BOOT = require('./backend/boot');
+} catch (e) {
+  /* Ex.: DATABASE_URL ausente lança dentro de backend/pool.js */
+  escreverBootErro('Falha ao carregar o backend (require):', (e && (e.stack || e.message)) || e);
+  process.exit(1);
+}
+const { API, Auth, Bot } = MODULOS_BOOT;
 
 const PORTA = Number(process.env.PORT || 3000);
 const RAIZ = path.join(__dirname, 'frontend');
@@ -740,6 +762,21 @@ function servirEstatico(req, res, url) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const pathname = url.pathname;
+
+  /* Durante o boot o servidor JÁ escuta (Hostinger exige listen() rápido).
+     Antes de pronto: responde 503 "inicializando". Se o boot falhou,
+     responde com o MOTIVO no corpo (a app fica viva só para diagnóstico;
+     em produção ela nunca serve a aplicação nesse estado). */
+  if (global.__CC_BOOT_ERROR) {
+    res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end('Corte Certo — erro de inicialização:\n\n' +
+      String(global.__CC_BOOT_ERROR) + '\n\nDetalhes em boot-error.log na raiz do app.');
+  }
+  if (!global.__CC_BOOT_READY) {
+    res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end('Corte Certo inicializando... recarregue em instantes.');
+  }
+
   if (req.method === 'GET' && pathname === '/health') {
     return void (async () => {
       let ok = false;
@@ -823,9 +860,22 @@ function bancoRemoto() {
 }
 
 (async function iniciar() {
+  /* LISTEN IMEDIATO: a Hostinger mata o processo se listen() não vier em
+     ~3 segundos. O boot (migrações + carga do banco) demora mais que isso,
+     então escutamos já, com o handler respondendo "inicializando..." e o
+     suporte a responder a APP só depois de `__CC_BOOT_READY=true`. */
+  server.listen(PORTA, () => {
+    console.log('  [boot] servidor escutando na porta ' + PORTA + ' (aguardando boot...)');
+  });
+
   if (!bancoRemoto()) {
     let bancoOk = await portaAberta(5432);
-    if (!bancoOk) {
+    /* Só auto-inicia o PostgreSQL portátil (.pg/) quando ele EXISTE no
+       diretório — ou seja, ambiente local de desenvolvimento. Em servidor
+       (ex.: Hostinger) ".pg" não existe: nenhum PG local deve ser tentado,
+       o banco obrigatoriamente vem de DATABASE_URL. */
+    const temPgPortatil = fs.existsSync(path.join(__dirname, '.pg', 'pgsql', 'bin', 'pg_ctl.exe'));
+    if (!bancoOk && temPgPortatil) {
       await iniciarPostgresLocal();
       for (let i = 0; i < 24 && !bancoOk; i++) {
         await new Promise(r => setTimeout(r, 500));
@@ -833,9 +883,14 @@ function bancoRemoto() {
       }
     }
     if (!bancoOk) {
-      console.error('[boot] PostgreSQL não está rodando na porta 5432.');
-      console.error('[boot] Instale/aloque um PostgreSQL local ou rode `npm run db:start` (se usou o banco portátil de .pg/).');
-      process.exit(1);
+      const urlInfo = process.env.DATABASE_URL
+        ? 'DATABASE_URL está definida mas o host "' + (function () { try { return String(new URL(process.env.DATABASE_URL).host); } catch (e) { return '<URL inválida>'; } })() + '" não respondeu na porta 5432.'
+        : 'DATABASE_URL NÃO está definida no servidor.';
+      console.error('[boot] PostgreSQL inacessível. ' + urlInfo);
+      console.error('[boot] No servidor, configure DATABASE_URL apontando para um PostgreSQL acessível (ex.: servidor do próprio plano, Supabase ou Neon).');
+      escreverBootErro('PostgreSQL inacessível no servidor.', urlInfo);
+      global.__CC_BOOT_ERROR = 'PostgreSQL inacessível. ' + urlInfo;
+      return; /* mantém o processo vivo só para devolver o erro via HTTP */
     }
   }
 
@@ -856,6 +911,8 @@ function bancoRemoto() {
           ':5432", mas o banco do app é remoto (Render/Neon).');
         console.error('[migrate] Configure MIGRATION_DATABASE_URL com a "Internal Database URL" do Postgres');
         console.error('[migrate] no painel do Render (mesmo host e usuário dono do DATABASE_URL de produção).');
+        escreverBootErro('MIGRATION_DATABASE_URL aponta para localhost mas o banco do app é remoto.',
+          'Use a URL do PostgreSQL remoto (mesmo host do DATABASE_URL) na MIGRATION_DATABASE_URL.');
         process.exit(1);
       }
     }
@@ -876,7 +933,10 @@ function bancoRemoto() {
       await dbMig.destroy();
     } catch (e) {
       console.error('[migrate] falha ao aplicar migrações:', (e && (e.message || e)) || e);
-      process.exit(1);
+      escreverBootErro('Falha ao aplicar as migrações no PostgreSQL:',
+        (e && e.stack) || (e && (e.message || e)) || e);
+      global.__CC_BOOT_ERROR = 'Falha ao aplicar as migrações: ' + ((e && (e.message || e)) || e);
+      return;
     }
   }
 
@@ -884,7 +944,9 @@ function bancoRemoto() {
     await boot.init();
   } catch (e) {
     console.error('[boot] Falha ao carregar o banco de dados:', e);
-    process.exit(1);
+    escreverBootErro('Falha ao carregar o banco de dados (boot.init):', (e && e.stack) || (e && (e.message || e)) || e);
+    global.__CC_BOOT_ERROR = 'Falha ao carregar o banco de dados: ' + ((e && ((e.message || e))) || e);
+    return;
   }
 
   /* Job diário dos relatórios: padrão de TODOS os planos pagos.
@@ -948,28 +1010,28 @@ function bancoRemoto() {
   }
 
   Bot.start(); // monitora a caixa do Gmail (somente se ativo no painel)
-  server.listen(PORTA, () => {
-    console.log('');
-    console.log('  Corte Certo rodando:');
-    console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
-    console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
-    console.log('  Banco de dados   : PostgreSQL (cortecerto)');
-    console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
-    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      // [SEGURANÇA] Mascarar e-mail no log de boot
-      console.log('  E-mail (código)  : Gmail real (' + mascararEmail(process.env.GMAIL_USER) + ')');
-    } else {
-      console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
-    }
-    console.log(process.env.ABACATEPAY_API_KEY
-      ? '  Pagamentos PIX   : AbacatePay (' +
-        (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
-      : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
-    if (process.env.GEMINI_API_KEY) {
-      console.log('  Atendente bot    : IA Gemini ativa (' + (process.env.GEMINI_MODEL || 'gemini-2.0-flash') + ')');
-    } else {
-      console.log('  Atendente bot    : classificação por palavras-chave — coloque GEMINI_API_KEY no .env para usar a IA Gemini');
-    }
-    console.log('');
-  });
+  global.__CC_BOOT_READY = true; // libera o handler para servir a aplicação
+  try { fs.writeFileSync(path.join(__dirname, 'boot-error.log'), ''); } catch (e) { /* opcional */ }
+  console.log('');
+  console.log('  Corte Certo rodando:');
+  console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
+  console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
+  console.log('  Banco de dados   : PostgreSQL (cortecerto)');
+  console.log('  Códigos de acesso são enviados por e-mail (Gmail), com código demo no terminal e na tela de login.');
+  if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+    // [SEGURANÇA] Mascarar e-mail no log de boot
+    console.log('  E-mail (código)  : Gmail real (' + mascararEmail(process.env.GMAIL_USER) + ')');
+  } else {
+    console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
+  }
+  console.log(process.env.ABACATEPAY_API_KEY
+    ? '  Pagamentos PIX   : AbacatePay (' +
+      (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
+    : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
+  if (process.env.GEMINI_API_KEY) {
+    console.log('  Atendente bot    : IA Gemini ativa (' + (process.env.GEMINI_MODEL || 'gemini-2.0-flash') + ')');
+  } else {
+    console.log('  Atendente bot    : classificação por palavras-chave — coloque GEMINI_API_KEY no .env para usar a IA Gemini');
+  }
+  console.log('');
 })();
