@@ -606,8 +606,10 @@ document.addEventListener('DOMContentLoaded', () => {
   mostrarFlash();
   renderNavAuth();
   montarNotificacoes();
-  montarShellAdmin();
-  aplicarRBACSidebar();
+  if (typeof Auth !== 'undefined') {
+    montarShellAdmin();
+    aplicarRBACSidebar();
+  }
 
   const hamburger = document.getElementById('hamburger');
   const sidebar = document.querySelector('.sidebar');
