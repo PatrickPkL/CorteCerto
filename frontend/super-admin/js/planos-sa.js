@@ -13,9 +13,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var lblGratis = document.getElementById('lbl-site-gratis');
   var avisoGratis = document.getElementById('aviso-site-gratis');
   var tbodyPlanos = document.getElementById('tbody-planos');
-  var modal = document.getElementById('modal-plano');
+  var modal = document.getElementById('sa-modal-plano');
   var formPlano = document.getElementById('form-plano');
-  var modalTitulo = document.getElementById('modal-titulo');
+  var modalTitulo = document.getElementById('sa-modal-titulo');
   var btnSalvarPlano = document.getElementById('btn-salvar-plano');
 
   var planoEditando = null;
