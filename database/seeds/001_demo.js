@@ -2,15 +2,20 @@
 /* ============================================================
    Corte Certo – seeds/001_demo.js
    Seed de demonstração: planos e dados demo
-   (6 salões SEM usuário vinculado, serviços, profissionais,
-   horários, clientes, agendamentos, avaliações, assinaturas).
-   Sem usuários: ninguém loga como dono demo; contas reais vem do SMS.
+   (6 salões, serviços, profissionais, horários, clientes,
+   agendamentos, avaliações, assinaturas) + usuários demo em
+   desenvolvimento (dono, funcionário e barbeiro vinculados à loja 1).
+
+   Contas reais NUNCA são apagadas pelo seed: na gravação removemos
+   apenas os ids demo fixos (7001/7002/7003). Usuários demo só existem
+   fora de produção (ou com CC_DEMO_USERS=1).
 
    Usa UUIDs determinísticos para referências cruzadas consistentes.
    Roda como superuser (knexfile) — imune ao RLS.
    ============================================================ */
 
 const crypt = require('../../backend/crypt');
+const _cryp = require('crypto');
 
 const uuid = (n) => '00000000-0000-4000-8000-' + String(n).padStart(12, '0');
 
@@ -42,9 +47,9 @@ const plans = [
 ];
 
   // ---------- users (dados sensíveis cifrados) ----------
-  const mkUser = (id, role, name, email, phone, verified, created) => {
+  const mkUser = (id, role, name, email, phone, verified, created, extra) => {
     function tele(v) { return String(v || '').replace(/\D/g, ''); }
-    return {
+    return Object.assign({
       id: uuid(id), role, name,
       email: crypt.criptografar(email || ''),
       email_hash: crypt.hashSHA256((email || '').toLowerCase()),
@@ -56,19 +61,42 @@ const plans = [
         { tipo: 'privacidade', data: created, versao: '1.0', origem: 'seed' }
       ],
       created_at: created
-    };
+    }, extra || {});
   };
+
+  /* Mesmo algoritmo de hash de senha do backend/auth.js */
+  function hashSenhaDemo(senha) {
+    const salt = _cryp.randomBytes(16);
+    const h = _cryp.scryptSync(String(senha), salt, 64, { N: 16384, r: 8, p: 1 });
+    return 'scrypt:16384:8:1:' + salt.toString('base64') + ':' + h.toString('base64');
+  }
 
   const D = addDiasISO;
   const hoje = hojeISO();
-  /* Sem usuários demo desde 28/08/2026: ninguém pode logar como dono
-     solto na plataforma. Os salões seguem no catálogo público sem dono
-     vinculado (owner_user_id null). Usuários reais entram pelo SMS. */
+
+  /* Usuários demo (só fora de produção, ou com CC_DEMO_USERS=1):
+     o dono demo usa o e-mail do GMAIL_USER (Patrick recebe o código por
+     e-mail) ou um link mágico para entrar no painel; o funcionário testa
+     o RBAC e o barbeiro a aba de agendamentos da equipe.
+     Contas reais nunca são apagadas pelo seed — na gravação removemos
+     apenas os ids fixes 7001/7002/7003. */
+  const criarDemo = process.env.NODE_ENV !== 'production' || process.env.CC_DEMO_USERS === '1';
+  const EMAIL_DONO_DEMO = (process.env.GMAIL_USER || '').trim() || 'dono.demo@cortecerto';
+
   const users = [];
+  if (criarDemo) {
+    const DDEMO = addDiasISO(-30);
+    users.push(mkUser(7001, 'dono', 'Carlos Demo', EMAIL_DONO_DEMO, '71999990001', 1, DDEMO + 'T09:00', {}));
+    users.push(Object.assign(
+      mkUser(7002, 'dependente', 'Renata Demo', 'depend.demo@cortecerto', '71999990002', 1, DDEMO + 'T09:00', {}),
+      { password_hash: hashSenhaDemo('demo1234') }
+    ));
+    users.push(mkUser(7003, 'barbeiro', 'Paulo Demo', 'barbeiro.demo@cortecerto', '71999990003', 1, DDEMO + 'T09:00', {}));
+  }
 
   // ---------- barbershops ----------
   const barbershops = [
-    { id: uuid(1), owner_user_id: null, name: 'Barbearia São Jorge', description: 'Tradição e precisão em cortes clássicos e modernos.', slug: 'barbearia-sao-jorge', codigo_unico: 'SJORGE8BA', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
+    { id: uuid(1), owner_user_id: criarDemo ? uuid(7001) : null, name: 'Barbearia São Jorge', description: 'Tradição e precisão em cortes clássicos e modernos.', slug: 'barbearia-sao-jorge', codigo_unico: 'SJORGE8BA', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
     { id: uuid(2), owner_user_id: null, name: 'Studio Nova Era', description: 'Coloração e tratamentos capilares especializados.', slug: 'studio-nova-era', codigo_unico: 'NOVAER6BA', phone: '(71) 3344-1020', whatsapp: '', email: '', instagram: '', address: 'Av. Oceânica, 800', city: 'Salvador', uf: 'BA', lat: -13.0101, lng: -38.4985, logo_url: null, cover_url: null, tags: ['Corte', 'Coloração', 'Hidratação'], rating_base: 4.6, rating_count_base: 98, created_at: D(-300) + 'T10:00', updated_at: D(-20) + 'T10:00' },
     { id: uuid(3), owner_user_id: null, name: 'Barbearia do Zé', description: 'Barbearia de bairro com atendimento de qualidade.', slug: 'barbearia-do-ze', codigo_unico: 'ZE8BARBS', phone: '(75) 3612-7788', whatsapp: '', email: '', instagram: '', address: 'Rua Barão do Rio Branco, 55', city: 'Feira de Santana', uf: 'BA', lat: -12.2664, lng: -38.9663, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Sobrancelha'], rating_base: 4.9, rating_count_base: 210, created_at: D(-350) + 'T08:00', updated_at: D(-15) + 'T08:00' },
     { id: uuid(4), owner_user_id: null, name: 'Espaço Bela Vista', description: 'Beleza e bem-estar para todos os estilos.', slug: 'espaco-bela-vista', codigo_unico: 'BELAVI5BA', phone: '(71) 3621-3030', whatsapp: '', email: '', instagram: '', address: 'Praça Desembargador Hugo Gomes, 12', city: 'Camaçari', uf: 'BA', lat: -12.6976, lng: -38.3229, logo_url: null, cover_url: null, tags: ['Coloração', 'Corte'], rating_base: 4.5, rating_count_base: 76, created_at: D(-250) + 'T09:00', updated_at: D(-25) + 'T09:00' },
@@ -118,7 +146,7 @@ const plans = [
     id: uuid(p[1]),
     barbershop_id: uuid(p[0]),
     name: p[2], color: p[3], bio: p[4], phone: p[5],
-    user_id: p[6] ? uuid(p[6]) : null,
+    user_id: p[6] ? uuid(p[6]) : (criarDemo && p[1] === 11 ? uuid(7003) : null),
     is_active: true,
     created_at: D(-90) + 'T09:00'
   }));
@@ -311,10 +339,20 @@ const plans = [
   await knex('professionals').del();
   await knex('services').del();
   await knex('barbershops').del();
-  await knex('users').del();
+  /* Contas reais são preservadas: removemos apenas as demo (ids fixos) e
+     as sessões/códigos/links desses usuários demo. */
+  const DEMO_IDS = [uuid(7001), uuid(7002), uuid(7003)];
+  await knex('sessions').whereIn('user_id', DEMO_IDS).del();
+  await knex('magic_tokens').whereIn('user_id', DEMO_IDS).del();
+  await knex('users').whereIn('id', DEMO_IDS).del();
 
   if (users.length) await knex('users').insert(users);
   await knex('barbershops').insert(barbershops);
+  /* vínculo do dependente demo à loja 1 (FK circular: users.barbershop_id
+     aponta para barbershops e barbershops.owner_user_id para users) */
+  if (criarDemo) {
+    await knex('users').where('id', uuid(7002)).update({ barbershop_id: uuid(1) });
+  }
   await knex('services').insert(services);
   await knex('professionals').insert(professionals);
   await knex('professional_services').insert(professional_services);

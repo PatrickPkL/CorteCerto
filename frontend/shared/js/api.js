@@ -142,7 +142,15 @@
 
   /* ---------------- RPC explícitos (além do Proxy) ---------------- */
 
-  API.verificarMagicLink = function (token) { return rpc('verificarMagicLink', [token]); };
+  API.verificarMagicLink = function (token) {
+    const r = rpc('verificarMagicLink', [token]);
+    if (r && r.token) {
+      localStorage.setItem(KEY_TOKEN, r.token);
+      localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
+      localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
+    }
+    return r;
+  };
   API.gerarLembretesAmanha = function () { return rpc('gerarLembretesAmanha', []); };
   API.lojasProximas = function (dados) { return rpc('lojasProximas', [dados]); };
 

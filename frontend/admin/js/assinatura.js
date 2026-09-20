@@ -509,4 +509,34 @@ function fecharPagamento() {
   });
 
   render();
+
+  /* ---------- planos em tempo real ----------
+     Super-admin pode criar/editar/excluir planos e mudar preços a
+     qualquer momento. Re-consulta a cada 20s (e ao reativar a aba)
+     e só re-renderiza quando algo mudou de fato nos planos ou no
+     status da assinatura. */
+  let planoSnapshot = JSON.stringify(planos);
+  let subSnapshot = '';
+
+  function sincronizarAoVivo() {
+    try {
+      const novos = API.listarPlanos();
+      const snap = JSON.stringify(novos || []);
+      let sub = null;
+      try { sub = API.minhaAssinatura(); } catch (e2) { return; }
+      const snapSub = JSON.stringify(sub);
+      const subMudou = snapSub !== subSnapshot;
+      subSnapshot = snapSub;
+      const planosMudaram = snap !== planoSnapshot;
+      if (planosMudaram) planos = novos || [];
+      planoSnapshot = snap;
+      if (planosMudaram || subMudou) render();
+    } catch (e) { /* rede indisponível — tenta no próximo ciclo */ }
+  }
+
+  window.addEventListener('focus', sincronizarAoVivo);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') sincronizarAoVivo();
+  });
+  setInterval(sincronizarAoVivo, 20000);
 });

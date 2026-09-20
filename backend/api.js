@@ -374,8 +374,12 @@ window.API = (function () {
     DB.salvar();
     var usuario = (_db().users || []).find(function(u) { return u.id === registro.user_id; });
     if (!usuario) err(404, 'Usuário não encontrado.');
-    var sessao = require('./auth').criarSessao(usuario.id);
-    return { token: sessao.token, user: { id: usuario.id, name: usuario.name, role: usuario.role } };
+    var sessao = Auth.criarSessao(usuario.id);
+    return {
+      token: sessao.token,
+      user: { id: usuario.id, name: usuario.name, role: usuario.role },
+      barbershop: Auth.salaoDoUsuario(usuario)
+    };
   }
 
   /* Envia os lembretes por e-mail (Gmail) de uma data.

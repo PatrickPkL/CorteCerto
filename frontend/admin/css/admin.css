@@ -121,8 +121,9 @@
   z-index: 90;
   opacity: 0;
   transition: opacity 0.25s ease;
+  pointer-events: none;
 }
-.sidebar-overlay.visible { opacity: 1; }
+.sidebar-overlay.visible { opacity: 1; pointer-events: auto; }
 
 .main {
   padding: 32px 40px 60px;

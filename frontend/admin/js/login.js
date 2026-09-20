@@ -293,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (magicToken) {
       localStorage.removeItem('cc_magic_token');
       try {
-        var r = Auth.verificarMagicLink(magicToken);
+        var r = API.verificarMagicLink(magicToken);
         showToast('Login realizado via link mágico!');
         setTimeout(function() { window.location.href = destinoPosLogin(r.user); }, 500);
       } catch (e) {
