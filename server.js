@@ -760,8 +760,7 @@ function handleWebhookAbacate(req, res, url) {
 function servirEstatico(req, res, url) {
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/') {
-    res.writeHead(302, { Location: '/public/telainicial.html' });
-    return res.end();
+    caminho = '/public/telainicial.html';
   }
 
   const alvo = path.normalize(path.join(RAIZ, caminho));
