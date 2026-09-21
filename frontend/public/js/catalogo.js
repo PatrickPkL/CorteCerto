@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : '');
     const rating = Number(l.rating_avg || 0).toFixed(1);
 
-    return '<a href="salao-publico.html?id=' + l.id + '" class="salon-card">' +
+    return '<a href="/salao-publico.html?id=' + l.id + '" class="salon-card">' +
       '<div class="salon-card-cover"' + capaStyle + '></div>' +
       '<div class="salon-card-body">' +
         '<div class="salon-name">' + esc(l.name) + '</div>' +

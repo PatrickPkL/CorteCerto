@@ -259,8 +259,8 @@ function exigirLogin(role) {
       tipo: 'error'
     }));
     const naAdmin = window.location.pathname.includes('/admin/');
-    const destino = (naAdmin ? 'login.html' : '../admin/login.html') +
-      '?next=' + encodeURIComponent(aqui) + '&role=' + papeis.join(',');
+    const destino = '/admin/login.html?next=' + encodeURIComponent(aqui) +
+      '&role=' + papeis.join(',');
     window.location.replace(destino);
     return null;
   }
@@ -300,10 +300,10 @@ function destinoPosLogin(usuario) {
       'configuracoes.html', 'suporte.html'];
     if (usuario.role === 'dono' && paginasAdmin.includes(next)) return next;
     if (usuario.role === 'cliente' && !paginasAdmin.includes(next)) {
-      return '../public/' + next;
+      return '/' + next;
     }
   }
-  return usuario.role === 'dono' ? 'index.html' : '../public/perfil.html';
+  return usuario.role === 'dono' ? '/admin/index.html' : '/perfil.html';
 }
 
 /* Dependente com conta criada por autoatendimento mas ainda SEM vínculo
@@ -387,18 +387,18 @@ function renderNavAuth() {
       e.preventDefault();
       Auth.logout();
       showToast('Você saiu da sua conta.');
-      setTimeout(() => { window.location.href = 'catalogo.html'; }, 600);
+      setTimeout(() => { window.location.href = '/catalogo.html'; }, 600);
     });
     slot.appendChild(sair);
 
     const minhaConta = document.createElement('a');
-    minhaConta.href = u.role === 'dono' ? '../admin/index.html' : 'perfil.html';
+    minhaConta.href = u.role === 'dono' ? '/admin/index.html' : '/perfil.html';
     minhaConta.className = 'btn btn-brass btn-sm-header';
     minhaConta.textContent = u.role === 'dono' ? 'Painel' : 'Meu perfil';
     slot.appendChild(minhaConta);
   } else {
     const entrar = document.createElement('a');
-    entrar.href = '../admin/login.html';
+    entrar.href = '/admin/login.html';
     entrar.className = 'btn btn-brass btn-sm-header';
     entrar.id = 'btn-minha-conta';
     entrar.textContent = 'Minha conta';

@@ -759,8 +759,14 @@ function handleWebhookAbacate(req, res, url) {
 
 function servirEstatico(req, res, url) {
   let caminho = decodeURIComponent(url.pathname);
-  if (caminho === '/') {
+  if (caminho === '/' || caminho === '/index.html') {
     caminho = '/public/telainicial.html';
+  } else if (caminho.startsWith('/') && caminho.endsWith('.html')) {
+    const naRaiz = path.join(RAIZ, caminho);
+    const noPublic = path.join(RAIZ, 'public' + caminho);
+    if (!fs.existsSync(naRaiz) && fs.existsSync(noPublic)) {
+      caminho = '/public' + caminho;
+    }
   }
 
   const alvo = path.normalize(path.join(RAIZ, caminho));

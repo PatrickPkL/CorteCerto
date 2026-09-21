@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const capa = l.logo_url || l.cover_url; // foto de perfil manda no card
     const capaStyle = capa ? ' style="background:#000 url(&quot;' + esc(capa) + '&quot;) center/cover no-repeat;"' : '';
     return '<div class="fav-card">' +
-      '<a href="salao-publico.html?id=' + l.id + '" class="salon-card">' +
+      '<a href="/salao-publico.html?id=' + l.id + '" class="salon-card">' +
         '<div class="salon-card-cover"' + capaStyle + '></div>' +
         '<div class="salon-card-body">' +
           '<div class="salon-name">' + esc(l.name) + '</div>' +
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             API.sairDeDependente();
             showToast('Você deixou de ser dependente. Sua conta agora é de cliente.', 'success');
-            setTimeout(() => { window.location.href = 'perfil.html'; }, 900);
+            setTimeout(() => { window.location.href = '/perfil.html'; }, 900);
           } catch (err2) {
             showToast(msgErro(err2), 'error');
           }
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             API.vincularDependente({ codigo_unico: campo.value });
             showToast('Vínculo realizado com sucesso!', 'success');
-            setTimeout(() => { window.location.href = 'perfil.html'; }, 900);
+            setTimeout(() => { window.location.href = '/perfil.html'; }, 900);
           } catch (err2) {
             showToast(msgErro(err2), 'error');
             campo.select();
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-sair-perfil')?.addEventListener('click', () => {
     Auth.logout();
     showToast('Você saiu da sua conta.');
-    setTimeout(() => { window.location.href = 'catalogo.html'; }, 600);
+    setTimeout(() => { window.location.href = '/catalogo.html'; }, 600);
   });
 
   /* ---------- exclusão de conta com código (P3-3) ---------- */
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
       API.confirmarExclusao(code);
       Auth.limparSessao();
       showToast('Conta excluída.', 'error');
-      setTimeout(() => { window.location.href = 'catalogo.html'; }, 1200);
+      setTimeout(() => { window.location.href = '/catalogo.html'; }, 1200);
     } catch (err2) {
       showToast(msgErro(err2), 'error');
     }
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         API.logoutTodosDispositivos();
         Auth.logout();
         showToast('Sessões encerradas.');
-        setTimeout(function() { window.location.href = 'catalogo.html'; }, 800);
+        setTimeout(function() { window.location.href = '/catalogo.html'; }, 800);
       } catch(e) { showToast(msgErro(e), 'error'); }
     });
   }

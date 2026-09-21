@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   (function montarLinkAgendamento() {
     const input = document.getElementById('link-agendamento');
     if (!input) return;
-    const url = location.origin + '/public/salao-publico.html?id=' + encodeURIComponent(loja.id);
+    const url = location.origin + '/salao-publico.html?id=' + encodeURIComponent(loja.id);
     input.value = url;
 
     /* Usar o link de agendamento é ação produtiva: exige assinatura ativa
