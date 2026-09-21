@@ -40,7 +40,7 @@
       try {
         if (!automatico && !/assinatura\.html$/i.test(window.location.pathname)) {
           sessionStorage.setItem('cc_assinatura_aviso', erro);
-          window.location.href = '/admin/assinatura.html';
+          window.location.href = '/assinatura';
           return undefined;
         }
       } catch (e) { /* fora de contexto de navegador */ }

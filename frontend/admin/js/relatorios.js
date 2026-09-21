@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!usuario) return;
     if (!loja) {
       showToast('Nenhum salão vinculado a esta conta.', 'error');
-      setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+      setTimeout(() => { window.location.href = '/login'; }, 1200);
       return;
     }
   }
@@ -614,9 +614,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
       container.innerHTML = motivo
         ? '<div class="rel-block-note">' + esc(motivo) +
-          ' <a href="assinatura.html">Ver planos</a></div>'
+          ' <a href="/assinatura">Ver planos</a></div>'
         : '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
-          'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+          'Assine ou faça upgrade na aba <a href="/assinatura">Assinatura</a> para liberar.</div>';
       return;
     }
 
@@ -679,9 +679,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
       container.innerHTML = motivo
         ? '<div class="rel-block-note">' + esc(motivo) +
-          ' <a href="assinatura.html">Ver planos</a></div>'
+          ' <a href="/assinatura">Ver planos</a></div>'
         : '<div class="rel-block-note">Relatórios estão bloqueados no seu plano. ' +
-          'Assine ou faça upgrade na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+          'Assine ou faça upgrade na aba <a href="/assinatura">Assinatura</a> para liberar.</div>';
       return;
     }
     const dados = relatorio;
@@ -840,9 +840,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const motivo = relatorioDiarioErro && (relatorioDiarioErro.error || relatorioDiarioErro.message);
       container.innerHTML = motivo
         ? '<div class="rel-block-note">' + esc(motivo) +
-          ' <a href="assinatura.html">Ver planos</a></div>'
+          ' <a href="/assinatura">Ver planos</a></div>'
         : '<div class="rel-block-note">O relatório diário (00:00) faz parte dos planos pagos. ' +
-          'Assine um plano na aba <a href="assinatura.html">Assinatura</a> para liberar.</div>';
+          'Assine um plano na aba <a href="/assinatura">Assinatura</a> para liberar.</div>';
       return;
     }
     const d = relatorioDiario;
@@ -874,10 +874,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const motivo = relatorioErro && (relatorioErro.error || relatorioErro.message);
       container.innerHTML = motivo
         ? '<div class="rel-block-note">' + esc(motivo) +
-          ' <a href="assinatura.html">Ver planos</a></div>'
+          ' <a href="/assinatura">Ver planos</a></div>'
         : '<div class="rel-block-note">Sem dados de horários de pico no período. ' +
           'Conclua atendimentos para visualizar as faixas mais movimentadas. ' +
-          'Na dúvida, veja os detalhes na aba <a href="assinatura.html">Assinatura</a>.</div>';
+          'Na dúvida, veja os detalhes na aba <a href="/assinatura">Assinatura</a>.</div>';
       return;
     }
     const card = document.createElement('div');

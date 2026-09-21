@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       sessionStorage.removeItem('cc_flash');
       if (r.link_pendente) {
         showToast('Conta criada mas ainda sem vínculo. Informe o Código Único da empresa.', 'success');
-        window.location.href = 'agendamentos.html';
+        window.location.href = '/agendamentos';
         return;
       }
       showToast('Bem-vindo, ' + (r.user.name ? r.user.name.split(' ')[0] : 'funcionário') + '!');

@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {
     showToast('Nenhum salão vinculado a esta conta.', 'error');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    setTimeout(() => { window.location.href = '/login'; }, 1200);
     return;
   }
 
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const irAssinar = () => {
       sessionStorage.setItem('cc_assinatura_aviso',
         'Assine um plano para usar o link de agendamento e as demais funções.');
-      window.location.href = 'assinatura.html';
+      window.location.href = '/assinatura';
     };
 
     const btnAbrir = document.getElementById('btn-abrir-link');
@@ -247,3 +247,4 @@ document.getElementById('btn-exportar-csv')?.addEventListener('click', () => {
 
   try { API.gerarLembretesAmanha(); } catch(e) { /* best-effort */ }
 });
+

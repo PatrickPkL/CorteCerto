@@ -238,7 +238,7 @@ function exigirLogin(role) {
       texto: 'Acesso restrito: sua conta permite apenas as abas Agendamentos e Clientes.',
       tipo: 'error'
     }));
-    window.location.replace('agendamentos.html');
+    window.location.replace('/agendamentos');
     return null;
   }
   if (u && u.role === 'dependente' && !papeis.includes('dependente')) {
@@ -246,7 +246,7 @@ function exigirLogin(role) {
       texto: 'Acesso restrito: a conta Dependente permite apenas Agendamentos e Clientes (relatórios são bloqueados).',
       tipo: 'error'
     }));
-    window.location.replace('agendamentos.html');
+    window.location.replace('/agendamentos');
     return null;
   }
 
@@ -279,31 +279,40 @@ function mostrarFlash() {
 }
 
 /* Para onde o usuário vai depois do login (honra ?next=) */
+function rotaAdmin(pagina) {
+  const nome = String(pagina || '').split('/').pop().replace(/\.html$/, '');
+  if (!nome || nome === 'index') return '/painel';
+  return '/' + nome;
+}
+
 function destinoPosLogin(usuario) {
   const next = getParam('next');
+  const ehAdmin = (pagina) => {
+    const n = String(pagina || '').split('/').pop().replace(/\.html$/, '');
+    return ['painel', 'index', 'agendamentos', 'clientes', 'servicos',
+      'profissionais', 'assinatura', 'configuracoes', 'suporte',
+      'funcionarios', 'horarios', 'relatorios'].includes(n);
+  };
 
   /* barbeiro ajudante (RBAC): apenas Agendamentos e Clientes */
   if (usuario.role === 'barbeiro') {
-    if (next && ['agendamentos.html', 'clientes.html'].includes(next)) return next;
-    return 'agendamentos.html';
+    if (next && ['agendamentos', 'clientes'].includes(String(next).split('/').pop().replace(/\.html$/, ''))) return rotaAdmin(next);
+    return '/agendamentos';
   }
 
   /* dependente/funcionário (RBAC): agenda + clientes; relatórios bloqueados */
   if (usuario.role === 'dependente') {
-    if (next && ['agendamentos.html', 'clientes.html'].includes(next)) return next;
-    return 'agendamentos.html';
+    if (next && ['agendamentos', 'clientes'].includes(String(next).split('/').pop().replace(/\.html$/, ''))) return rotaAdmin(next);
+    return '/agendamentos';
   }
 
   if (next) {
-    const paginasAdmin = ['index.html', 'agendamentos.html', 'clientes.html',
-      'servicos.html', 'profissionais.html', 'assinatura.html',
-      'configuracoes.html', 'suporte.html'];
-    if (usuario.role === 'dono' && paginasAdmin.includes(next)) return next;
-    if (usuario.role === 'cliente' && !paginasAdmin.includes(next)) {
+    if (usuario.role === 'dono' && ehAdmin(next)) return rotaAdmin(next);
+    if (usuario.role === 'cliente' && !ehAdmin(next)) {
       return next.startsWith('/') ? next : '/' + next;
     }
   }
-  return usuario.role === 'dono' ? '/admin/index.html' : '/perfil';
+  return usuario.role === 'dono' ? '/painel' : '/perfil';
 }
 
 /* Dependente com conta criada por autoatendimento mas ainda SEM vínculo
@@ -358,7 +367,7 @@ function telaVinculoPendente() {
     e.preventDefault();
     Auth.logout();
     showToast('Você saiu da sua conta.');
-    setTimeout(() => { window.location.href = 'login.html'; }, 600);
+    setTimeout(() => { window.location.href = '/login'; }, 600);
   });
 
   card.appendChild(form);
@@ -392,7 +401,7 @@ function renderNavAuth() {
     slot.appendChild(sair);
 
     const minhaConta = document.createElement('a');
-    minhaConta.href = u.role === 'dono' ? '/admin/index.html' : '/perfil';
+    minhaConta.href = u.role === 'dono' ? '/painel' : '/perfil';
     minhaConta.className = 'btn btn-brass btn-sm-header';
     minhaConta.textContent = u.role === 'dono' ? 'Painel' : 'Meu perfil';
     slot.appendChild(minhaConta);
@@ -510,7 +519,7 @@ function aplicarBannerPlano() {
     '<strong style="color:var(--warn-text);">Funcionalidade bloqueada no plano ' + esc(nomePlano) + '.</strong>' +
     '<span style="color:var(--text-muted);font-size:14px;">' +
     'Você pode consultar tudo aqui, mas para criar e editar é preciso um dos planos pagos.</span>' +
-    '<a href="assinatura.html" class="btn btn-brass" style="margin-left:auto;">Ver planos</a>';
+    '<a href="/assinatura" class="btn btn-brass" style="margin-left:auto;">Ver planos</a>';
   document.querySelector('.main').prepend(av);
 }
 
@@ -569,7 +578,7 @@ function montarShellAdmin() {
     btnSair.addEventListener('click', () => {
       Auth.logout();
       showToast('Você saiu da sua conta.');
-      setTimeout(() => { window.location.href = 'login.html'; }, 600);
+      setTimeout(() => { window.location.href = '/login'; }, 600);
     });
   }
 }
@@ -580,7 +589,7 @@ function aplicarRBACSidebar() {
   const u = Auth.usuarioAtual();
   if (!u || (u.role !== 'barbeiro' && u.role !== 'dependente')) return;
 
-  const permitidas = ['agendamentos.html', 'clientes.html'];
+  const permitidas = ['agendamentos', 'clientes'];
   document.querySelectorAll('.sidebar .nav-item').forEach(item => {
     const a = item.querySelector('a');
     const href = ((a && a.getAttribute('href')) || '').split('/').pop();

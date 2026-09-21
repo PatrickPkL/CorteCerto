@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {
     showToast('Nenhum salão vinculado a esta conta.', 'error');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    setTimeout(() => { window.location.href = '/login'; }, 1200);
     return;
   }
 
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
       API.confirmarExclusao(code);
       Auth.limparSessao();
       showToast('Conta excluída permanentemente.', 'error');
-      setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+      setTimeout(() => { window.location.href = '/login'; }, 1200);
     } catch (err2) {
       showToast(msgErro(err2), 'error');
     }
@@ -212,3 +212,4 @@ document.addEventListener('DOMContentLoaded', () => {
   preencherDados();
   renderGaleria();
 });
+

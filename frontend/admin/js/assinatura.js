@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {
     showToast('Nenhum salão vinculado a esta conta.', 'error');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    setTimeout(() => { window.location.href = '/login'; }, 1200);
     return;
   }
 
@@ -540,3 +540,4 @@ function fecharPagamento() {
   });
   setInterval(sincronizarAoVivo, 20000);
 });
+

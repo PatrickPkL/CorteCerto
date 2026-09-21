@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!usuario) return;
     if (!loja) {
       showToast('Nenhum sal├úo vinculado a esta conta.', 'error');
-      setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+      setTimeout(() => { window.location.href = '/login'; }, 1200);
       return;
     }
   }
@@ -552,3 +552,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   });
 });
+

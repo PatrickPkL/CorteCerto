@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/admin/">
 <link rel="icon" type="image/png" href="../public/assets/cortecertologo.png">
 <title>Assinatura · Corte Certo</title>
 <script src="../shared/js/tema-inicio.js"></script>
@@ -30,11 +31,11 @@
 
     <span class="nav-group-label">Painel</span>
     <ul class="nav-list">
-      <li class="nav-item"><a href="index.html">
+      <li class="nav-item"><a href="/painel">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Início
       </a></li>
-      <li class="nav-item"><a href="agendamentos.html">
+      <li class="nav-item"><a href="/agendamentos">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
         Agendamentos
       </a></li>
@@ -42,23 +43,23 @@
 
     <span class="nav-group-label">Cadastros</span>
     <ul class="nav-list">
-      <li class="nav-item"><a href="clientes.html">
+      <li class="nav-item"><a href="/clientes">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/></svg>
         Clientes
       </a></li>
-      <li class="nav-item"><a href="servicos.html">
+      <li class="nav-item"><a href="/servicos">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6M14 4l-9 9-2 5 5-2 9-9-3-3zM17 7l3 3"/></svg>
         Serviços
       </a></li>
-      <li class="nav-item"><a href="profissionais.html">
+      <li class="nav-item"><a href="/profissionais">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="18" cy="7" r="2.2"/><path d="M15.5 14c2.6.3 4.5 2.2 4.5 5"/></svg>
         Profissionais
       </a></li>
-      <li class="nav-item"><a href="horarios.html">
+      <li class="nav-item"><a href="/horarios">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
         Horários
       </a></li>
-      <li class="nav-item"><a href="relatorios.html">
+      <li class="nav-item"><a href="/relatorios">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16"/><path d="M6 16l3-4 4 2 5-7"/><circle cx="18" cy="7" r="2"/></svg>
         Relatórios
       </a></li>
@@ -67,17 +68,17 @@
 
     <span class="nav-group-label">Sistema</span>
     <ul class="nav-list">
-      <li class="nav-item active"><a href="assinatura.html">
+      <li class="nav-item active"><a href="/assinatura">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
         Assinatura
       </a></li>
       
-      <li class="nav-item"><a href="suporte.html">
+      <li class="nav-item"><a href="/suporte">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
         Suporte
       </a></li>
       
-      <li class="nav-item"><a href="configuracoes.html">
+      <li class="nav-item"><a href="/configuracoes">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>
         Configurações
       </a></li>
@@ -99,7 +100,7 @@
   </aside>
 
   <main class="main">
-    <a href="index.html" class="btn-back">
+    <a href="/painel" class="btn-back">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Início
     </a>
@@ -216,3 +217,4 @@
 <script src="js/assinatura.js"></script>
 </body>
 </html>
+

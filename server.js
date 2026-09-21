@@ -766,7 +766,19 @@ function servirEstatico(req, res, url) {
     '/login': '/admin/login.html',
     '/privacidade': '/public/privacidade.html',
     '/termos': '/public/termos.html',
-    '/lgpd': '/public/lgpd.html'
+    '/lgpd': '/public/lgpd.html',
+    '/painel': '/admin/index.html',
+    '/agendamentos': '/admin/agendamentos.html',
+    '/clientes': '/admin/clientes.html',
+    '/servicos': '/admin/servicos.html',
+    '/profissionais': '/admin/profissionais.html',
+    '/horarios': '/admin/horarios.html',
+    '/funcionarios': '/admin/funcionarios.html',
+    '/relatorios': '/admin/relatorios.html',
+    '/assinatura': '/admin/assinatura.html',
+    '/configuracoes': '/admin/configuracoes.html',
+    '/suporte': '/admin/suporte.html',
+    '/relatorios-unica': '/admin/relatorios-unica.html'
   };
   if (caminho === '/' || caminho === '/index.html') {
     caminho = '/public/telainicial.html';

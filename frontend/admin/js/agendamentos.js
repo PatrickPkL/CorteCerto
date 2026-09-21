@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* dependente com conta criada por autoatendimento e ainda sem vínculo */
     if (usuario.role === 'dependente' && telaVinculoPendente()) return;
     showToast('Nenhum salão vinculado a esta conta.', 'error');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    setTimeout(() => { window.location.href = '/login'; }, 1200);
     return;
   }
 
@@ -297,3 +297,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   render();
 });
+
