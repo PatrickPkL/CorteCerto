@@ -547,6 +547,7 @@ window.Auth = (function () {
       logo_url: null, cover_url: null,
       tags: ['Corte', 'Barba'],
       ratingBase: 0, ratingCountBase: 0,
+      horarios_configurados: 0,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     };
     db.barbershops.push(loja);

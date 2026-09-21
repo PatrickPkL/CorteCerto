@@ -275,6 +275,8 @@ window.API = (function () {
       const v = clampInt(patch.slot_interval_min, 5, 180, 15);
       shop.slotIntervalMin = v;
       shop.slot_interval_min = v;
+      /* RF-035: definir o intervalo também habilita a agenda para o cliente */
+      shop.horarios_configurados = 1;
     }
     const campos = ['name', 'description', 'phone', 'email', 'whatsapp',
       'instagram', 'address', 'city', 'uf', 'logo_url', 'cover_url', 'tags',
@@ -1615,6 +1617,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const db = DB._d();
     if (!Array.isArray(dias)) err(400, 'Envie a grade de horários.');
 
+    /* RF-035: salvar o expediente habilita agendamento para o cliente */
+    shop.horarios_configurados = 1;
+
     dias.forEach(dia => {
       const dow = Number(dia.day_of_week);
       if (!(dow >= 0 && dow <= 6)) err(400, 'Dia da semana inválido.');
@@ -1662,6 +1667,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       if (patch[c] !== undefined) w[c] = patch[c] || null;
     });
     if (patch.is_open !== undefined) w.is_open = patch.is_open ? 1 : 0;
+    shop.horarios_configurados = 1;
     DB.salvar();
     return w;
   }
@@ -1834,9 +1840,12 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const respostaBase = {
       date: dateISO, duration_min: dur,
       is_open: !!(linhaLoja && linhaLoja.is_open),
+      horarios_configurados: !!shop.horarios_configurados,
       per_professional: [], union: [], available_slots: [], free_ranges: []
     };
     if (!respostaBase.is_open) return respostaBase;
+    /* RF-035: sem horários configurados pelo dono, a agenda fica vazia para o cliente */
+    if (!shop.horarios_configurados) return respostaBase;
 
     const periodosLoja = periodosDeTrabalho(linhaLoja);
 
@@ -2120,6 +2129,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     /* validação de conflito (RF-039.4) — contra profissional OU loja (DT-03) */
     const disponivel = verificarSlot(db, shop.id, profId, date, iniMin, durMin);
     if (!disponivel.ok) {
+      if (disponivel.motivo === 'sem-horarios') {
+        err(409, 'Este salão ainda não definiu os horários de agendamento.');
+      }
       const disp = disponibilidade(shop.id, date, durMin, profId);
       err(409, 'Conflito de horário para este profissional. Horários livres: ' +
         (disp.available_slots.join(', ') || 'nenhum neste dia.'));
@@ -2227,6 +2239,10 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   }
 
   function verificarSlot(db, shopId, profId, dateISO, iniMin, durMin) {
+    const shop = db.barbershops.find(b => b.id == shopId);
+    if (!shop || !shop.horarios_configurados) {
+      return { ok: false, motivo: 'sem-horarios' };
+    }
     const dow = DB.diaSemana(dateISO);
 
     let linha = null;
@@ -2361,6 +2377,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       const okSlot = verificarSlot(db, ag.barbershop_id, ag.professional_id, novaData,
         DB.hhmmToMin(novaHora), dur);
       if (!okSlot.ok) {
+        if (okSlot.motivo === 'sem-horarios') {
+          err(409, 'Este salão ainda não definiu os horários de agendamento.');
+        }
         const disp = disponibilidade(ag.barbershop_id, novaData, dur, ag.professional_id);
         err(409, 'Conflito de horário. Livres: ' + (disp.available_slots.join(', ') || 'nenhum neste dia.'));
       }

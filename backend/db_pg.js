@@ -89,6 +89,7 @@ function lojaPublica(b) {
     logo_url: b.logo_url, cover_url: b.cover_url, tags: b.tags || [],
     rating_base: Number(b.rating_base || 0), rating_count_base: Number(b.rating_count_base || 0),
     slot_interval_min: Number(b.slot_interval_min || 15),
+    horarios_configurados: b.horarios_configurados ? 1 : 0,
     created_at: fmtLocal(b.created_at), updated_at: fmtLocal(b.updated_at)
   };
 }
@@ -289,6 +290,7 @@ async function provisionarSalao(usuario, nomeSalao) {
       whatsapp: '', email: usuario.email || '', instagram: '',
       address: '', city: '', uf: '', lat: null, lng: null, logo_url: null, cover_url: null,
       tags: ['Corte', 'Barba'], rating_base: 0, rating_count_base: 0,
+      horarios_configurados: 0,
       created_at: now, updated_at: now
     });
     // horários padrão: seg–sáb 09–18, dom fechado

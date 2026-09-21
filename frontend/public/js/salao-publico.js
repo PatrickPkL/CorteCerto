@@ -293,7 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!disp.available_slots.length) {
-      slotTimes.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:4px 0;">Nenhum horário livre neste dia.</p>';
+      slotTimes.innerHTML = disp.horarios_configurados === false
+        ? '<p style="color:var(--text-muted);font-size:13px;margin:4px 0;">Esta barbearia ainda não definiu os horários de agendamento. Volte mais tarde.</p>'
+        : '<p style="color:var(--text-muted);font-size:13px;margin:4px 0;">Nenhum horário livre neste dia.</p>';
       return;
     }
 

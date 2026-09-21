@@ -1,17 +1,17 @@
-'use strict';
+﻿'use strict';
 /* ============================================================
-   Corte Certo – seeds/001_demo.js
-   Seed de demonstração: planos e dados demo
-   (6 salões, serviços, profissionais, horários, clientes,
-   agendamentos, avaliações, assinaturas) + usuários demo em
-   desenvolvimento (dono, funcionário e barbeiro vinculados à loja 1).
+   Corte Certo â€“ seeds/001_demo.js
+   Seed de demonstraÃ§Ã£o: planos e dados demo
+   (6 salÃµes, serviÃ§os, profissionais, horÃ¡rios, clientes,
+   agendamentos, avaliaÃ§Ãµes, assinaturas) + usuÃ¡rios demo em
+   desenvolvimento (dono, funcionÃ¡rio e barbeiro vinculados Ã  loja 1).
 
-   Contas reais NUNCA são apagadas pelo seed: na gravação removemos
-   apenas os ids demo fixos (7001/7002/7003). Usuários demo só existem
-   fora de produção (ou com CC_DEMO_USERS=1).
+   Contas reais NUNCA sÃ£o apagadas pelo seed: na gravaÃ§Ã£o removemos
+   apenas os ids demo fixos (7001/7002/7003). UsuÃ¡rios demo sÃ³ existem
+   fora de produÃ§Ã£o (ou com CC_DEMO_USERS=1).
 
-   Usa UUIDs determinísticos para referências cruzadas consistentes.
-   Roda como superuser (knexfile) — imune ao RLS.
+   Usa UUIDs determinÃ­sticos para referÃªncias cruzadas consistentes.
+   Roda como superuser (knexfile) â€” imune ao RLS.
    ============================================================ */
 
 const crypt = require('../../backend/crypt');
@@ -40,13 +40,13 @@ function fmtDataBR(iso) {
 exports.seed = async function (knex) {
   // ---------- plans ----------
 const plans = [
-  { id: uuid(1), name: 'Autonomo', price_monthly: 9.90, price_annual: 118.00, price_per_employee: 0, max_professionals: 1, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
-  { id: uuid(2), name: 'Salao', price_monthly: 19.90, price_annual: 199.99, price_per_employee: 10, max_professionals: 5, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
-  { id: uuid(3), name: 'Salao Pro', price_monthly: 25.99, price_annual: 249.99, price_per_employee: 0, max_professionals: null, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'Relatórios financeiros: diário, semanal e mensal', 'Relatório completo (detalhado por cliente, horários de pico)', 'Exportar CSV', 'Lembretes automáticos por notificação no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
-  { id: uuid(4), name: 'Free', price_monthly: 0, price_annual: 0, price_per_employee: 0, price_compare: 19.90, max_professionals: 1, max_dependents: 1, features: ['Catálogo público no site', 'Perfil próprio para clientes', 'Agendamento pelo site'], permissions: [], active: true, is_free: true, nivel_relatorio: null },
+  { id: uuid(1), name: 'Autonomo', price_monthly: 9.90, price_annual: 118.00, price_per_employee: 0, max_professionals: 1, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'RelatÃ³rios financeiros: diÃ¡rio, semanal e mensal', 'RelatÃ³rio completo (detalhado por cliente, horÃ¡rios de pico)', 'Exportar CSV', 'Lembretes automÃ¡ticos por notificaÃ§Ã£o no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+  { id: uuid(2), name: 'Salao', price_monthly: 19.90, price_annual: 199.99, price_per_employee: 10, max_professionals: 5, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'RelatÃ³rios financeiros: diÃ¡rio, semanal e mensal', 'RelatÃ³rio completo (detalhado por cliente, horÃ¡rios de pico)', 'Exportar CSV', 'Lembretes automÃ¡ticos por notificaÃ§Ã£o no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+  { id: uuid(3), name: 'Salao Pro', price_monthly: 25.99, price_annual: 249.99, price_per_employee: 0, max_professionals: null, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'RelatÃ³rios financeiros: diÃ¡rio, semanal e mensal', 'RelatÃ³rio completo (detalhado por cliente, horÃ¡rios de pico)', 'Exportar CSV', 'Lembretes automÃ¡ticos por notificaÃ§Ã£o no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
+  { id: uuid(4), name: 'Free', price_monthly: 0, price_annual: 0, price_per_employee: 0, price_compare: 19.90, max_professionals: 1, max_dependents: 1, features: ['CatÃ¡logo pÃºblico no site', 'Perfil prÃ³prio para clientes', 'Agendamento pelo site'], permissions: [], active: true, is_free: true, nivel_relatorio: null },
 ];
 
-  // ---------- users (dados sensíveis cifrados) ----------
+  // ---------- users (dados sensÃ­veis cifrados) ----------
   const mkUser = (id, role, name, email, phone, verified, created, extra) => {
     function tele(v) { return String(v || '').replace(/\D/g, ''); }
     return Object.assign({
@@ -56,7 +56,7 @@ const plans = [
       phone: crypt.criptografar(tele(phone)),
       phone_hash: crypt.hashSHA256(tele(phone)),
       verified,
-      prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' },
+      prefs: { notif_email: 'sim', notif_sms: 'nÃ£o', lembrete: '30' },
       consentimentos: [
         { tipo: 'privacidade', data: created, versao: '1.0', origem: 'seed' }
       ],
@@ -74,11 +74,11 @@ const plans = [
   const D = addDiasISO;
   const hoje = hojeISO();
 
-  /* Usuários demo (só fora de produção, ou com CC_DEMO_USERS=1):
-     o dono demo usa o e-mail do GMAIL_USER (Patrick recebe o código por
-     e-mail) ou um link mágico para entrar no painel; o funcionário testa
+  /* UsuÃ¡rios demo (sÃ³ fora de produÃ§Ã£o, ou com CC_DEMO_USERS=1):
+     o dono demo usa o e-mail do GMAIL_USER (Patrick recebe o cÃ³digo por
+     e-mail) ou um link mÃ¡gico para entrar no painel; o funcionÃ¡rio testa
      o RBAC e o barbeiro a aba de agendamentos da equipe.
-     Contas reais nunca são apagadas pelo seed — na gravação removemos
+     Contas reais nunca sÃ£o apagadas pelo seed â€” na gravaÃ§Ã£o removemos
      apenas os ids fixes 7001/7002/7003. */
   const criarDemo = process.env.NODE_ENV !== 'production' || process.env.CC_DEMO_USERS === '1';
   const EMAIL_DONO_DEMO = (process.env.GMAIL_USER || '').trim() || 'dono.demo@cortecerto';
@@ -96,21 +96,21 @@ const plans = [
 
   // ---------- barbershops ----------
   const barbershops = [
-    { id: uuid(1), owner_user_id: criarDemo ? uuid(7001) : null, name: 'Barbearia São Jorge', description: 'Tradição e precisão em cortes clássicos e modernos.', slug: 'barbearia-sao-jorge', codigo_unico: 'SJORGE8BA', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
-    { id: uuid(2), owner_user_id: null, name: 'Studio Nova Era', description: 'Coloração e tratamentos capilares especializados.', slug: 'studio-nova-era', codigo_unico: 'NOVAER6BA', phone: '(71) 3344-1020', whatsapp: '', email: '', instagram: '', address: 'Av. Oceânica, 800', city: 'Salvador', uf: 'BA', lat: -13.0101, lng: -38.4985, logo_url: null, cover_url: null, tags: ['Corte', 'Coloração', 'Hidratação'], rating_base: 4.6, rating_count_base: 98, created_at: D(-300) + 'T10:00', updated_at: D(-20) + 'T10:00' },
-    { id: uuid(3), owner_user_id: null, name: 'Barbearia do Zé', description: 'Barbearia de bairro com atendimento de qualidade.', slug: 'barbearia-do-ze', codigo_unico: 'ZE8BARBS', phone: '(75) 3612-7788', whatsapp: '', email: '', instagram: '', address: 'Rua Barão do Rio Branco, 55', city: 'Feira de Santana', uf: 'BA', lat: -12.2664, lng: -38.9663, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Sobrancelha'], rating_base: 4.9, rating_count_base: 210, created_at: D(-350) + 'T08:00', updated_at: D(-15) + 'T08:00' },
-    { id: uuid(4), owner_user_id: null, name: 'Espaço Bela Vista', description: 'Beleza e bem-estar para todos os estilos.', slug: 'espaco-bela-vista', codigo_unico: 'BELAVI5BA', phone: '(71) 3621-3030', whatsapp: '', email: '', instagram: '', address: 'Praça Desembargador Hugo Gomes, 12', city: 'Camaçari', uf: 'BA', lat: -12.6976, lng: -38.3229, logo_url: null, cover_url: null, tags: ['Coloração', 'Corte'], rating_base: 4.5, rating_count_base: 76, created_at: D(-250) + 'T09:00', updated_at: D(-25) + 'T09:00' },
-    { id: uuid(5), owner_user_id: null, name: 'Barber Class', description: 'Experiência premium em barbearia.', slug: 'barber-class', codigo_unico: 'BCLASS8BA', phone: '(71) 3025-5050', whatsapp: '', email: '', instagram: '', address: 'Rua Chile, 40', city: 'Salvador', uf: 'BA', lat: -12.9277, lng: -38.5098, logo_url: null, cover_url: null, tags: ['Corte + Barba', 'Barba'], rating_base: 4.7, rating_count_base: 88, created_at: D(-200) + 'T10:00', updated_at: D(-18) + 'T10:00' },
-    { id: uuid(6), owner_user_id: null, name: 'Trato Fino Barbearia', description: 'Seu estilo, nosso compromisso.', slug: 'trato-fino-barbearia', codigo_unico: 'TRATOF9BA', phone: '(71) 3411-9090', whatsapp: '', email: '', instagram: '', address: 'Av. Tancredo Neves, 1283', city: 'Salvador', uf: 'BA', lat: -12.9787, lng: -38.4586, logo_url: null, cover_url: null, tags: ['Corte', 'Barba'], rating_base: 4.4, rating_count_base: 54, created_at: D(-150) + 'T09:00', updated_at: D(-12) + 'T09:00' }
+    { id: uuid(1), owner_user_id: criarDemo ? uuid(7001) : null, name: 'Barbearia SÃ£o Jorge', description: 'TradiÃ§Ã£o e precisÃ£o em cortes clÃ¡ssicos e modernos.', slug: 'barbearia-sao-jorge', codigo_unico: 'SJORGE8BA', phone: '(71) 3212-4455', whatsapp: '7132124455', email: 'contato@saolojorge.com', instagram: '@saolojorge.barber', address: 'Rua das Flores, 120', city: 'Salvador', uf: 'BA', lat: -12.9714, lng: -38.5014, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Corte + Barba'], rating_base: 4.8, rating_count_base: 132, horarios_configurados: 1, created_at: D(-400) + 'T09:00', updated_at: D(-10) + 'T09:00' },
+    { id: uuid(2), owner_user_id: null, name: 'Studio Nova Era', description: 'ColoraÃ§Ã£o e tratamentos capilares especializados.', slug: 'studio-nova-era', codigo_unico: 'NOVAER6BA', phone: '(71) 3344-1020', whatsapp: '', email: '', instagram: '', address: 'Av. OceÃ¢nica, 800', city: 'Salvador', uf: 'BA', lat: -13.0101, lng: -38.4985, logo_url: null, cover_url: null, tags: ['Corte', 'ColoraÃ§Ã£o', 'HidrataÃ§Ã£o'], rating_base: 4.6, rating_count_base: 98, horarios_configurados: 1, created_at: D(-300) + 'T10:00', updated_at: D(-20) + 'T10:00' },
+    { id: uuid(3), owner_user_id: null, name: 'Barbearia do ZÃ©', description: 'Barbearia de bairro com atendimento de qualidade.', slug: 'barbearia-do-ze', codigo_unico: 'ZE8BARBS', phone: '(75) 3612-7788', whatsapp: '', email: '', instagram: '', address: 'Rua BarÃ£o do Rio Branco, 55', city: 'Feira de Santana', uf: 'BA', lat: -12.2664, lng: -38.9663, logo_url: null, cover_url: null, tags: ['Corte', 'Barba', 'Sobrancelha'], rating_base: 4.9, rating_count_base: 210, horarios_configurados: 1, created_at: D(-350) + 'T08:00', updated_at: D(-15) + 'T08:00' },
+    { id: uuid(4), owner_user_id: null, name: 'EspaÃ§o Bela Vista', description: 'Beleza e bem-estar para todos os estilos.', slug: 'espaco-bela-vista', codigo_unico: 'BELAVI5BA', phone: '(71) 3621-3030', whatsapp: '', email: '', instagram: '', address: 'PraÃ§a Desembargador Hugo Gomes, 12', city: 'CamaÃ§ari', uf: 'BA', lat: -12.6976, lng: -38.3229, logo_url: null, cover_url: null, tags: ['ColoraÃ§Ã£o', 'Corte'], rating_base: 4.5, rating_count_base: 76, horarios_configurados: 1, created_at: D(-250) + 'T09:00', updated_at: D(-25) + 'T09:00' },
+    { id: uuid(5), owner_user_id: null, name: 'Barber Class', description: 'ExperiÃªncia premium em barbearia.', slug: 'barber-class', codigo_unico: 'BCLASS8BA', phone: '(71) 3025-5050', whatsapp: '', email: '', instagram: '', address: 'Rua Chile, 40', city: 'Salvador', uf: 'BA', lat: -12.9277, lng: -38.5098, logo_url: null, cover_url: null, tags: ['Corte + Barba', 'Barba'], rating_base: 4.7, rating_count_base: 88, horarios_configurados: 1, created_at: D(-200) + 'T10:00', updated_at: D(-18) + 'T10:00' },
+    { id: uuid(6), owner_user_id: null, name: 'Trato Fino Barbearia', description: 'Seu estilo, nosso compromisso.', slug: 'trato-fino-barbearia', codigo_unico: 'TRATOF9BA', phone: '(71) 3411-9090', whatsapp: '', email: '', instagram: '', address: 'Av. Tancredo Neves, 1283', city: 'Salvador', uf: 'BA', lat: -12.9787, lng: -38.4586, logo_url: null, cover_url: null, tags: ['Corte', 'Barba'], rating_base: 4.4, rating_count_base: 54, horarios_configurados: 1, created_at: D(-150) + 'T09:00', updated_at: D(-12) + 'T09:00' }
   ];
 
   // ---------- services ----------
   const svcDefs = [
     [1, 'Corte', 30, 45, 1], [1, 'Barba', 20, 30, 2], [1, 'Corte + Barba', 45, 65, 3],
-    [1, 'Pezinho', 15, 20, 4], [1, 'Coloração', 60, 90, 5],
-    [2, 'Corte Feminino', 45, 70, 1], [2, 'Coloração', 60, 120, 2], [2, 'Hidratação', 40, 80, 3],
+    [1, 'Pezinho', 15, 20, 4], [1, 'ColoraÃ§Ã£o', 60, 90, 5],
+    [2, 'Corte Feminino', 45, 70, 1], [2, 'ColoraÃ§Ã£o', 60, 120, 2], [2, 'HidrataÃ§Ã£o', 40, 80, 3],
     [3, 'Corte', 30, 35, 1], [3, 'Barba', 20, 25, 2], [3, 'Sobrancelha', 15, 15, 3],
-    [4, 'Coloração', 90, 130, 1], [4, 'Corte', 45, 60, 2],
+    [4, 'ColoraÃ§Ã£o', 90, 130, 1], [4, 'Corte', 45, 60, 2],
     [5, 'Corte + Barba', 50, 75, 1], [5, 'Barba', 25, 35, 2],
     [6, 'Corte', 30, 40, 1], [6, 'Barba', 20, 28, 2]
   ];
@@ -122,7 +122,7 @@ const plans = [
     description: '',
     duration_min: s[2],
     price: s[3],
-    active: !(s[0] === 1 && s[1] === 'Coloração'),
+    active: !(s[0] === 1 && s[1] === 'ColoraÃ§Ã£o'),
     sort_order: s[4],
     created_at: D(-100) + 'T09:00'
   }));
@@ -133,11 +133,11 @@ const plans = [
 
   // ---------- professionals ----------
   const profDefs = [
-    [1, 11, 'Marcos Silva', '#b8863b', 'Barbeiro · dono', '7132124455', null],
+    [1, 11, 'Marcos Silva', '#b8863b', 'Barbeiro Â· dono', '7132124455', null],
     [1, 12, 'Bianca Rocha', '#4c7a5e', 'Colorista', '', null],
     [1, 13, 'Tiago Andrade', '#a1433c', 'Barbeiro', '', null],
     [2, 21, 'Carla Mendes', '#3b82f6', 'Hair stylist', '', null],
-    [3, 31, 'Zé Carlos', '#b8863b', 'Barbeiro · dono', '', null],
+    [3, 31, 'ZÃ© Carlos', '#b8863b', 'Barbeiro Â· dono', '', null],
     [4, 41, 'Rita Vieira', '#4c7a5e', 'Colorista', '', null],
     [5, 51, 'Duda Prado', '#3b82f6', 'Barbeira', '', null],
     [6, 61, 'Nando Lima', '#b8863b', 'Barbeiro', '', null]
@@ -154,10 +154,10 @@ const plans = [
   // ---------- professional_services ----------
   const profServices = [
     [11, 1, 'Corte', null], [11, 1, 'Barba', null], [11, 1, 'Corte + Barba', 60],
-    [12, 1, 'Coloração', null], [13, 1, 'Corte', 40], [13, 1, 'Barba', null],
-    [21, 2, 'Corte Feminino', null], [21, 2, 'Hidratação', null],
+    [12, 1, 'ColoraÃ§Ã£o', null], [13, 1, 'Corte', 40], [13, 1, 'Barba', null],
+    [21, 2, 'Corte Feminino', null], [21, 2, 'HidrataÃ§Ã£o', null],
     [31, 3, 'Corte', null], [31, 3, 'Barba', null],
-    [41, 4, 'Coloração', null],
+    [41, 4, 'ColoraÃ§Ã£o', null],
     [51, 5, 'Corte + Barba', null],
     [61, 6, 'Corte', null], [61, 6, 'Barba', null]
   ];
@@ -221,23 +221,23 @@ const plans = [
 
   // ---------- clients ----------
   const clients = [
-    { id: uuid(201), barbershop_id: uuid(1), name: 'João Silva', phone: '71991234455', email: 'joao@email.com', notes: 'Prefere degradê baixo.', total_visits: 3, total_spent: 175, last_visit_at: D(-21) + 'T11:30', user_id: null, created_at: D(-180) + 'T10:00' },
-    { id: uuid(202), barbershop_id: uuid(1), name: 'João Pedro', phone: '71998881122', email: '', notes: '', total_visits: 1, total_spent: 65, last_visit_at: D(-40) + 'T09:30', user_id: null, created_at: D(-40) + 'T09:00' },
-    { id: uuid(203), barbershop_id: uuid(1), name: 'Ana Souza', phone: '71988772211', email: '', notes: 'Alergia a amônia.', total_visits: 1, total_spent: 90, last_visit_at: D(-60) + 'T15:00', user_id: null, created_at: D(-60) + 'T14:00' },
+    { id: uuid(201), barbershop_id: uuid(1), name: 'JoÃ£o Silva', phone: '71991234455', email: 'joao@email.com', notes: 'Prefere degradÃª baixo.', total_visits: 3, total_spent: 175, last_visit_at: D(-21) + 'T11:30', user_id: null, created_at: D(-180) + 'T10:00' },
+    { id: uuid(202), barbershop_id: uuid(1), name: 'JoÃ£o Pedro', phone: '71998881122', email: '', notes: '', total_visits: 1, total_spent: 65, last_visit_at: D(-40) + 'T09:30', user_id: null, created_at: D(-40) + 'T09:00' },
+    { id: uuid(203), barbershop_id: uuid(1), name: 'Ana Souza', phone: '71988772211', email: '', notes: 'Alergia a amÃ´nia.', total_visits: 1, total_spent: 90, last_visit_at: D(-60) + 'T15:00', user_id: null, created_at: D(-60) + 'T14:00' },
     { id: uuid(204), barbershop_id: uuid(1), name: 'Carlos Dias', phone: '71996540099', email: '', notes: '', total_visits: 2, total_spent: 60, last_visit_at: D(-30) + 'T14:20', user_id: null, created_at: D(-70) + 'T10:00' },
     { id: uuid(205), barbershop_id: uuid(1), name: 'Pedro Alves', phone: '71985554433', email: '', notes: '', total_visits: 1, total_spent: 30, last_visit_at: D(-45) + 'T13:50', user_id: null, created_at: D(-45) + 'T13:00' },
     { id: uuid(206), barbershop_id: uuid(1), name: 'Rafael Lima', phone: '71997775566', email: '', notes: '', total_visits: 1, total_spent: 45, last_visit_at: D(-35) + 'T10:45', user_id: null, created_at: D(-35) + 'T10:00' },
-    { id: uuid(207), barbershop_id: uuid(1), name: 'Otávio Reis', phone: '71993217788', email: '', notes: '', total_visits: 0, total_spent: 0, last_visit_at: null, user_id: null, created_at: D(-5) + 'T11:00' }
+    { id: uuid(207), barbershop_id: uuid(1), name: 'OtÃ¡vio Reis', phone: '71993217788', email: '', notes: '', total_visits: 0, total_spent: 0, last_visit_at: null, user_id: null, created_at: D(-5) + 'T11:00' }
   ];
 
   // ---------- reviews ----------
   const reviews = [
-    { id: uuid(301), barbershop_id: uuid(1), user_id: null, rating: 5, comment: 'Melhor barbearia da região, atendimento impecável!', created_at: D(-20) + 'T18:00' },
-    { id: uuid(302), barbershop_id: uuid(1), user_id: null, rating: 4, comment: 'Ótimo corte, só demorou um pouco.', created_at: D(-40) + 'T12:00' },
+    { id: uuid(301), barbershop_id: uuid(1), user_id: null, rating: 5, comment: 'Melhor barbearia da regiÃ£o, atendimento impecÃ¡vel!', created_at: D(-20) + 'T18:00' },
+    { id: uuid(302), barbershop_id: uuid(1), user_id: null, rating: 4, comment: 'Ã“timo corte, sÃ³ demorou um pouco.', created_at: D(-40) + 'T12:00' },
     { id: uuid(303), barbershop_id: uuid(1), user_id: null, rating: 5, comment: '', created_at: D(-29) + 'T16:00' },
-    { id: uuid(304), barbershop_id: uuid(2), user_id: null, rating: 5, comment: 'Amei a coloração!', created_at: D(-30) + 'T17:00' },
+    { id: uuid(304), barbershop_id: uuid(2), user_id: null, rating: 5, comment: 'Amei a coloraÃ§Ã£o!', created_at: D(-30) + 'T17:00' },
     { id: uuid(305), barbershop_id: uuid(2), user_id: null, rating: 4, comment: '', created_at: D(-50) + 'T11:00' },
-    { id: uuid(306), barbershop_id: uuid(3), user_id: null, rating: 5, comment: 'Zé é o melhor barbeiro de Feira.', created_at: D(-25) + 'T10:00' },
+    { id: uuid(306), barbershop_id: uuid(3), user_id: null, rating: 5, comment: 'ZÃ© Ã© o melhor barbeiro de Feira.', created_at: D(-25) + 'T10:00' },
     { id: uuid(307), barbershop_id: uuid(3), user_id: null, rating: 5, comment: '', created_at: D(-48) + 'T15:00' },
     { id: uuid(308), barbershop_id: uuid(4), user_id: null, rating: 4, comment: 'Bom atendimento.', created_at: D(-35) + 'T14:00' },
     { id: uuid(309), barbershop_id: uuid(5), user_id: null, rating: 5, comment: 'Ambiente premium, vale cada centavo.', created_at: D(-22) + 'T19:00' },
@@ -302,7 +302,7 @@ const plans = [
   }
 
   ag({ shop: 1, clienteId: 202, prof: 11, services: ['Corte + Barba'], data: hoje, hora: '09:00', status: 'confirmado', criadoEm: D(-3), origin: 'admin' });
-  ag({ shop: 1, clienteId: 203, prof: 12, services: ['Coloração'], data: hoje, hora: '11:15', status: 'pendente' });
+  ag({ shop: 1, clienteId: 203, prof: 12, services: ['ColoraÃ§Ã£o'], data: hoje, hora: '11:15', status: 'pendente' });
   ag({ shop: 1, clienteId: 204, prof: 11, services: ['Barba'], data: hoje, hora: '14:00', status: 'confirmado', origin: 'admin' });
   ag({ shop: 1, clienteId: 207, prof: 12, services: ['Corte'], data: hoje, hora: '15:40', status: 'cancelado', motivo: 'Cliente desistiu' });
   ag({ shop: 1, clienteId: 201, prof: 11, services: ['Corte + Barba'], data: D(2), hora: '10:30', status: 'confirmado', criadoEm: D(-1) });
@@ -311,14 +311,14 @@ const plans = [
   ag({ shop: 1, clienteId: 201, prof: 11, services: ['Corte + Barba'], data: D(-7), hora: '09:00', status: 'concluido' });
   ag({ shop: 1, clienteId: 205, prof: 13, services: ['Barba'], data: D(-10), hora: '13:30', status: 'concluido' });
   ag({ shop: 1, clienteId: 204, prof: 11, services: ['Barba'], data: D(-30), hora: '14:20', status: 'concluido' });
-  ag({ shop: 1, clienteId: 203, prof: 12, services: ['Coloração'], data: D(-60), hora: '15:00', status: 'concluido' });
+  ag({ shop: 1, clienteId: 203, prof: 12, services: ['ColoraÃ§Ã£o'], data: D(-60), hora: '15:00', status: 'concluido' });
   ag({ shop: 1, clienteId: 202, prof: 11, services: ['Corte'], data: D(-35), hora: '11:00', status: 'concluido' });
   ag({ shop: 1, clienteId: 202, prof: 11, services: ['Corte + Barba'], data: D(-21), hora: '10:30', status: 'concluido' });
 
   // ---------- notifications ----------
   const notifications = [
-    { id: uuid(501), barbershop_id: uuid(1), user_id: null, type: 'new_appointment', title: 'Novo agendamento', message: 'Ana Souza solicitou Coloração para ' + fmtDataBR(hoje) + ' às 11:15.', read: false, created_at: agoraISO() },
-    { id: uuid(502), barbershop_id: null, user_id: null, type: 'appointment_status', title: 'Agendamento confirmado', message: 'Seu agendamento na Barbearia São Jorge foi confirmado.', read: false, created_at: agoraISO() }
+    { id: uuid(501), barbershop_id: uuid(1), user_id: null, type: 'new_appointment', title: 'Novo agendamento', message: 'Ana Souza solicitou ColoraÃ§Ã£o para ' + fmtDataBR(hoje) + ' Ã s 11:15.', read: false, created_at: agoraISO() },
+    { id: uuid(502), barbershop_id: null, user_id: null, type: 'appointment_status', title: 'Agendamento confirmado', message: 'Seu agendamento na Barbearia SÃ£o Jorge foi confirmado.', read: false, created_at: agoraISO() }
   ];
 
   // ---------- grava tudo ----------
@@ -339,8 +339,8 @@ const plans = [
   await knex('professionals').del();
   await knex('services').del();
   await knex('barbershops').del();
-  /* Contas reais são preservadas: removemos apenas as demo (ids fixos) e
-     as sessões/códigos/links desses usuários demo. */
+  /* Contas reais sÃ£o preservadas: removemos apenas as demo (ids fixos) e
+     as sessÃµes/cÃ³digos/links desses usuÃ¡rios demo. */
   const DEMO_IDS = [uuid(7001), uuid(7002), uuid(7003)];
   await knex('sessions').whereIn('user_id', DEMO_IDS).del();
   await knex('magic_tokens').whereIn('user_id', DEMO_IDS).del();
@@ -348,7 +348,7 @@ const plans = [
 
   if (users.length) await knex('users').insert(users);
   await knex('barbershops').insert(barbershops);
-  /* vínculo do dependente demo à loja 1 (FK circular: users.barbershop_id
+  /* vÃ­nculo do dependente demo Ã  loja 1 (FK circular: users.barbershop_id
      aponta para barbershops e barbershops.owner_user_id para users) */
   if (criarDemo) {
     await knex('users').where('id', uuid(7002)).update({ barbershop_id: uuid(1) });

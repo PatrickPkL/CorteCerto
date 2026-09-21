@@ -121,6 +121,7 @@ const MAP = [
       tags: knexArr(b.tags || []),
       rating_base: (b.ratingBase || 0), rating_count_base: (b.ratingCountBase || 0),
       slot_interval_min: (b.slotIntervalMin || 15),
+      horarios_configurados: b.horarios_configurados ? 1 : 0,
       codigo_unico: b.codigo_unico || null,
       created_at: toPgDate(b.created_at) || new Date(), updated_at: toPgDate(b.updated_at) || new Date()
     }),
@@ -132,6 +133,7 @@ const MAP = [
       logo_url: r.logo_url, cover_url: r.cover_url, tags: r.tags || [],
       ratingBase: Number(r.rating_base || 0), ratingCountBase: Number(r.rating_count_base || 0),
       slotIntervalMin: Number(r.slot_interval_min || 15),
+      horarios_configurados: r.horarios_configurados ? 1 : 0,
       codigo_unico: r.codigo_unico || null,
       created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
     })
