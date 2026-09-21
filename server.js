@@ -759,8 +759,19 @@ function handleWebhookAbacate(req, res, url) {
 
 function servirEstatico(req, res, url) {
   let caminho = decodeURIComponent(url.pathname);
+  const MAPA_LIMPO = {
+    '/catalogo': '/public/catalogo.html',
+    '/salao': '/public/salao-publico.html',
+    '/perfil': '/public/perfil.html',
+    '/login': '/admin/login.html',
+    '/privacidade': '/public/privacidade.html',
+    '/termos': '/public/termos.html',
+    '/lgpd': '/public/lgpd.html'
+  };
   if (caminho === '/' || caminho === '/index.html') {
     caminho = '/public/telainicial.html';
+  } else if (MAPA_LIMPO[caminho]) {
+    caminho = MAPA_LIMPO[caminho];
   } else if (caminho.startsWith('/') && caminho.endsWith('.html')) {
     const naRaiz = path.join(RAIZ, caminho);
     const noPublic = path.join(RAIZ, 'public' + caminho);

@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let loja;
   try { loja = API.getLoja(lojaId); }
-  catch (e) { window.location.href = '/catalogo.html'; return; }
+  catch (e) { window.location.href = '/catalogo'; return; }
 
   const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -218,8 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
       texto: 'Faça login para agendar seu horário.',
       tipo: 'error'
     }));
-    const volta = '/salao-publico.html?id=' + encodeURIComponent(loja.id);
-    window.location.href = '/admin/login.html?next=' + encodeURIComponent(volta);
+    const volta = '/salao?id=' + encodeURIComponent(loja.id);
+    window.location.href = '/login?next=' + encodeURIComponent(volta);
     return false;
   }
 
@@ -575,8 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
       texto: 'Faça login para denunciar um perfil.',
       tipo: 'error'
     }));
-    const volta = '/salao-publico.html?id=' + encodeURIComponent(loja.id);
-    window.location.href = '/admin/login.html?next=' + encodeURIComponent(volta);
+    const volta = '/salao?id=' + encodeURIComponent(loja.id);
+    window.location.href = '/login?next=' + encodeURIComponent(volta);
     return false;
   }
 
