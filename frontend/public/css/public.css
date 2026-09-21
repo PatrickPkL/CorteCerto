@@ -484,14 +484,14 @@
   box-shadow: var(--shadow-lg);
   padding: 16px 18px;
   z-index: 1000;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 14px;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.3s ease, transform 0.3s ease;
-  pointer-events: auto;
+  pointer-events: none;
 }
-.consent-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.consent-banner.show { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 .consent-banner-texto { font-size: 13.5px; line-height: 1.5; margin: 0; color: rgba(237,231,218,0.85); }
 .consent-banner-texto a { color: var(--brass); }
 .consent-banner-acoes { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
