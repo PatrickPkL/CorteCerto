@@ -581,6 +581,15 @@ function montarShellAdmin() {
       setTimeout(() => { window.location.href = '/login'; }, 600);
     });
   }
+
+  /* Acesso da conta para barbeiro/dependente: o botão de exclusão fica no
+     perfil público (/perfil) — o painel não expõe zona de risco para eles. */
+  const chip = document.querySelector('.user-chip');
+  if (chip && (u.role === 'barbeiro' || u.role === 'dependente') && !chip.dataset.ccBound) {
+    chip.dataset.ccBound = '1';
+    chip.style.cursor = 'pointer';
+    chip.addEventListener('click', () => { window.location.href = '/perfil'; });
+  }
 }
 
 /* RBAC do ajudante e do dependente: mantém na sidebar apenas

@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  const usuario = exigirLogin(['cliente', 'dependente']);
+  const usuario = exigirLogin(['cliente', 'dependente', 'barbeiro']);
   if (!usuario) return;
 
   /* sincroniza com o servidor antes de renderizar: o cache do navegador

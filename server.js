@@ -136,7 +136,20 @@ function mascararEmail(e) {
 /* ---------------- rate-limit ---------------- */
 const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
-const RATE_MAX = 60;
+const RATE_MAX = 300;
+
+/* Atrás do proxy (Render) o remoteAddress é o IP do proxy, compartilhado
+   por todos os clientes — o teto viraria global e estouraria com o polling
+   do painel. Resolve o IP real do cliente via X-Forwarded-For (primeiro
+   hop) quando presente. */
+function ipDoRequest(req) {
+  const fwd = req.headers && req.headers['x-forwarded-for'];
+  if (fwd) {
+    const primeiro = String(fwd).split(',')[0].trim();
+    if (primeiro) return primeiro;
+  }
+  return req.socket.remoteAddress || '0.0.0.0';
+}
 
 /* Limpa os rate/burte-force maps periodicamente: registros fora da janela
    não voltam mais a ser consultados (_rateMap acumulava um IP por cliente
@@ -271,7 +284,7 @@ function sanitizarParams(v, profundidade) {
 
 function handleRpc(req, res) {
   /* rate-limit por IP */
-  const ip = req.socket.remoteAddress || '0.0.0.0';
+  const ip = ipDoRequest(req);
   const now = Date.now();
   const rec = _rateMap.get(ip);
   if (rec && now < rec.reset) {
@@ -359,7 +372,7 @@ function handleRpc(req, res) {
 
     global.__CC_REQUEST_TOKEN = req.headers['x-cc-token'] || null;
     global.__CC_HTTP = true;
-    const ip = req.socket.remoteAddress || '0.0.0.0';
+    const ip = ipDoRequest(req);
     const ts = new Date().toISOString();
     // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
 
