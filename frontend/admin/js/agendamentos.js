@@ -24,6 +24,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const filtroStatus = document.getElementById('filtro-status');
   const filtroData = document.getElementById('filtro-data');
 
+  /* ---------- link de agendamento (dono, barbeiro e dependente) ---------- */
+  (function montarLinkAgendamento() {
+    const btn = document.getElementById('btn-compartilhar-link');
+    if (!btn) return;
+    const url = location.origin + '/salao?id=' + encodeURIComponent(loja.id);
+
+    let liberado = true;
+    try { liberado = !!API.acessoLiberado(loja.id); } catch (e) { liberado = true; }
+    const irAssinar = () => {
+      sessionStorage.setItem('cc_assinatura_aviso',
+        'Assine um plano para usar o link de agendamento e as demais funções.');
+      window.location.href = '/assinatura';
+    };
+    const copiar = (ok) => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(ok).catch(() => {
+          const tmp = document.createElement('input');
+          tmp.value = url;
+          document.body.appendChild(tmp);
+          tmp.select(); document.execCommand('copy'); tmp.remove(); ok();
+        });
+      } else {
+        const tmp = document.createElement('input');
+        tmp.value = url;
+        document.body.appendChild(tmp);
+        tmp.select(); document.execCommand('copy'); tmp.remove(); ok();
+      }
+    };
+
+    btn.addEventListener('click', () => {
+      if (!liberado) return irAssinar();
+      const texto = 'Agende seu horário na ' + (loja.name || 'nossa barbearia') + ': ';
+      if (navigator.share) {
+        navigator.share({ title: loja.name || 'Corte Certo', text: texto, url: url })
+          .catch(() => { /* usuário cancelou */ });
+        return;
+      }
+      copiar(() => showToast('Link de agendamento copiado!'));
+    });
+  })();
+
   let pagina = 1;
   const POR_PAGINA = 50;
   let totalItens = 0;
