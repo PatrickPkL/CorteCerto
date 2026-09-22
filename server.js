@@ -176,6 +176,7 @@ const _authRequired = new Set([
   'ativarTrial', 'assinarComTrial',
   'criarCobrancaPlano', 'statusCobranca', 'listarMinhasCobrancas',
   'confirmarCobrancaDemo', 'simularCobranca',
+  'estornarArrependimento',
   'criarReview', 'minhasReviews',
   'denunciarPerfil', 'minhasDenuncias',
   'bloquearCliente', 'desbloquearCliente', 'clienteBloqueado',

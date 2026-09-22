@@ -442,6 +442,7 @@ function fecharPagamento() {
   /* ---------- histórico real de cobranças ---------- */
   function badgeDe(status) {
     if (status === 'paid') return ['badge-confirmado', 'Pago'];
+    if (status === 'refunded') return ['badge-cancelado', 'Estornado'];
     if (status === 'pending') return ['badge-pendente', 'Aguardando'];
     if (status === 'expired') return ['badge-cancelado', 'Expirado'];
     return ['badge-cancelado', 'Cancelada'];
@@ -461,20 +462,55 @@ function fecharPagamento() {
         '<td class="mono">R$ 0,00</td><td><span class="badge badge-pendente">Trial</span></td></tr>');
     }
     cobrancas.forEach(c => {
-      const [bCls, bTxt] = badgeDe(c.status);
+      const estornada = !!(c.refunded_at || c.status === 'refunded');
+      const [bCls, bTxt] = estornada ? ['badge-cancelado', 'Estornado'] : badgeDe(c.status);
       const anual = c.billing_period === 365;
       let desc = 'Plano ' + esc(c.plan_name) + (anual ? ' — anual' : ' — mensalidade');
       if (anual && c.installments > 1) desc += ' em ' + c.installments + '×';
       if (c.provider === 'demo') desc += ' <small>(teste)</small>';
+
+      let acao = '';
+      if (c.status === 'paid' && !estornada && dentroDaJanelaArrependimento(c.paid_at)) {
+        acao = '<button type="button" class="btn btn-outline btn-estornar" data-id="' + c.id + '" ' +
+          'title="Direito de arrependimento (CDC art. 49): desistir em até 7 dias e receber o valor de volta" ' +
+          'style="margin-top:8px; font-size:12px; padding:4px 10px;">Solicitar reembolso</button>';
+      }
+
       linhas.push(
         '<tr><td class="mono">' + DB.fmtDataBR(String(c.created_at).slice(0, 10)) + '</td>' +
         '<td>' + desc + '</td>' +
         '<td class="mono">' + DB.fmtBRL(c.amount_cents / 100) + '</td>' +
-        '<td><span class="badge ' + bCls + '">' + bTxt + '</span></td></tr>');
+        '<td><span class="badge ' + bCls + '">' + bTxt + '</span>' + acao + '</td></tr>');
     });
 
     tb.innerHTML = linhas.join('') ||
       '<tr><td colspan="4" style="color:var(--text-muted)">Sem cobranças registradas.</td></tr>';
+
+    tb.querySelectorAll('.btn-estornar').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        if (!confirm(
+          'Solicitar reembolso integral (direito de arrependimento — CDC art. 49)?\n\n' +
+          'Você vai desistir desta compra e receber de volta o valor pago integralmente. ' +
+          'O acesso ao plano será encerrado e os dias pagos removidos da assinatura.'
+        )) return;
+        try {
+          const r = API.estornarArrependimento(id);
+          if (r && r.refunded_at) showToast('Reembolso solicitado com sucesso. Valor devolvido integralmente.', 'success');
+          else showToast('Reembolso processado.', 'success');
+          render();
+        } catch (e2) {
+          showToast(msgErro(e2), 'error');
+        }
+      });
+    });
+  }
+
+  function dentroDaJanelaArrependimento(paidAt) {
+    if (!paidAt) return false;
+    const paidMs = Date.parse(paidAt);
+    if (isNaN(paidMs)) return false;
+    return Date.now() - paidMs <= 7 * 24 * 60 * 60 * 1000;
   }
 
   /* ---------- cancelar assinatura ---------- */

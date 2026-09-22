@@ -66,6 +66,9 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       qr_base64: pag.qr_base64 || '',
       abacate_id: pag.abacate_id || null,
       dev_mode: pag.dev_mode === true,
+      refunded_at: pag.refunded_at || null,
+      refund_reason: pag.refund_reason || null,
+      refund_id: pag.refund_id || null,
       created_at: pag.created_at,
       expires_at: pag.expires_at,
       paid_at: pag.paid_at || null
@@ -318,6 +321,123 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     return pagamentoPublico(pag);
   }
 
+  /**
+   * Estorno integral na AbacatePay (cobrança transparente).
+   * Só devolve sucesso quando a AbacatePay confirma o reembolso
+   * (refundPublicId). Lança erro -> 502 quando recusado.
+   */
+  async function estornarNaAbacate(pag) {
+    const resp = await fetch(URL_API + '/transparents/refund', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + chaveApi(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        id: pag.abacate_id,
+        reason: 'Arrependimento de compra online (CDC art. 49 — 7 dias).'
+      })
+    });
+    let corpo = null;
+    try { corpo = await resp.json(); } catch (e) { /* resposta não-JSON */ }
+    if (!resp.ok || !corpo || corpo.success !== true || !corpo.data) {
+      const motivo = (corpo && (corpo.error || (corpo.data && (corpo.data.error || '')))) ||
+        ('HTTP ' + resp.status);
+      throw {
+        status: 502, code: 'estorno_recusado',
+        error: 'A AbacatePay recusou o estorno (' + motivo + '). Nenhuma cobrança foi alterada.'
+      };
+    }
+    return (corpo.data && (corpo.data.refundPublicId || corpo.data.id)) || null;
+  }
+
+  /**
+   * Direito de arrependimento — CDC art. 49.
+   * Desistência em até 7 dias corridos da contratação/pagamento,
+   * com devolução integral dos valores pagos.
+   *
+   * [SEGURANÇA] Validações server-side (nunca confia no cliente):
+   * • só o DONO do salão da cobrança (barbershop_id batido);
+   * • só cobranças 'paid' (dinheiro de fato recebido);
+   * • janela de 7 dias contada a partir de paid_at;
+   * • estorno idempotente (refunded_at) — nunca estorna 2×;
+   * • cobrança real (abacatepay) só vira "estornada" se a AbacatePay
+   *   confirmar o reembolso (estornarNaAbacate); caso contrário,
+   *   lança erro e nada é alterado;
+   * • ao estornar, recalcula o período pago da assinatura para
+   *   revogar os dias devolvidos (recalcularPeriodoAposEstorno).
+   */
+  async function estornarArrependimento(paymentId) {
+    const { shop } = exigirDonoLocal();
+    const pag = DB._d().payments.find(p => p.id == paymentId && p.barbershop_id === shop.id);
+    if (!pag) throw { status: 404, error: 'Cobrança não encontrada.' };
+    if (pag.status !== 'paid') throw { status: 409, code: 'nao_paga', error: 'Só é possível estornar cobranças já pagas.' };
+    if (pag.refunded_at) throw { status: 409, code: 'ja_estornada', error: 'Esta cobrança já foi estornada.' };
+
+    const paidMs = Date.parse(pag.paid_at || '');
+    if (isNaN(paidMs)) throw { status: 409, code: 'sem_paid_at', error: 'Cobrança sem data de pagamento registrada.' };
+    const DIAS_CDC = 7;
+    const limiteMs = Date.now() - DIAS_CDC * 24 * 60 * 60 * 1000;
+    if (paidMs < limiteMs) {
+      throw {
+        status: 409, code: 'fora_da_janela',
+        error: 'O direito de arrependimento vale por 7 dias após o pagamento (CDC art. 49). ' +
+          'Fora desse prazo, use "Cancelar assinatura" (acesso até o fim do período já pago).'
+      };
+    }
+
+    let refund_id = null;
+    if (pag.provider === 'abacatepay') {
+      if (!pag.abacate_id) throw { status: 409, code: 'sem_abacate_id', error: 'Cobrança sem referência na AbacatePay — entre em contato.' };
+      refund_id = await estornarNaAbacate(pag);
+    }
+
+    pag.refunded_at = agoraMsISO();
+    pag.refund_reason = 'arrependimento_cdc49';
+    pag.refund_id = refund_id;
+    DB.salvar();
+
+    /* Revoga os dias que o pagamento devolvido tinha concedido. */
+    recalcularPeriodoAposEstorno(shop.id);
+
+    return pagamentoPublico(pag);
+  }
+
+  /**
+   * Recalcula o período pago da assinatura somando periods NÃO
+   * estornados (determinístico — mesmo resultado em qualquer ordem
+   * de estornos). Sem cobrança paga restante, encerra o acesso.
+   */
+  function recalcularPeriodoAposEstorno(shopId) {
+    const db = DB._d();
+    const sub = db.subscriptions.find(s => s.barbershop_id === shopId);
+    if (!sub) return;
+    const pagos = db.payments
+      .filter(p => p.barbershop_id === shopId && p.status === 'paid' && !p.refunded_at)
+      .sort((a, b) => (a.paid_at || '') > (b.paid_at || '') ? 1 : -1);
+    let fim = null;
+    let plano = null;
+    for (const p of pagos) {
+      const dias = Number(p.billing_period || 30);
+      if (!fim) {
+        fim = DB.addDiasISO(dias, p.paid_at ? String(p.paid_at).slice(0, 10) : undefined);
+      } else {
+        fim = DB.addDiasISO(dias, fim);
+      }
+      plano = p.plan_id;
+    }
+    if (fim) {
+      sub.current_period_end = fim;
+      sub.plan_id = plano || sub.plan_id;
+      sub.status = 'ativa';
+    } else {
+      sub.current_period_end = null;
+      sub.status = 'expirada';
+    }
+    sub.updated_at = agoraISO();
+    DB.salvar();
+  }
+
   /** Dispara a simulação de pagamento na AbacatePay (só dev mode).
       Exige Content-Type json com corpo vazio — sem isso a API
       responde 400 "Pix QR Code not found". Requer CHECKOUT:READ. */
@@ -382,14 +502,14 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
 
   /**
    * Webhook da AbacatePay (server.js valida secret/HMAC antes).
-   * Idempotente: eventos repetidos não duplicam ativação.
+   * Idempotente: eventos repetidos não duplicam ativação nem estorno.
    */
   function processarEventoWebhook(ev) {
     const tipo = String((ev && ev.event) || '');
     const dados = (ev && ev.data) || {};
     const PAGOS = ['transparent.completed', 'checkout.completed',
       'pix.paid', 'billing.paid', 'subscription.renewed'];
-    if (!PAGOS.includes(tipo)) return { ignored: true, event: tipo };
+    const ESTORNADOS = ['transparent.refunded', 'checkout.refunded', 'subscription.refunded'];
 
     let pag = null;
     const db = DB._d();
@@ -399,9 +519,23 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     if (!pag && dados.id) {
       pag = db.payments.find(p => p.abacate_id === dados.id);
     }
-    if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
-    const mudou = aplicarPagamento(pag);
-    return { ok: true, payment_db_id: pag.id, applied: mudou };
+    if (PAGOS.includes(tipo)) {
+      if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+      const mudou = aplicarPagamento(pag);
+      return { ok: true, payment_db_id: pag.id, applied: mudou };
+    }
+    if (ESTORNADOS.includes(tipo)) {
+      if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+      if (!pag.refunded_at) {
+        pag.refunded_at = agoraMsISO();
+        pag.refund_reason = 'webhook_abacatepay';
+        pag.refund_id = (dados && (dados.refundPublicId || dados.id)) || null;
+        DB.salvar();
+        recalcularPeriodoAposEstorno(pag.barbershop_id);
+      }
+      return { ok: true, payment_db_id: pag.id, refunded: true };
+    }
+    return { ignored: true, event: tipo };
   }
 
   function err400(msg) { throw { status: 400, error: msg }; }
@@ -430,6 +564,7 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     listarMinhasCobrancas,
     confirmarCobrancaDemo,
     simularCobranca: simularPagamento,
+    estornarArrependimento,
     processarEventoWebhook,
     acessoLiberado
   });
