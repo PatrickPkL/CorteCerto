@@ -1363,6 +1363,23 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true, id: alvo.id };
   }
 
+  /* O usuário pode desconectar sua conta da empresa (soft disconnect):
+      limpa o barbershop_id, mantém a conta existindo e pode logar outra vez.
+      Este é o "desconectar": o usuário sai, pode logar como outro usuário. */
+  function desvincularMinhaConta() {
+    const user = sessao();
+    const db = DB._d();
+    const conta = db.users.find(u => u.id === user.id);
+    if (!conta) err(404, 'Usuário não encontrado.');
+    const shopId = conta.barbershop_id;
+    conta.barbershop_id = null;
+    if (conta.role !== 'cliente') conta.role = 'cliente';
+    _auditLog(user.id, 'desvincular_minha_conta', { barbershop_id: shopId, via: user.role });
+    DB.salvar();
+    Auth.logout();
+    return { ok: true, message: 'Conexão com a empresa removida. Você pode logar como outro usuário.' };
+  }
+
   /* login público do funcionário — o Código Único é opcional:
      · conta criada pelo dono (já vinculada) → senha + código;
      · conta criada por autoatendimento (sem vínculo) → login+senha

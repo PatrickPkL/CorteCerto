@@ -434,6 +434,22 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { window.location.href = '/catalogo'; }, 600);
   });
 
+  /* ---------- desvincular conta (soft disconnect) ---------- */
+  const btnDesvincularConta = document.getElementById('btn-desvincular-conta');
+  if (btnDesvincularConta) {
+    btnDesvincularConta.addEventListener('click', () => {
+      if (!confirm('Tem certeza que deseja desconectar esta conta da empresa? Sua conta continuará existindo, mas perderá o vínculo com o salão. Você poderá logar novamente depois.')) return;
+      try {
+        const r = API.desvincularMinhaConta();
+        showToast(r && r.message ? r.message : 'Conta desconectada.');
+        Auth.limparSessao();
+        setTimeout(() => { window.location.href = '/catalogo'; }, 1200);
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      }
+    });
+  }
+
   /* ---------- exclusão de conta com código (P3-3) ---------- */
   const modalExcluirCli = document.getElementById('modal-excluir-cliente');
   const stepCli1 = document.getElementById('excluir-cli-step-1');
