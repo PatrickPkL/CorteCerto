@@ -606,6 +606,9 @@ function aplicarRBACSidebar() {
     }
     if (!temItens) label.remove();
   });
+
+  /* RBAC aplicado: revela a navegação já filtrada (remove o "escudo" anti-flash) */
+  document.documentElement.classList.remove('cc-rbac-pending');
 }
 
 /* ---------------- BOOT ---------------- */

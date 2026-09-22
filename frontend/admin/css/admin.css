@@ -32,6 +32,13 @@
   margin: 18px 0 8px 10px;
 }
 
+/* RBAC: enquanto o perfil (dono/barbeiro/dependente) não aplicou os itens,
+   mantém a navegação restrita oculta para não dar flash de itens proibidos */
+html.cc-rbac-pending .sidebar .nav-list,
+html.cc-rbac-pending .sidebar .nav-group-label {
+  display: none;
+}
+
 .nav-list { list-style: none; margin: 0; padding: 0; }
 
 .nav-item a {
