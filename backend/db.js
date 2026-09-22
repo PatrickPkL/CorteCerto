@@ -108,6 +108,31 @@ window.DB = (function () {
     });
   }
 
+  function _keyOf(m, row) {
+    return _pkCols(m.pk).map(c => String(row[c] == null ? '' : row[c])).join('|');
+  }
+
+  /* Diff incremental por linha: devolve as linhas a dar upsert (novas ou
+     alteradas) e as removidas, comparando a coleção em memória com o
+     snapshot _orig. Evita reescrever a tabela inteira a cada salvar(). */
+  function diffCol(m, prevRows, curRows) {
+    const prevByKey = new Map();
+    for (const r of (prevRows || [])) prevByKey.set(_keyOf(m, r), r);
+    const curByKey = new Map();
+    for (const r of (curRows || [])) curByKey.set(_keyOf(m, r), r);
+
+    const upsert = [];
+    for (const r of (curRows || [])) {
+      const p = prevByKey.get(_keyOf(m, r));
+      if (p === undefined || JSON.stringify(p) !== JSON.stringify(r)) upsert.push(r);
+    }
+    const removed = [];
+    for (const r of (prevRows || [])) {
+      if (!curByKey.has(_keyOf(m, r))) removed.push(r);
+    }
+    return { upsert, removed };
+  }
+
   async function syncAll() {
     if (!_loaded) return;
     // [FIXBug6] Uma falha em UMA coleção (ex.: violação de constraint)
@@ -120,15 +145,18 @@ window.DB = (function () {
       const prev = _orig[m.colecao];
       const prevJson = prev === undefined ? '[]' : JSON.stringify(prev);
       const curJson = JSON.stringify(cur);
-      if (curJson !== prevJson) {
-        const snap = _deep(cur);
-        try {
-          await writeCol(m, snap, prev || []);
-          _orig[m.colecao] = snap;
-        } catch (e) {
-          console.error('[db][sync] falha persistindo coleção "' + m.colecao + '":',
-            (e && (e.message || e.code)) || e);
+      if (curJson === prevJson) continue;
+      const snap = _deep(cur);
+      try {
+        // incremental: só as linhas novas/alteradas (upsert) e as removidas
+        const { upsert, removed } = diffCol(m, prev || [], cur);
+        if (upsert.length || removed.length) {
+          await writeCol(m, upsert, removed);
         }
+        _orig[m.colecao] = snap;
+      } catch (e) {
+        console.error('[db][sync] falha persistindo coleção "' + m.colecao + '":',
+          (e && (e.message || e.code)) || e);
       }
     }
   }
@@ -178,10 +206,9 @@ window.DB = (function () {
     return Array.isArray(pk) ? pk : [pk];
   }
 
-  async function writeCol(m, rows, prevRows) {
-    // detecta removidos (diff de pk entre estado anterior e atual)
-    const curKeys = new Set(rows.map(r => _pkCols(m.pk).map(c => String(r[c])).join('|')));
-    const removed = (prevRows || []).filter(r => !curKeys.has(_pkCols(m.pk).map(c => String(r[c])).join('|')));
+  async function writeCol(m, rows, removedRows) {
+    // rmRows/rows já vêm do diff incremental (writeCol só escreve o que mudou)
+    const removed = removedRows || [];
 
     await asAdmin(async trx => {
       if (removed.length) {
