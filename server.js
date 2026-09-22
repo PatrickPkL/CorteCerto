@@ -138,6 +138,25 @@ const _rateMap = new Map();
 const RATE_WINDOW_MS = 60000;
 const RATE_MAX = 60;
 
+/* Limpa os rate/burte-force maps periodicamente: registros fora da janela
+   não voltam mais a ser consultados (_rateMap acumulava um IP por cliente
+   ao dia). Roda a cada 10 min — nunca afeta contadores de requisições
+   ativas (esses são consultados e renovados continuamente). */
+setInterval(() => {
+  const agora = Date.now();
+  for (const [ip, rec] of _rateMap) {
+    if (agora >= rec.reset) _rateMap.delete(ip);
+  }
+  for (const [k, rec] of _failedAuth) {
+    const janelaExpirada = agora >= (rec.windowStart + AUTH_FAIL_WINDOW_MS);
+    const bloqueioExpirado = agora >= rec.blockedUntil;
+    if (rec.count === 0 || (janelaExpirada && bloqueioExpirado)) _failedAuth.delete(k);
+  }
+  for (const [k, rec] of _failedAuthByIdent) {
+    if (agora >= rec.blockedUntil) _failedAuthByIdent.delete(k);
+  }
+}, 10 * 60 * 1000);
+
 /* ---------------- auth-brute-force ---------------- */
 const _failedAuth = new Map();
 const AUTH_FAIL_MAX = 5;
@@ -1029,7 +1048,10 @@ function bancoRemoto() {
 
   /* Job diário dos relatórios: padrão de TODOS os planos pagos.
      Ao virar o dia (00:00) grava o snapshot de faturamento por loja;
-     no boot de um dia novo também cobre o dia anterior (catch-up). */
+     no boot de um dia novo também cobre o dia anterior (catch-up).
+     Roda a cada 10 min (não a cada 60s) — o cálculo já é O(agendamentos)
+     em passada única; frequência maior não muda o dado, só o snapshot
+     do dia corrente, e sobrecarrega o event loop à toa. */
   {
     async function garantirRelatoriosDiarios() {
       try {
@@ -1044,7 +1066,7 @@ function bancoRemoto() {
       }
     }
     garantirRelatoriosDiarios();
-    setInterval(garantirRelatoriosDiarios, 60 * 1000);
+    setInterval(garantirRelatoriosDiarios, 10 * 60 * 1000);
   }
 
   /* Job de lembretes por e-mail (Gmail): envia 1 dia antes e no dia do

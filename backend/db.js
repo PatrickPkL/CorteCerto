@@ -32,6 +32,7 @@ window.DB = (function () {
   var db = null;              // working copy (memória)
   var _orig = {};             // snapshot por coleção (detecção de mudanças)
   var _queue = Promise.resolve();
+  var _versoes = {};          // versão por coleção (invalida índices de memória)
 
   /* ---------------- helpers de data (hora local, mata DT-11) ---------------- */
 
@@ -154,6 +155,7 @@ window.DB = (function () {
           await writeCol(m, upsert, removed);
         }
         _orig[m.colecao] = snap;
+        _versoes[m.colecao] = (_versoes[m.colecao] || 0) + 1;
       } catch (e) {
         console.error('[db][sync] falha persistindo coleção "' + m.colecao + '":',
           (e && (e.message || e.code)) || e);
@@ -330,6 +332,7 @@ window.DB = (function () {
     salvar,
     proximoId: nextId,
     reset,
+    versao: colecao => (_versoes[colecao] || 0),
 
     // datas/horas
     hojeISO, addDiasISO, parseISO, diaSemana, agoraMinutos,

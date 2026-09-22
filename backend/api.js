@@ -2896,15 +2896,28 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       if (d && alvos.indexOf(d) < 0) alvos.push(d);
     });
     const hoje = DB.hojeISO();
+
+    /* Passada única: agrupa os agendamentos concluídos por loja+data,
+       evitando um filter O(total) para CADA loja (job roda por todas). */
+    const porLoja = new Map();
+    for (const a of db.appointments) {
+      if (a.status !== 'concluido') continue;
+      const dia = a.starts_at.slice(0, 10);
+      if (alvos.indexOf(dia) < 0) continue;
+      const chave = a.barbershop_id + '|' + dia;
+      let l = porLoja.get(chave);
+      if (!l) { l = []; porLoja.set(chave, l); }
+      l.push(a);
+    }
+
     for (const dia of alvos) {
       const diaCorrente = dia === hoje;
       for (const loja of db.barbershops) {
+        const chave = loja.id + '|' + dia;
+        const lista = porLoja.get(chave) || [];
         const idx = db.relatorios_diarios.findIndex(r =>
           r.barbershop_id === loja.id && r.data === dia);
         if (idx >= 0 && !diaCorrente) continue; /* dias passados fechados: mantém o snapshot */
-        const lista = db.appointments.filter(a =>
-          a.barbershop_id === loja.id && a.status === 'concluido' &&
-          a.starts_at.slice(0, 10) === dia);
         const faturamento = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
         const faixas = {};
         lista.forEach(a => {

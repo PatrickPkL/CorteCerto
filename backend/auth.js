@@ -12,6 +12,7 @@ window.Auth = (function () {
   'use strict';
 
   var Mailer = require('./mailer');
+  var IDX = require('./idx');
 
   const TOKEN_TTL_DIAS = 7;
   const CODIGO_TTL_MS = 10 * 60 * 1000;   // RF-002: 10 minutos
@@ -37,9 +38,9 @@ window.Auth = (function () {
   function usuarioPorIdentidade(db, ident) {
     if (!ident) return null;
     if (ehEmail(ident)) {
-      return db.users.find(u => String(u.email || '').toLowerCase() === ident) || null;
+      return IDX.usuarioPorEmail().get(ident) || null;
     }
-    return db.users.find(u => u.phone === ident) || null;
+    return IDX.usuarioPorTelefone().get(ident) || null;
   }
 
   function agoraMs() { return Date.now(); }
@@ -124,7 +125,7 @@ window.Auth = (function () {
       : localStorage.getItem('token');
     if (!token) return null;
     const db = DB._d();
-    const s = db.sessions.find(x => x.token === token);
+    const s = IDX.sessaoPorToken().get(token);
     if (!s) { limparSessao(); return null; }
     if (s.expires_at <= new Date().toISOString()) {
       // RF-006: purga na verificação
@@ -133,24 +134,24 @@ window.Auth = (function () {
       limparSessao();
       return null;
     }
-    return db.users.find(u => u.id === s.user_id) || null;
+    return IDX.usuarioPorId().get(s.user_id) || null;
   }
 
   function salaoDoUsuario(user) {
     if (!user) return null;
     const db = DB._d();
     if (user.role === 'dono') {
-      return db.barbershops.find(b => b.owner_user_id === user.id) || null;
+      return IDX.lojaPorDono().get(user.id) || null;
     }
     if (user.role === 'barbeiro') {
-      const prof = db.professionals.find(p => p.user_id === user.id);
+      const prof = IDX.profissionalPorUsuario().get(user.id);
       if (!prof) return null;
-      return db.barbershops.find(b => b.id === prof.barbershop_id) || null;
+      return IDX.lojaPorId().get(prof.barbershop_id) || null;
     }
     /* Dependente/Funcionário: vínculo direto users.barbershop_id
        (acessa DADOS e AGENDA da empresa pelo Código Único). */
     if (user.role === 'dependente' && user.barbershop_id) {
-      return db.barbershops.find(b => b.id === user.barbershop_id) || null;
+      return IDX.lojaPorId().get(user.barbershop_id) || null;
     }
     return null;
   }
@@ -158,9 +159,9 @@ window.Auth = (function () {
   function criarSessao(userId) {
     const db = DB._d();
     /* limita a 5 sessões ativas por usuário */
-    const ativas = db.sessions.filter(s => s.user_id === userId);
+    const ativas = IDX.sessoesPorUsuario().get(userId) || [];
     if (ativas.length >= 5) {
-      const maisAntiga = ativas.sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0];
+      const maisAntiga = ativas.slice().sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0];
       db.sessions = db.sessions.filter(s => s.id !== maisAntiga.id);
     }
     const expira = new Date(Date.now() + TOKEN_TTL_DIAS * 24 * 3600 * 1000).toISOString();
@@ -168,7 +169,7 @@ window.Auth = (function () {
     db.sessions.push(sessao);
     DB.salvar();
     localStorage.setItem('token', sessao.token);
-    const u = db.users.find(x => x.id === userId);
+    const u = IDX.usuarioPorId().get(userId);
     const shop = salaoDoUsuario(u);
     localStorage.setItem('user', JSON.stringify(publicUser(u)));
     localStorage.setItem('barbershop', shop ? JSON.stringify(shop) : '');
