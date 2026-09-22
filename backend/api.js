@@ -76,6 +76,18 @@ window.API = (function () {
     return { user, shop };
   }
 
+  /* Dono ou barbeiro ajudante da loja: podem gerenciar o vínculo dos
+     dependentes (visualizar e desligar). Dependente/cliente não. */
+  function exigirDonoOuBarbeiro() {
+    const user = sessao();
+    const shop = Auth.salaoDoUsuario(user);
+    if (!shop) err(404, 'Nenhum salão vinculado a esta conta.');
+    if (user.role !== 'dono' && user.role !== 'barbeiro') {
+      err(403, 'Acesso restrito ao dono ou barbeiro do salão.');
+    }
+    return { user, shop };
+  }
+
   /* Equipe = dono, barbeiro ajudante OU dependente (funcionário) da
      loja. Libera agenda e clientes; relatórios financeiros/gerenciais
      continuam exclusivos do dono (exigirDono). */
@@ -1212,12 +1224,12 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { plano, ativos, limite, nomePlano: plano ? plano.name : 'sem plano' };
   }
 
-  /* Cota do plano no painel do dono (ex.: "1 de 5 usados") */
-  function meuCodigoEmpresa() {
-    const { shop } = exigirDono();
+  /* Dados dos dependentes da loja. `incluirCodigo` controla se o Código
+     Único (convite de novos funcionários) é exposto: só o dono o vê. */
+  function dadosDependentesDaEquipe(shop, incluirCodigo) {
     const { plano, ativos, limite, nomePlano } = cotaDependentes(shop.id);
     return {
-      codigo_unico: codigoUnicoDaLoja(shop),
+      codigo_unico: incluirCodigo ? codigoUnicoDaLoja(shop) : null,
       empresa: shop.name,
       plano: nomePlano,
       max_dependents: limite === Infinity ? null : limite,
@@ -1231,8 +1243,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     };
   }
 
+  /* Cota do plano no painel do dono (ex.: "1 de 5 usados") */
+  function meuCodigoEmpresa() {
+    const { shop } = exigirDono();
+    return dadosDependentesDaEquipe(shop, true);
+  }
+
+  /* Barbeiro e dono: listam os dependentes da loja. O Código Único
+     (chave de convite do dono) só é exposto ao dono. */
   function listarDependentes() {
-    return meuCodigoEmpresa();
+    const { user, shop } = exigirDonoOuBarbeiro();
+    return dadosDependentesDaEquipe(shop, user.role === 'dono');
   }
 
   /* RF: o dono cria as credenciais (Login/Senha) do funcionário.
@@ -1546,15 +1567,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true, user: Auth.publicUser(conta) };
   }
 
-  /* O dono pode desligar (desvincular) um dependente da loja mantendo a conta. */
+  /* O dono OU o barbeiro podem desligar (desvincular) um dependente da
+     loja mantendo a conta. Isso libera a vaga da cota do plano para um
+     novo funcionário. */
   function desvincularDependente(id) {
-    const { shop, user } = exigirDono();
+    const { shop, user } = exigirDonoOuBarbeiro();
     const db = DB._d();
     const alvo = db.users.find(u => u.id == id && u.role === 'dependente' && u.barbershop_id === shop.id);
     if (!alvo) err(404, 'Funcionário não encontrado nesta empresa.');
     alvo.role = 'cliente';
     alvo.barbershop_id = null;
-    _auditLog(user.id, 'desvincular_dependente', { dependente_id: alvo.id, via: 'dono' });
+    _auditLog(user.id, 'desvincular_dependente', { dependente_id: alvo.id, via: user.role });
     DB.salvar();
     return { ok: true, id: alvo.id };
   }

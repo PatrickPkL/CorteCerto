@@ -593,12 +593,14 @@ function montarShellAdmin() {
 }
 
 /* RBAC do ajudante e do dependente: mantém na sidebar apenas
-   Agendamentos e Clientes (Relatórios e demais áreas ficam ocultos) */
+   Agendamentos e Clientes (Relatórios e demais áreas ficam ocultos).
+   O barbeiro também vê Funcionários para desligar dependentes. */
 function aplicarRBACSidebar() {
   const u = Auth.usuarioAtual();
   if (!u || (u.role !== 'barbeiro' && u.role !== 'dependente')) return;
 
   const permitidas = ['agendamentos', 'clientes'];
+  if (u.role === 'barbeiro') permitidas.push('funcionarios');
   document.querySelectorAll('.sidebar .nav-item').forEach(item => {
     const a = item.querySelector('a');
     const href = ((a && a.getAttribute('href')) || '').split('/').pop();

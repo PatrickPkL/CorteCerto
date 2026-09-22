@@ -7,13 +7,22 @@
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const usuario = exigirLogin('dono');
+  const usuario = exigirLogin(['dono', 'barbeiro']);
   if (!usuario) return;
   const loja = Auth.salaoDoUsuario(usuario);
   if (!loja) {
     showToast('Nenhum salão vinculado a esta conta.', 'error');
     setTimeout(() => { window.location.href = '/login'; }, 1200);
     return;
+  }
+
+  const ehDono = usuario.role === 'dono';
+
+  /* barbeiro vê só a lista (p/ desligar); criação e remoção em definitivo
+     são do dono */
+  if (!ehDono) {
+    const formCriar = document.getElementById('form-criar-funcionario');
+    if (formCriar) formCriar.closest('.card').style.display = 'none';
   }
 
   let dados = null;
@@ -32,10 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderCota() {
     const el = document.getElementById('cota-plano');
     if (!el) return;
+    const codigo = datos.codigo_unico ? ' · Código único: ' + datos.codigo_unico : '';
     el.textContent = 'Plano ' + (dados.plano || '—') + ' · ' +
       dados.dependentes_ativos + ' de ' +
       (dados.max_dependents == null ? 'ilimitados' : dados.max_dependents) +
-      ' funcionário(s) em uso. Código único: ' + (dados.codigo_unico || '—');
+      ' funcionário(s) em uso' + (ehDono ? codigo : '') + '.';
   }
 
   function renderLista() {
@@ -66,13 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
       btnDesligar.addEventListener('click', () => desligar(dep));
       acoes.appendChild(btnDesligar);
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn btn-outline';
-      btn.style.cssText = 'padding:6px 10px;font-size:12.5px;color:var(--danger-text, #e5484d);';
-      btn.textContent = 'Remover';
-      btn.addEventListener('click', () => remover(dep));
-      acoes.appendChild(btn);
+      if (ehDono) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline';
+        btn.style.cssText = 'padding:6px 10px;font-size:12.5px;color:var(--danger-text, #e5484d);';
+        btn.textContent = 'Remover';
+        btn.addEventListener('click', () => remover(dep));
+        acoes.appendChild(btn);
+      }
 
       tr.appendChild(nome); tr.appendChild(login); tr.appendChild(criado); tr.appendChild(acoes);
       tb.appendChild(tr);
