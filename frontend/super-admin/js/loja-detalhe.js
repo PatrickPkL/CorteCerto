@@ -24,15 +24,63 @@ document.addEventListener('DOMContentLoaded', function () {
   var elAgendStats = document.getElementById('section-agendamentos');
   var elPlanoStatus = document.getElementById('plano-status');
   var selectPlano = document.getElementById('select-plano');
+  var selectStatus = document.getElementById('select-status');
   var btnSalvarPlano = document.getElementById('btn-salvar-plano');
   var btnExcluir = document.getElementById('btn-excluir');
   var btnVoltar = document.getElementById('btn-voltar');
+
+  var planos = [];
+  var planoAtual = null;
 
   /* ---------- voltar ---------- */
   if (btnVoltar) {
     btnVoltar.addEventListener('click', function () {
       window.location.href = 'index.html';
     });
+  }
+
+  /* ---------- carregar planos (preenchimento do select) ---------- */
+  function carregarPlanos() {
+    return fetch('/api/super-admin/planos', { headers: saAuth.headers() })
+      .then(function (res) {
+        if (res.status === 401 || res.status === 403) {
+          saAuth.logout();
+          return;
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || data.error) return;
+        planos = data.data || [];
+        if (!selectPlano) return;
+        selectPlano.innerHTML = '';
+        planos.forEach(function (p) {
+          var opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name + (p.is_free ? ' (grátis)' : '');
+          selectPlano.appendChild(opt);
+        });
+        if (planoAtual) definirSelectPlano();
+      })
+      .catch(function () { /* sem planos: select fica vazio */ });
+  }
+
+  function definirSelectPlano() {
+    if (!selectPlano || !planoAtual) return;
+    var achou = planos.some(function (p) {
+      if (String(p.id) === String(planoAtual)) {
+        selectPlano.value = p.id;
+        return true;
+      }
+      return false;
+    });
+    if (!achou) {
+      var opt = document.createElement('option');
+      opt.value = planoAtual;
+      opt.textContent = 'Plano #' + planoAtual;
+      selectPlano.appendChild(opt);
+      selectPlano.value = planoAtual;
+    }
   }
 
   /* ---------- carregar dados da loja ---------- */
@@ -55,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (data && data.error) showToast(data.error, 'error');
           return;
         }
-        renderizarLoja(data);
+        renderizarLoja(data.data || {});
       })
       .catch(function () {
         showToast('Erro ao carregar dados da loja.', 'error');
@@ -63,20 +111,23 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- renderizar ---------- */
-  function renderizarLoja(loja) {
-    if (elNomeLoja) elNomeLoja.textContent = loja.nome || loja.salon_name || 'Loja #' + lojaId;
+  function renderizarLoja(payload) {
+    var loja = payload.loja || {};
+    var owner = payload.owner || {};
+
+    if (elNomeLoja) elNomeLoja.textContent = loja.name || 'Loja #' + lojaId;
 
     /* info */
     if (elInfoSection) {
       elInfoSection.innerHTML = '';
       var campos = [
         ['ID', loja.id],
-        ['Nome', loja.nome || loja.salon_name || '—'],
-        ['Cidade', loja.cidade || '—'],
-        ['Telefone', loja.telefone || loja.phone || '—'],
-        ['E-mail', loja.email || '—'],
-        ['Owner', loja.owner_name || loja.owner || '—'],
-        ['Criado em', loja.criado_em || loja.created_at || '—']
+        ['Nome', loja.name || '—'],
+        ['Cidade', [loja.city, loja.uf].filter(Boolean).join(' - ') || '—'],
+        ['Telefone', loja.phone || loja.whatsapp || '—'],
+        ['E-mail', loja.email || owner.email || '—'],
+        ['Owner', owner.name || '—'],
+        ['Criado em', loja.created_at || '—']
       ];
       campos.forEach(function (c) {
         var row = document.createElement('div');
@@ -96,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* serviços */
     if (elServicos) {
       elServicos.innerHTML = '';
-      var servicos = loja.servicos || [];
+      var servicos = payload.servicos || [];
       if (!servicos.length) {
         elServicos.textContent = 'Nenhum serviço cadastrado.';
       } else {
@@ -104,9 +155,9 @@ document.addEventListener('DOMContentLoaded', function () {
         ulServ.className = 'sa-lista';
         servicos.forEach(function (s) {
           var li = document.createElement('li');
-          li.textContent = (s.nome || s.name || 'Serviço') +
-            (s.preco != null ? ' — R$ ' + Number(s.preco).toFixed(2).replace('.', ',') : '') +
-            (s.duracao ? ' (' + s.duracao + ' min)' : '');
+          li.textContent = s.name +
+            (s.price != null ? ' — R$ ' + Number(s.price).toFixed(2).replace('.', ',') : '') +
+            (s.duration_min ? ' (' + s.duration_min + ' min)' : '');
           ulServ.appendChild(li);
         });
         elServicos.appendChild(ulServ);
@@ -116,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* profissionais */
     if (elProfissionais) {
       elProfissionais.innerHTML = '';
-      var profs = loja.profissionais || loja.professionals || [];
+      var profs = payload.profissionais || [];
       if (!profs.length) {
         elProfissionais.textContent = 'Nenhum profissional cadastrado.';
       } else {
@@ -124,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ulProfs.className = 'sa-lista';
         profs.forEach(function (p) {
           var li = document.createElement('li');
-          li.textContent = p.nome || p.name || 'Profissional';
+          li.textContent = p.name + (p.phone ? ' — ' + p.phone : '');
           ulProfs.appendChild(li);
         });
         elProfissionais.appendChild(ulProfs);
@@ -134,12 +185,12 @@ document.addEventListener('DOMContentLoaded', function () {
     /* agendamentos stats */
     if (elAgendStats) {
       elAgendStats.innerHTML = '';
-      var stats = loja.agendamentos_stats || loja.stats || {};
+      var porStatus = payload.agendamentosPorStatus || {};
       var items = [
-        ['Hoje', stats.hoje || stats.today || 0],
-        ['Semana', stats.semana || stats.week || 0],
-        ['Mês', stats.mes || stats.month || 0],
-        ['Total', stats.total || 0]
+        ['Total', payload.totalAgendamentos || 0],
+        ['Confirmados', porStatus.confirmado || 0],
+        ['Concluídos', porStatus.concluido || 0],
+        ['Cancelados', porStatus.cancelado || 0]
       ];
       items.forEach(function (item) {
         var div = document.createElement('div');
@@ -157,24 +208,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* plano */
+    planoAtual = (payload.planos && payload.planos.plan_id) || null;
+    var planoNome = (payload.plano && payload.plano.name) || (planoAtual != null ? 'Plano #' + planoAtual : 'nenhum');
+    var statusSub = (payload.planos && payload.planos.status) || 'Sem assinatura';
     if (selectPlano) {
-      var planoAtual = loja.plano || loja.plan || 'free';
-      selectPlano.value = planoAtual;
-      if (elPlanoStatus) elPlanoStatus.textContent = 'Plano atual: ' + planoAtual;
+      definirSelectPlano();
+    }
+    if (selectStatus) {
+      selectStatus.value = (payload.planos && payload.planos.status) || '';
+    }
+    if (elPlanoStatus) {
+      var extras = '';
+      if (payload.planos && payload.planos.trial_ends_at) {
+        extras += ' · trial até ' + String(payload.planos.trial_ends_at).slice(0, 10);
+      }
+      if (payload.planos && payload.planos.current_period_end) {
+        extras += ' · vigência até ' + String(payload.planos.current_period_end).slice(0, 10);
+      }
+      elPlanoStatus.textContent = 'Plano atual: ' + planoNome + ' · ' + statusSub + extras;
     }
   }
 
   /* ---------- salvar plano ---------- */
   if (btnSalvarPlano) {
     btnSalvarPlano.addEventListener('click', function () {
-      var novoPlano = selectPlano ? selectPlano.value : 'free';
+      var novoPlano = selectPlano ? selectPlano.value : '';
+      var novoStatus = selectStatus ? selectStatus.value : '';
+      if (!novoPlano) {
+        showToast('Selecione um plano.', 'error');
+        return;
+      }
       btnSalvarPlano.disabled = true;
       btnSalvarPlano.textContent = 'Salvando...';
 
       fetch('/api/super-admin/loja/' + lojaId + '/plan', {
         method: 'PUT',
         headers: saAuth.headers(),
-        body: JSON.stringify({ status: novoPlano })
+        body: JSON.stringify({ plan_id: novoPlano, status: novoStatus })
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
@@ -182,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
             showToast(data.error, 'error');
           } else {
             showToast('Plano atualizado com sucesso!');
-            if (elPlanoStatus) elPlanoStatus.textContent = 'Plano atual: ' + novoPlano;
+            carregarLoja();
           }
           btnSalvarPlano.disabled = false;
           btnSalvarPlano.textContent = 'Salvar Plano';
@@ -248,5 +318,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- init ---------- */
-  carregarLoja();
+  carregarPlanos().then(function () {
+    carregarLoja();
+  });
 });

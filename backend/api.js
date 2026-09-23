@@ -561,10 +561,12 @@ window.API = (function () {
     var profs = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; });
     var ags = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id; });
     var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
+    var planoDb = sub && (_db().plans || []).find(function(p) { return p.id === sub.plan_id; });
     var totalPago = (_db().payments || []).filter(function(p) { return p.barbershop_id === b.id && p.status === 'paid'; })
       .reduce(function(sum, p) { return sum + (Number(p.amount_cents) || 0) / 100; }, 0);
     return {
       loja: b, owner: owner, planos: sub,
+      plano: planoDb || null,
       servicos: svcs, profissionais: profs,
       totalAgendamentos: ags.length,
       agendamentosPorStatus: {
@@ -579,11 +581,33 @@ window.API = (function () {
   function saAtualizarPlano(shopId, dados) {
     var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id == shopId; });
     if (!sub) err(404, 'Assinatura não encontrada.');
-    if (dados.status) sub.status = dados.status;
+    dados = dados || {};
+    if (dados.plan_id != null && dados.plan_id !== '') {
+      var plano = (_db().plans || []).find(function(p) { return p.id == dados.plan_id; });
+      if (!plano) err(400, 'Plano não encontrado.');
+      sub.plan_id = plano.id;
+      if (plano.is_free) {
+        sub.status = 'cancelada';
+        sub.trial_ends_at = null;
+        sub.current_period_end = null;
+      }
+    }
+    if (dados.status) {
+      var valido = ['trial', 'ativa', 'cancelada'];
+      if (valido.indexOf(dados.status) === -1) err(400, 'Status inválido. Use trial, ativa ou cancelada.');
+      sub.status = dados.status;
+    }
     if (dados.current_period_end) sub.current_period_end = dados.current_period_end;
     sub.updated_at = agoraISO();
     DB.salvar();
-    return sub;
+    var planoDb = (_db().plans || []).find(function(p) { return p.id === sub.plan_id; });
+    return {
+      id: sub.id, barbershop_id: sub.barbershop_id, plan_id: sub.plan_id,
+      plano: planoDb ? planoDb.name : null,
+      status: sub.status,
+      trial_ends_at: sub.trial_ends_at || null,
+      current_period_end: sub.current_period_end || null
+    };
   }
 
   /* ---------------- Super-admin: preços dos planos e modo grátis ---------------- */

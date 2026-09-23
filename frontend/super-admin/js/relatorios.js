@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
           showToast(data.error, 'error');
           return;
         }
-        dadosRelatorio = data;
+        dadosRelatorio = data.data || {};
         renderizarTudo();
       })
       .catch(function () {

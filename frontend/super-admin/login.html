@@ -8,6 +8,7 @@
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="sa.css">
 <style>
   body {
     margin: 0;
@@ -15,31 +16,31 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0c0c0c;
+    background: var(--paper);
     font-family: system-ui, -apple-system, sans-serif;
   }
   .sa-login-card {
-    background: #161616;
-    border: 1px solid #222;
+    background: var(--paper-soft);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 40px 36px;
     width: 100%;
     max-width: 380px;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    box-shadow: var(--shadow-lg);
   }
   .sa-login-brand {
     text-align: center;
     font-size: 1.6rem;
     font-weight: 700;
-    color: #f0f0f0;
+    color: var(--text);
     margin-bottom: 8px;
   }
   .sa-login-brand span {
-    color: #b8863b;
+    color: var(--brass);
   }
   .sa-login-subtitle {
     text-align: center;
-    color: #888;
+    color: var(--text-muted);
     font-size: .85rem;
     margin-bottom: 28px;
   }
@@ -48,7 +49,7 @@
   }
   .sa-form-group label {
     display: block;
-    color: #888;
+    color: var(--text-muted);
     font-size: .8rem;
     margin-bottom: 6px;
     text-transform: uppercase;
@@ -57,10 +58,10 @@
   .sa-form-group input {
     width: 100%;
     padding: 12px 14px;
-    background: #0c0c0c;
-    border: 1px solid #222;
+    background: var(--field-bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    color: #f0f0f0;
+    color: var(--text);
     font-size: .95rem;
     font-family: system-ui, -apple-system, sans-serif;
     box-sizing: border-box;
@@ -68,15 +69,15 @@
     transition: border-color .2s;
   }
   .sa-form-group input:focus {
-    border-color: #b8863b;
+    border-color: var(--brass);
   }
   .sa-btn-entrar {
     width: 100%;
     padding: 12px;
-    background: #b8863b;
+    background: var(--brass);
     border: none;
     border-radius: 8px;
-    color: #0c0c0c;
+    color: var(--ink);
     font-size: .95rem;
     font-weight: 600;
     font-family: system-ui, -apple-system, sans-serif;
@@ -92,7 +93,7 @@
     cursor: not-allowed;
   }
   .sa-error-msg {
-    color: #e74c3c;
+    color: var(--danger);
     font-size: .82rem;
     text-align: center;
     margin-top: 12px;
