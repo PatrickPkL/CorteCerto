@@ -38,6 +38,11 @@ function fmtDataBR(iso) {
 }
 
 exports.seed = async function (knex) {
+  /* Guard reversÃ­vel (001_demo.js): com CC_SKIP_DEMO=1 o seed demo
+     nÃ£o roda e as barbearias/usuÃ¡rios demo nÃ£o sÃ£o (re)criados no boot.
+     Para trazer as demo de volta: remova a linha `if (...)` abaixo. */
+  if (process.env.CC_SKIP_DEMO === '1') return;
+
   // ---------- plans ----------
 const plans = [
   { id: uuid(1), name: 'Autonomo', price_monthly: 9.90, price_annual: 118.00, price_per_employee: 0, max_professionals: 1, features: ['Link de agendamento exclusivo', 'Agenda sincronizada em tempo real com o app dos clientes', 'RelatÃ³rios financeiros: diÃ¡rio, semanal e mensal', 'RelatÃ³rio completo (detalhado por cliente, horÃ¡rios de pico)', 'Exportar CSV', 'Lembretes automÃ¡ticos por notificaÃ§Ã£o no app'], permissions: ['servicos', 'profissionais', 'clientes', 'agendar', 'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'], active: true, nivel_relatorio: 'completo' },
