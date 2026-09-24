@@ -60,20 +60,29 @@
 
   <div class="prof-list-public" id="lista-profissionais-publica"></div>
 
+  <section class="reviews-box" id="reviews-box">
+    <div class="reviews-head">
+      <div>
+        <h3 class="reviews-title">Avaliações do salão</h3>
+        <div class="reviews-summary">
+          <span class="reviews-stars" id="reviews-stars">☆☆☆☆☆</span>
+          <span class="reviews-nota" id="reviews-nota">—</span>
+          <span class="reviews-count" id="reviews-count">— comentários</span>
+        </div>
+      </div>
+      <button type="button" id="reviews-toggle" class="btn btn-brass" aria-expanded="false">
+        Ver avaliações e comentar
+      </button>
+    </div>
+    <div id="reviews-panel" class="reviews-panel" hidden>
+      <div id="review-form-box" class="review-form-box"></div>
+      <div class="reviews-list" id="lista-reviews"></div>
+    </div>
+  </section>
+
   <h3 class="section-title">Escolha um serviço</h3>
 
   <div class="service-list-public" id="lista-servicos-publica"></div>
-
-  <h3 class="section-title">Avaliações</h3>
-  <button type="button" id="reviews-toggle" class="reviews-toggle" aria-expanded="false">
-    <span class="rating">★</span>
-    <span id="reviews-contador">— comentários</span>
-  </button>
-  <div id="reviews-panel" class="reviews-panel" hidden>
-    <p id="reviews-resumo" style="color:var(--text-muted); font-size:14px; margin:-6px 0 14px;"></p>
-    <div class="reviews-list" id="lista-reviews"></div>
-    <div id="review-form-box" class="review-form-box"></div>
-  </div>
 
   <div id="modal-agendar-cliente" class="modal-overlay" style="display:none;">
     <div class="card" style="width:480px; max-height:90vh; overflow-y:auto;">

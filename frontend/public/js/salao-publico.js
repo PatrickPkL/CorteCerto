@@ -160,45 +160,54 @@ document.addEventListener('DOMContentLoaded', () => {
     '<div class="empty-state"><h3>Nenhum serviço cadastrado</h3><p>Este salão ainda não cadastrou serviços.</p></div>';
   }
 
-  /* ---------- avaliações (RF-055) — discretas ----------
-     No perfil, antes de interagir, só aparece o Nº de comentários
-     (pequeno e sutil). Ao clicar, abre o painel com as avaliações
-     (1 a 5 estrelas, comentário ≤ 100 caracteres) e o formulário
-     para clientes logados. */
-  const contador = document.getElementById('reviews-contador');
+  /* ---------- avaliações (RF-055) ----------
+     Bloco logo após a escolha do profissional: mostra as estrelas do
+     salão e a quantidade de comentários já na abertura. Ao clicar,
+     abre a lista de comentários e o formulário (clientes logados). */
+  const reviewsStars = document.getElementById('reviews-stars');
+  const reviewsNota = document.getElementById('reviews-nota');
+  const reviewsCount = document.getElementById('reviews-count');
   const toggle = document.getElementById('reviews-toggle');
   const panels = document.getElementById('reviews-panel');
 
   let reviewsGerais = [];
-  function refreshReviews() {
-    try { reviewsGerais = API.reviewsDaLoja(loja.id); } catch (e) { reviewsGerais = []; }
+
+  function estrelasCheias(nota) {
+    const n = Math.max(0, Math.min(5, Math.round(Number(nota) || 0)));
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+  }
+
+  function atualizarResumo() {
     const total = reviewsGerais.length;
-    if (contador) {
-      contador.textContent = total + (total === 1 ? ' comentário' : ' comentários');
-    }
+    const media = total
+      ? reviewsGerais.reduce((s, r) => s + (Number(r.rating) || 0), 0) / total
+      : Number(loja.rating_avg || 0);
+    if (reviewsStars) reviewsStars.textContent = estrelasCheias(media);
+    if (reviewsNota) reviewsNota.textContent = total ? media.toFixed(1) : '—';
+    if (reviewsCount) reviewsCount.textContent = total + (total === 1 ? ' comentário' : ' comentários');
+  }
+
+  function carregarReviews() {
+    try { reviewsGerais = API.reviewsDaLoja(loja.id); } catch (e) { reviewsGerais = []; }
+    atualizarResumo();
   }
 
   function renderLista() {
     const box = document.getElementById('lista-reviews');
-    const resumo = document.getElementById('reviews-resumo');
     if (!box) return;
-    if (resumo) {
-      resumo.innerHTML = reviewsGerais.length
-        ? '<span class="rating">★ ' + Number(loja.rating_avg || 0).toFixed(1) + '</span> · ' +
-          reviewsGerais.length + ' avaliação(ões)'
-        : '<span style="color:var(--text-muted)">Ainda sem avaliações — seja o primeiro!</span>';
+    if (!reviewsGerais.length) {
+      box.innerHTML = '<p class="reviews-empty">Ainda sem avaliações — seja o primeiro a avaliar!</p>';
+      return;
     }
     box.innerHTML = reviewsGerais.slice(0, 8).map(r => {
-      const estrelas = '★'.repeat(Math.max(1, Math.min(5, Number(r.rating) || 0))) +
-        '☆'.repeat(5 - Math.max(1, Math.min(5, Number(r.rating) || 0)));
+      const n = Math.max(1, Math.min(5, Number(r.rating) || 0));
       return '<div class="review-item">' +
         '<div class="review-top"><strong>' + esc(r.client_name) + '</strong>' +
-          '<span class="rating">' + estrelas + '</span>' +
-          '<small style="color:var(--text-muted)">' + DB.fmtDataBR(String(r.created_at).slice(0, 10)) + '</small></div>' +
+          '<span class="rating">' + estrelasCheias(n) + '</span>' +
+          '<small>' + DB.fmtDataBR(String(r.created_at).slice(0, 10)) + '</small></div>' +
         (r.comment ? '<p>' + esc(r.comment) + '</p>' : '') +
       '</div>';
-    }).join('') ||
-    '<p style="color:var(--text-muted)">Nenhuma avaliação por aqui.</p>';
+    }).join('');
   }
 
   function renderFormulario() {
@@ -214,18 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     boxForm.innerHTML =
-      '<h4 style="font-size:15px;margin:0 0 10px;">Deixe sua avaliação</h4>' +
+      '<h4 class="review-form-title">Deixe sua avaliação</h4>' +
       '<form class="review-form" id="review-form">' +
         '<div class="review-estrelas" id="review-estrelas">' +
           [1, 2, 3, 4, 5].map(n =>
             '<button type="button" class="estrela" data-nota="' + n + '" aria-label="' + n + ' estrela(s)">★</button>').join('') +
-          '<span class="review-valor" id="review-valor"></span>' +
+          '<span class="review-valor" id="review-valor">Toque nas estrelas</span>' +
         '</div>' +
         '<div class="field">' +
-          '<textarea id="review-comentario" rows="2" maxlength="100" style="width:100%;resize:vertical;" placeholder="Como foi sua experiência? (máx. 100 caracteres)"></textarea>' +
+          '<textarea id="review-comentario" rows="3" maxlength="100" placeholder="Como foi sua experiência? (opcional, máx. 100 caracteres)"></textarea>' +
           '<div class="review-char-count" id="review-char-count">0/100</div>' +
         '</div>' +
-        '<button type="submit" class="btn btn-primary">Enviar avaliação</button>' +
+        '<button type="submit" class="btn btn-brass">Enviar avaliação</button>' +
       '</form>';
 
     const estrelasEl = boxForm.querySelector('#review-estrelas');
@@ -252,27 +261,28 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         API.criarReview(loja.id, { rating: nota, comment: comentario });
         showToast('Avaliação enviada! Obrigado.');
-        refreshReviews();
+        carregarReviews();
         renderLista();
-        boxForm.innerHTML = '';
+        renderFormulario();
       } catch (err2) {
         showToast(msgErro(err2), 'error');
       }
     });
   }
 
-  refreshReviews();
+  carregarReviews();
   if (toggle && !toggle.dataset.ccOn) {
     toggle.dataset.ccOn = '1';
     toggle.addEventListener('click', () => {
       const abrir = panels.hidden;
       if (abrir) {
-        refreshReviews();
+        carregarReviews();
         renderLista();
         renderFormulario();
       }
       panels.hidden = !abrir;
       toggle.setAttribute('aria-expanded', String(abrir));
+      toggle.textContent = abrir ? 'Ocultar avaliações' : 'Ver avaliações e comentar';
     });
   }
 
@@ -632,8 +642,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
-
-  refreshReviews();
 
   const btnCompartilhar = document.getElementById('btn-compartilhar');
   if (btnCompartilhar) {

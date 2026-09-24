@@ -139,6 +139,20 @@ function montarTema() {
     return;
   }
 
+  /* Painel Super Admin: coloca o botão de tema dentro do cabeçalho, junto
+     aos demais botões do canto direito — evita flutuar sobre eles. */
+  const saHeader = document.querySelector('.sa-header');
+  if (saHeader) {
+    let extra = saHeader.querySelector('.sa-header-extra');
+    if (!extra) {
+      extra = document.createElement('div');
+      extra.className = 'sa-header-extra';
+      saHeader.appendChild(extra);
+    }
+    extra.appendChild(criarBotaoTema());
+    return;
+  }
+
   const topo = document.createElement('div');
   topo.className = 'login-topbar';
   topo.appendChild(criarBotaoTema());
