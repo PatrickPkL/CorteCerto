@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 001_extension_and_types.js
+   Corte Comigo – 001_extension_and_types.js
    Extensão pgcrypto + tipos ENUM do domínio.
    ============================================================ */
 

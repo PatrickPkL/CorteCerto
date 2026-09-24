@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 011_denuncias_bloqueios.js
+   Corte Comigo – 011_denuncias_bloqueios.js
    Denúncia de perfil (barbeiro/salão/cliente) e bloqueio de
    cliente por parte do barbeiro/salão.
 

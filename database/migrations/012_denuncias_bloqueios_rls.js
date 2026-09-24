@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 012_denuncias_bloqueios_rls.js
+   Corte Comigo – 012_denuncias_bloqueios_rls.js
    RLS + grants para as tabelas reports e blocked_clients.
 
    - reports: o denunciante cria a linha (inserção com

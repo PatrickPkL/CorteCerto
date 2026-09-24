@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/catalogo.js
+   Corte Comigo – public/js/catalogo.js
    Catálogo público com busca server-like (RF-050..054).
    ============================================================ */
 

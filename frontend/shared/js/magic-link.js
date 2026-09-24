@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – shared/js/magic-link.js
+   Corte Comigo – shared/js/magic-link.js
    Recebe o token via query string e inicia a sessão no admin.
    Em arquivo externo para o CSP não precisar de 'unsafe-inline'.
    ============================================================ */

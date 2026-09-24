@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – db.js (shim de cliente)
+   Corte Comigo – db.js (shim de cliente)
    Os DADOS agora vivem no servidor (backend + database/db.json).
    Aqui ficam apenas os utilitários puros de data/formatação que
    as páginas usam para renderizar — nada acessa localStorage.

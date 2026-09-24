@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – backend/idx.js
+   Corte Comigo – backend/idx.js
    Índices em memória (Map) sobre o espelho do PostgreSQL.
    Transforma buscas O(n) dos hot paths de autenticação/RPC em
    lookups O(1). Inválida por coleção e é auto-reparável:

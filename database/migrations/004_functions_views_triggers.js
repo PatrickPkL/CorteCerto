@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 004_functions_views_triggers.js
+   Corte Comigo – 004_functions_views_triggers.js
    Funções SQL, triggers de updated_at e views.
    ============================================================ */
 

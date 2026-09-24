@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 006_slot_interval.js
+   Corte Comigo – 006_slot_interval.js
    Intervalo de slots de agendamento configurável por salão.
    ============================================================ */
 

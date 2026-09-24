@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/salao-publico.js
+   Corte Comigo – public/js/salao-publico.js
    Página pública do salão: funcionamento real (RF-028..031),
    galeria, avaliações e agendamento com slots reais da engine
    + escolha automática de profissional (DT-03/DT-04).
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
   /* ---------- cabeçalho ---------- */
-  document.title = loja.name + ' · Corte Certo';
+  document.title = loja.name + ' · Corte Comigo';
 
   document.getElementById('salao-nome').textContent = loja.name;
   const meta = document.getElementById('salao-meta');
@@ -681,9 +681,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCompartilhar.addEventListener('click', () => {
       const url = window.location.href;
       const nomeEl = document.querySelector('.salon-name, h1, .salao-nome');
-      const texto = 'Confira ' + (nomeEl ? nomeEl.textContent : 'esta barbearia') + ' no Corte Certo: ';
+      const texto = 'Confira ' + (nomeEl ? nomeEl.textContent : 'esta barbearia') + ' no Corte Comigo: ';
       if (navigator.share) {
-        navigator.share({ title: 'Corte Certo', text: texto, url: url });
+        navigator.share({ title: 'Corte Comigo', text: texto, url: url });
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(texto + url).then(() => alert('Link copiado!'));
       } else {

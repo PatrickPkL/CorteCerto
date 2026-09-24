@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/servicos.js
+   Corte Comigo – admin/js/servicos.js
    CRUD de serviços com validações da API (RF-018..021).
    ============================================================ */
 

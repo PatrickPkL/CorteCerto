@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/chats-sa.js
+   Corte Comigo – super-admin/js/chats-sa.js
    Chat do site (super-admin): lista conversas e responde
    via REST /api/super-admin/chats*.
    Requer super-auth.js carregado antes.

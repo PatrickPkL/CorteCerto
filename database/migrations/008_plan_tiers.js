@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 008_plan_tiers.js
+   Corte Comigo – 008_plan_tiers.js
    Sistema de travamento por plano (RF planos v3):
 
    - plans.permissions  : funcionalidades liberadas por plano

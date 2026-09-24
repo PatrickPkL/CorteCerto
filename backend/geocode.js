@@ -12,7 +12,7 @@ function geocodificar(endereco, cidade, uf) {
     var query = encodeURIComponent(partes.join(', '));
     var timer = setTimeout(function() { resolve(null); }, 8000);
     var url = 'https://nominatim.openstreetmap.org/search?q=' + query + '&format=json&limit=1&countrycodes=br';
-    https.get(url, { headers: { 'User-Agent': 'CorteCerto/1.0 (contato@cortecerto.com)' } }, function(res) {
+    https.get(url, { headers: { 'User-Agent': 'CorteComigo/1.0 (contato@cortecomigo.com)' } }, function(res) {
       var data = '';
       res.on('data', function(c) { data += c; });
       res.on('end', function() {

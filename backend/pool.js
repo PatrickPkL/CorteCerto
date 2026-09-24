@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – pool.js
+   Corte Comigo – pool.js
    Pool de conexões PostgreSQL (via Knex) para a aplicação.
 
    Conecta como `cortecerto_app` (role com RLS ativo). Operações

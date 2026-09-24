@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/bot-sa.js
+   Corte Comigo – super-admin/js/bot-sa.js
    Bot atendente (super-admin): config, verificação, simulação
    e histórico via REST /api/super-admin/bot*.
    Requer super-auth.js carregado antes.

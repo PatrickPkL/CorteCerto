@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 025_horarios_configurados.js
+   Corte Comigo – 025_horarios_configurados.js
    Marca quando o dono do salão configura os horários (expediente
    ou intervalo). Enquanto false, o agendamento fica "zerado" para
    o cliente (RF-035) — só aparecem horários após o barbeiro salvar.

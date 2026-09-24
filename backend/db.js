@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – db.js  (PRD v2 · Seção 5 / Seção 7)
+   Corte Comigo – db.js  (PRD v2 · Seção 5 / Seção 7)
    Persistência cuja FONTE DE VERDADE é o PostgreSQL.
 
    [SEGURANÇA] Dados sensíveis (email/telefone) são descriptografados no boot

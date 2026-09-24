@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – knexfile.js
+   Corte Comigo – knexfile.js
    Configuração do Knex (query builder + migrações + seeds).
 
    - Migrações/seed rodam com o usuário superuser (postgres) para

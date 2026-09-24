@@ -1,6 +1,6 @@
 ﻿'use strict';
 /* ============================================================
-   Corte Certo ÔÇô 005_rls.js
+   Corte Comigo ÔÇô 005_rls.js
    Roles, grants e Row Level Security (multi-tenant).
 
    Modelo:

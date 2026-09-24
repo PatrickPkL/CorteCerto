@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/lgpd.js
+   Corte Comigo – public/js/lgpd.js
    Exercício de direitos LGPD: envia a solicitação e mostra o
    protocolo. Em arquivo externo para o CSP não precisar de
    'unsafe-inline' em script-src.
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
 
-    /* Em produção, isso enviaria um e-mail para dpo@cortecerto.com via backend.
+    /* Em produção, isso enviaria um e-mail para dpo@cortecomigo.com via backend.
        Por agora, registra no console e mostra sucesso. */
     console.log('[LGPD] Solicitação recebida:', { protocolo: protocolo, nome: nome, email: email, telefone: telefone, tipo: tipo, descricao: descricao });
 

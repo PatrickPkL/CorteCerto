@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – backend/bot.js
+   Corte Comigo – backend/bot.js
    Atendente automático de e-mail ("Bot").
 
    Fluxo:
@@ -80,7 +80,7 @@ function _cfgInit() {
   return {
     enabled: false,
     forwardTo: String(process.env.BOT_FORWARD_TO || '').trim(),
-    assistantName: String(process.env.BOT_ASSISTANT_NAME || 'Equipe Corte Certo').trim(),
+    assistantName: String(process.env.BOT_ASSISTANT_NAME || 'Equipe Corte Comigo').trim(),
     barbershopId: null,
     seconds: Math.max(10, Math.min(3600, parseInt(process.env.BOT_CHECK_SECONDS, 10) || 30))
   };
@@ -170,7 +170,7 @@ async function salvarConfig() {
           enabled: !!_cfg.enabled,
           forward_to: fwd.valor,
           forward_to_hash: fwd.hash,
-          assistant_name: _cfg.assistantName || 'Equipe Corte Certo',
+          assistant_name: _cfg.assistantName || 'Equipe Corte Comigo',
           barbershop_id: _cfg.barbershopId || null,
           seconds: _cfg.seconds || 30,
           updated_at: new Date().toISOString()
@@ -618,7 +618,7 @@ function _contextoLoja(loja, contexto) {
 }
 
 const SISTEMA_GEMINI =
-  'Você é o atendente virtual (IA) do site "Corte Certo", um diretório online de barbearias e salões de beleza. ' +
+  'Você é o atendente virtual (IA) do site "Corte Comigo", um diretório online de barbearias e salões de beleza. ' +
   'Atende clientes pelo chat do site ou por e-mail, com acesso aos dados REAIS e atuais do salão e do cliente. ' +
   'Sua missão é RESOLVER POR CONTA PRÓPRIA a grande maioria das situações do dia a dia: preços, horários, endereço, ' +
   'contato, situação da conta do cliente, orientação de cancelamento/reagendamento, recuperação de senha, formas de ' +
@@ -1027,7 +1027,7 @@ function _respostaConhecimento(loja, nome, intent, contexto) {
   }
   if (intent === 'comoUsarSite') {
     return ack +
-      'O Corte Certo junta barbearias e salões numa página só: você escolhe o salão, vê serviços, preços, horários e ' +
+      'O Corte Comigo junta barbearias e salões numa página só: você escolhe o salão, vê serviços, preços, horários e ' +
       'endereço, e agenda em tempo real direto do site — sem ligação e sem app extra. Quer que eu te mostre os serviços deste salão agora?' +
       _fechamentoResposta();
   }
@@ -1153,19 +1153,19 @@ function _textoRespostaChat(loja, categorias, nome) {
 
 const SAUDACOES = [
   function (loja, nome) {
-    return 'Olá' + (nome ? ', ' + nome : '') + '! Eu sou ' + _cfg.assistantName + ', o assistente virtual (IA) do site Corte Certo. ' +
+    return 'Olá' + (nome ? ', ' + nome : '') + '! Eu sou ' + _cfg.assistantName + ', o assistente virtual (IA) do site Corte Comigo. ' +
       'Posso te ajudar com as informações deste salão: serviços e preços, horários, endereço, contato e agendamento. É só perguntar!';
   },
   function (loja, nome) {
     return 'E aí' + (nome ? ', ' + nome : '') + '! Bem-vindo ao atendimento deste salão. Eu sou o ' + _cfg.assistantName +
-      ' (IA do site Corte Certo) e já tô por dentro de tudo por aqui: preços, horários, endereço, contato e agendamento. Pode mandar!';
+      ' (IA do site Corte Comigo) e já tô por dentro de tudo por aqui: preços, horários, endereço, contato e agendamento. Pode mandar!';
   },
   function (loja, nome) {
-    return 'Oi' + (nome ? ', ' + nome : '') + '! Aqui é o atendimento virtual do site Corte Certo, seu assistente do dia a dia. ' +
+    return 'Oi' + (nome ? ', ' + nome : '') + '! Aqui é o atendimento virtual do site Corte Comigo, seu assistente do dia a dia. ' +
       'Precisa saber de serviço, preço, horário ou resolver alguma coisinha da conta? Tô aqui pra isso!';
   },
   function (loja, nome) {
-    return 'Hey' + (nome ? ', ' + nome : '') + '! Sou o atendente virtual do Corte Certo. Consigo responder na hora sobre ' +
+    return 'Hey' + (nome ? ', ' + nome : '') + '! Sou o atendente virtual do Corte Comigo. Consigo responder na hora sobre ' +
       'serviços, preços, horários, localização e ainda te oriento nos agendamentos. Como posso te ajudar?';
   }
 ];
@@ -1175,7 +1175,7 @@ function msgSaudacao(loja, nome) {
 }
 
 function msgIAAtendenteHumano(loja, nome, aPedidoDoCliente, prazoHoras) {
-  const inicio = 'Eu sou ' + _cfg.assistantName + ', o assistente virtual (IA) do site Corte Certo.';
+  const inicio = 'Eu sou ' + _cfg.assistantName + ', o assistente virtual (IA) do site Corte Comigo.';
   const acao = aPedidoDoCliente
     ? 'Você pediu para falar com uma pessoa real: já acionei o atendente humano.'
     : 'Essa é daquelas que só um atendente real resolve com segurança: já encaminhamos para nossa equipe.';
@@ -1445,11 +1445,11 @@ function rodapeHTML() { return '</body></html>'; }
 function containerHTML(conteudo) {
   return '<div style="max-width:480px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;margin-top:20px;margin-bottom:20px;">' +
     '<div style="background-color:#b8863b;padding:24px 20px;text-align:center;">' +
-      '<h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">Corte Certo</h1>' +
+      '<h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">Corte Comigo</h1>' +
     '</div>' +
     '<div style="padding:32px 20px;">' + conteudo + '</div>' +
     '<div style="padding:16px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">' +
-      '<p style="color:#999999;font-size:12px;margin:0;">' + escHTML(_cfg.assistantName) + ' — Corte Certo</p>' +
+      '<p style="color:#999999;font-size:12px;margin:0;">' + escHTML(_cfg.assistantName) + ' — Corte Comigo</p>' +
     '</div>' +
     '</div>';
 }
@@ -1466,7 +1466,7 @@ function enviarEmail(opts) {
   if (demo) {
     console.log('========================================');
     console.log('[BOT - MODO DEMO] ' + (opts.tag || ''));
-    console.log('De: Corte Certo <' + remetente + '>');
+    console.log('De: Corte Comigo <' + remetente + '>');
     console.log('Para:', opts.to);
     console.log('Assunto:', opts.subject);
     console.log('Redirecionado para:', opts.cc || '—');
@@ -1608,7 +1608,7 @@ async function processarMensagem(dados) {
   const atendente = _cfg.forwardTo || gmailUser();
   const corpoEnc = cabecalhoHTML() +
     '<div style="max-width:560px;margin:16px auto;background:#fff;border:1px solid #eee;border-radius:8px;padding:24px;">' +
-      '<p style="font-size:14px;color:#555;"><strong>Mensagem reencaminhada pelo Atendente automático Corte Certo.</strong></p>' +
+      '<p style="font-size:14px;color:#555;"><strong>Mensagem reencaminhada pelo Atendente automático Corte Comigo.</strong></p>' +
       '<p style="font-size:14px;color:#555;">De: ' + escHTML(de) + ' ' + (nome ? '(' + escHTML(nome) + ')' : '') + '</p>' +
       '<p style="font-size:14px;color:#555;">Recebida: ' + escHTML(String(dados.recibidoEm || new Date().toLocaleString('pt-BR'))) + '</p>' +
       '<p style="font-size:14px;color:#555;"><strong>Assunto original:</strong> ' + escHTML(assunto) + '</p>' +
@@ -1913,7 +1913,7 @@ async function botTestar(dados) {
     nome: String((dados && dados.nome) || '').trim() || nomeDoRemetente(texto),
     subject: assunto,
     text: texto,
-    messageId: '<bot-teste-' + Date.now() + '@cortecerto>',
+    messageId: '<bot-teste-' + Date.now() + '@cortecomigo>',
     references: null,
     recibidoEm: new Date().toLocaleString('pt-BR')
   });
@@ -2021,7 +2021,7 @@ async function saBotTestar(dados) {
     nome: String((dados && dados.nome) || '').trim() || nomeDoRemetente(texto),
     subject: assunto,
     text: texto,
-    messageId: '<bot-teste-' + Date.now() + '@cortecerto>',
+    messageId: '<bot-teste-' + Date.now() + '@cortecomigo>',
     references: null,
     recibidoEm: new Date().toLocaleString('pt-BR')
   });

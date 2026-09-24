@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 015_relatorios_diario_planos.js
+   Corte Comigo – 015_relatorios_diario_planos.js
    Relatórios escalonados v2 (RF-070 evolução):
 
    1. Tabela relatorios_diarios — snapshot diário (padrão de TODOS

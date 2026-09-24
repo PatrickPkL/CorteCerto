@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/agendamentos.js
+   Corte Comigo – admin/js/agendamentos.js
    Listagem com filtros e paginação (RF-040), criação com slots
    reais, edição com revalidação (DT-07) e mudanças de status.
    ============================================================ */
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!liberado) return irAssinar();
       const texto = 'Agende seu horário na ' + (loja.name || 'nossa barbearia') + ': ';
       if (navigator.share) {
-        navigator.share({ title: loja.name || 'Corte Certo', text: texto, url: url })
+        navigator.share({ title: loja.name || 'Corte Comigo', text: texto, url: url })
           .catch(() => { /* usuário cancelou */ });
         return;
       }

@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/horarios.js
+   Corte Comigo – admin/js/horarios.js
    Página dedicada de horários: expediente por dia (DT-09),
    intervalo de slots configurável e folgas/feriados (exceções).
    ============================================================ */

@@ -46,7 +46,7 @@ function checa(nome, cond, texto, esperado) {
   console.log('== Atendente automatico — testes ==\nBase: ' + BASE);
 
   let r = await enviar({ mensagem: 'oi, tudo bem?' });
-  checa('saudacao responde', /assistente virtual.*Corte Certo|Ol[áa]|Oi|E a[ií]|Hey/i.test(r.textoBot), r.textoBot);
+  checa('saudacao responde', /assistente virtual.*Corte Comigo|Ol[áa]|Oi|E a[ií]|Hey/i.test(r.textoBot), r.textoBot);
 
   r = await enviar({ mensagem: 'onde eu faco meu agendamento?' });
   checa('agendar: guia passo a passo', !r.acionadoHumano && /cat[aá]logo/i.test(r.textoBot) && /\b1\)|\b2\)/.test(r.textoBot), r.textoBot, 'guiar sem encaminhar');
@@ -55,7 +55,7 @@ function checa(nome, cond, texto, esperado) {
   checa('agendar: tenta orientar no site', !r.acionadoHumano && /agendar|hor[aá]rio/i.test(r.textoBot), r.textoBot);
 
   r = await enviar({ mensagem: 'tem vaga hoje?' });
-  checa('vaga: resolve com link+turma', !r.acionadoHumano && /catalogo|cortecerto|localhost/i.test(r.textoBot), r.textoBot);
+  checa('vaga: resolve com link+turma', !r.acionadoHumano && /catalogo|cortecomigo|localhost/i.test(r.textoBot), r.textoBot);
 
   r = await enviar({ mensagem: 'quero cancelar meu agendamento de hoje' });
   checa('cancelar: tutorial autosservico', !r.acionadoHumano && /Meus agendamentos/i.test(r.textoBot), r.textoBot);

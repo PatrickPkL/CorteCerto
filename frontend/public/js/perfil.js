@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/perfil.js
+   Corte Comigo – public/js/perfil.js
    Perfil do cliente: estatísticas reais, próximos/histórico,
    favoritos (UC-15), avaliações (RF-056) e configurações.
    ============================================================ */
@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
       var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = 'cortecerto-meus-dados-' + new Date().toISOString().slice(0,10) + '.json';
+      a.href = url; a.download = 'cortecomigo-meus-dados-' + new Date().toISOString().slice(0,10) + '.json';
       a.click();
       URL.revokeObjectURL(url);
     };

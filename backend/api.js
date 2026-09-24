@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – local-api.js  (PRD v2 · RNF-03 / Seção 3)
+   Corte Comigo – local-api.js  (PRD v2 · RNF-03 / Seção 3)
    Camada de API local que ESPELHA os contratos REST do backend v1:
    mesmos paths lógicos, payloads e respostas; erros simulados via
    throw { status, error } (códigos HTTP simulados).
@@ -523,7 +523,7 @@ function lojaPublica(l) {
   function ensureSuperAdmin() {
     var hash = process.env.SUPER_ADMIN_HASH;
     if (!hash) err(500, 'SUPER_ADMIN_HASH não configurado.');
-    var email = (process.env.SUPER_ADMIN_EMAIL || 'admin@cortecerto.com').toLowerCase();
+    var email = (process.env.SUPER_ADMIN_EMAIL || 'admin@cortecomigo.com').toLowerCase();
     var ips = (process.env.SUPER_ADMIN_IPS || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
     return { email: email, hash: hash, ips: ips };
   }
@@ -4174,7 +4174,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     });
     DB.salvar();
     /* enviar email para DPO */
-    var dpoEmail = (typeof process !== 'undefined' && process.env && process.env.DPO_EMAIL) || 'dpo@cortecerto.com';
+    var dpoEmail = (typeof process !== 'undefined' && process.env && process.env.DPO_EMAIL) || 'dpo@cortecomigo.com';
     var Mailer;
     try { Mailer = require('./mailer'); } catch(e) {}
     if (Mailer && Mailer.enviarEmail) {

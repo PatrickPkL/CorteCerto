@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 007_ticket_resposta.js
+   Corte Comigo – 007_ticket_resposta.js
    Coluna `resposta` em tickets (usada pelo super-admin ao
    responder um chamado). A migração 006 velha do pg_map já
    referenciava o campo; aqui materializamos no schema.

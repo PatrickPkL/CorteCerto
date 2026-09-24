@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 010_precos_anuais.js
+   Corte Comigo – 010_precos_anuais.js
    RF-033 (preços v3): preço anual próprio por plano.
 
    Esta migration é independente da 009. Ela não depende de nada

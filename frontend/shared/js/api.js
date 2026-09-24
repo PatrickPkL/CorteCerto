@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – api.js (cliente HTTP)
+   Corte Comigo – api.js (cliente HTTP)
    Substitui o antigo local-api.js: cada chamada vira um
    POST /api/rpc síncrono, preservando o contrato try/catch
    síncrono já usado em todas as páginas.

@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 006_bot.js
+   Corte Comigo – 006_bot.js
    Persistência do Atendente automático no PostgreSQL:
 
    - bot_config   : config global do bot (linha única).
@@ -25,7 +25,7 @@ exports.up = async function (knex) {
     enabled BOOLEAN NOT NULL DEFAULT FALSE,
     forward_to TEXT,
     forward_to_hash TEXT,
-    assistant_name TEXT NOT NULL DEFAULT 'Equipe Corte Certo',
+    assistant_name TEXT NOT NULL DEFAULT 'Equipe Corte Comigo',
     barbershop_id UUID REFERENCES barbershops(id) ON DELETE SET NULL,
     seconds INT NOT NULL DEFAULT 30 CHECK (seconds BETWEEN 10 AND 3600),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

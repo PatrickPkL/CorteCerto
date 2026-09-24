@@ -1,6 +1,6 @@
 ﻿'use strict';
 /* ============================================================
-   Corte Certo â€“ seeds/001_demo.js
+   Corte Comigo â€“ seeds/001_demo.js
    Seed de demonstraÃ§Ã£o: planos e dados demo
    (6 salÃµes, serviÃ§os, profissionais, horÃ¡rios, clientes,
    agendamentos, avaliaÃ§Ãµes, assinaturas) + usuÃ¡rios demo em
@@ -86,17 +86,17 @@ const plans = [
      Contas reais nunca sÃ£o apagadas pelo seed â€” na gravaÃ§Ã£o removemos
      apenas os ids fixes 7001/7002/7003. */
   const criarDemo = process.env.NODE_ENV !== 'production' || process.env.CC_DEMO_USERS === '1';
-  const EMAIL_DONO_DEMO = (process.env.GMAIL_USER || '').trim() || 'dono.demo@cortecerto';
+  const EMAIL_DONO_DEMO = (process.env.GMAIL_USER || '').trim() || 'dono.demo@cortecomigo';
 
   const users = [];
   if (criarDemo) {
     const DDEMO = addDiasISO(-30);
     users.push(mkUser(7001, 'dono', 'Carlos Demo', EMAIL_DONO_DEMO, '71999990001', 1, DDEMO + 'T09:00', {}));
     users.push(Object.assign(
-      mkUser(7002, 'dependente', 'Renata Demo', 'depend.demo@cortecerto', '71999990002', 1, DDEMO + 'T09:00', {}),
+      mkUser(7002, 'dependente', 'Renata Demo', 'depend.demo@cortecomigo', '71999990002', 1, DDEMO + 'T09:00', {}),
       { password_hash: hashSenhaDemo('demo1234') }
     ));
-    users.push(mkUser(7003, 'barbeiro', 'Paulo Demo', 'barbeiro.demo@cortecerto', '71999990003', 1, DDEMO + 'T09:00', {}));
+    users.push(mkUser(7003, 'barbeiro', 'Paulo Demo', 'barbeiro.demo@cortecomigo', '71999990003', 1, DDEMO + 'T09:00', {}));
   }
 
   // ---------- barbershops ----------

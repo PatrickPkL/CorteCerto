@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – db_pg.js
+   Corte Comigo – db_pg.js
    Camada de acesso a dados ASSÍNCRONA sobre PostgreSQL (Knex).
 
    Fonte de verdade: banco `cortecerto` (schema em database/migrations).

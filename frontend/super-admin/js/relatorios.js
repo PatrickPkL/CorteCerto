@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/relatorios.js
+   Corte Comigo – super-admin/js/relatorios.js
    Página de Relatórios: cards por período, planos, top 10 lojas
    por receita e atividade recente (logins).
    Requer super-auth.js carregado antes.

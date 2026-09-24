@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/login.js
+   Corte Comigo – admin/js/login.js
    Autenticação por telefone OU e-mail + código de verificação
    (RF-001..005, DT-13). Requer db.js, auth.js, local-api.js e
    shared.js antes.

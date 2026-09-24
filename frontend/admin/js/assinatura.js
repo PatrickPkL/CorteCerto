@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/assinatura.js
+   Corte Comigo – admin/js/assinatura.js
    Status da assinatura, troca de planos via PIX (AbacatePay)
    e histórico de cobranças (RF-057..061, DT-12).
    ============================================================ */

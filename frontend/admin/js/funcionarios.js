@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/funcionarios.js
+   Corte Comigo – admin/js/funcionarios.js
    Gestão de contas Dependente/Funcionário:
    · mostra cota do plano e o Código Único da empresa
    · cria credenciais (Login + Senha)

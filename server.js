@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – server.js
+   Corte Comigo – server.js
    Servidor de desenvolvimento, sem dependências externas.
 
    POST /api/rpc  → dispatch direto para as funções do backend
@@ -868,12 +868,12 @@ const server = http.createServer((req, res) => {
      em produção ela nunca serve a aplicação nesse estado). */
   if (global.__CC_BOOT_ERROR) {
     res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end('Corte Certo — erro de inicialização:\n\n' +
+    return res.end('Corte Comigo — erro de inicialização:\n\n' +
       String(global.__CC_BOOT_ERROR) + '\n\nDetalhes em boot-error.log na raiz do app.');
   }
   if (!global.__CC_BOOT_READY) {
     res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end('Corte Certo inicializando... recarregue em instantes.');
+    return res.end('Corte Comigo inicializando... recarregue em instantes.');
   }
 
   if (req.method === 'GET' && pathname === '/health') {
@@ -892,7 +892,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/magic-link') {
     const tk = url.searchParams.get('token');
     if (!tk) { res.writeHead(400, headersPadrao({ 'Content-Type': 'text/plain; charset=utf-8' })); return res.end('Token ausente.'); }
-    const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Certo...</p><script src="../shared/js/magic-link.js"></script></body></html>';
+    const html = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=../admin/">\n<title>Entrando...</title></head>\n<body><p>Entrando no Corte Comigo...</p><script src="../shared/js/magic-link.js"></script></body></html>';
     res.writeHead(200, headersPadrao({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html), 'Cache-Control': 'no-store' }));
     return res.end(html);
   }
@@ -1128,7 +1128,7 @@ function bancoRemoto() {
   try { Promise.resolve(Bot.start()).catch(e => console.error('[boot][bot]', (e && (e.message || e)) || e)); }
   catch (e) { console.error('[boot][bot]', (e && (e.message || e)) || e); }
   console.log('');
-  console.log('  Corte Certo rodando:');
+  console.log('  Corte Comigo rodando:');
   console.log('  Catálogo público : http://localhost:' + PORTA + '/public/catalogo.html');
   console.log('  Painel admin     : http://localhost:' + PORTA + '/admin/login.html');
   console.log('  Banco de dados   : PostgreSQL (cortecerto)');

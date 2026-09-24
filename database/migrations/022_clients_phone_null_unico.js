@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 022_clients_phone_null_unico.js
+   Corte Comigo – 022_clients_phone_null_unico.js
    Clientes sem telefone (cadastro só por e-mail/nome) NÃO devem
    colidir na unicidade (barbershop_id, phone): antes, dois clientes
    sem telefone do mesmo salão geravam conflito e derrubavam TODO o

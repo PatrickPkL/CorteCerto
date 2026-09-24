@@ -1,17 +1,17 @@
-# Relatório de Impacto à Proteção de Dados Pessoais (RIPD) — Corte Certo
+# Relatório de Impacto à Proteção de Dados Pessoais (RIPD) — Corte Comigo
 
 ## 1. Identificação do Controlador
 
 | Campo | Valor |
 |-------|-------|
-| **Nome** | Corte Certo |
-| **DPO** | dpo@cortecerto.com |
+| **Nome** | Corte Comigo |
+| **DPO** | dpo@cortecomigo.com |
 | **Data do RIPD** | 26/08/2026 |
 | **Versão** | 1.0 |
 
 ## 2. Descrição do Tratamento
 
-O Corte Certo é uma plataforma de conexão entre clientes e barbearias/salões de beleza, facilitando o agendamento de serviços.
+O Corte Comigo é uma plataforma de conexão entre clientes e barbearias/salões de beleza, facilitando o agendamento de serviços.
 
 **Operações de tratamento:**
 - Cadastro de usuários (clientes e donos de estabelecimentos)
@@ -76,4 +76,4 @@ O Corte Certo é uma plataforma de conexão entre clientes e barbearias/salões 
 
 ## 7. Conclusão
 
-O Corte Certo adota medidas técnicas e organizacionais adequadas ao risco, em conformidade com os princípios da LGPD (Art. 6º). Os riscos residuais são considerados aceitáveis. Este RIPD será revisado semestralmente ou a cada alteração significativa no tratamento de dados.
+O Corte Comigo adota medidas técnicas e organizacionais adequadas ao risco, em conformidade com os princípios da LGPD (Art. 6º). Os riscos residuais são considerados aceitáveis. Este RIPD será revisado semestralmente ou a cada alteração significativa no tratamento de dados.

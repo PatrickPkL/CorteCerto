@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 026_estorno_arrependimento.js
+   Corte Comigo – 026_estorno_arrependimento.js
    Direito de arrependimento (CDC art. 49): reembolso integral em
    até 7 dias corridos da contratação/pagamento.
 

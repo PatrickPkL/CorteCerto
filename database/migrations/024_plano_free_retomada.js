@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 024_plano_free_retomada.js
+   Corte Comigo – 024_plano_free_retomada.js
    Retoma o plano base Free (RF-070/DT-12 sem camada pagante única):
 
    - Reinsere o plano Free (is_free = TRUE) na vitrine de planos para

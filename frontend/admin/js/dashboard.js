@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/dashboard.js
+   Corte Comigo – admin/js/dashboard.js
    Estatísticas por período (RF-048) + exportação CSV (RF-049).
    ============================================================ */
 
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!liberado) return irAssinar();
       const texto = 'Agende seu horário na ' + (loja.name || 'nossa barbearia') + ': ';
       if (navigator.share) {
-        navigator.share({ title: loja.name || 'Corte Certo', text: texto, url: url })
+        navigator.share({ title: loja.name || 'Corte Comigo', text: texto, url: url })
           .catch(() => { /* usuário cancelou */ });
         return;
       }
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-compartilhar-codigo')?.addEventListener('click', () => {
-      const texto = 'Meu Código Único na Corte Certo: ' + dados.codigo_unico +
+      const texto = 'Meu Código Único na Corte Comigo: ' + dados.codigo_unico +
         ' — use com seu Login e Senha para acessar agenda e clientes.';
       if (navigator.share) {
         navigator.share({ text: texto }).catch(() => { /* cancelado */ });

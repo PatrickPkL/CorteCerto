@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 020_platform_settings.js
+   Corte Comigo – 020_platform_settings.js
    Configurações globais da plataforma (chave/valor), editáveis
    pelo super-admin. Primeiro uso: "site_gratis" — quando ligado,
    TODO o site fica liberado (todas as funcionalidades/relatórios)

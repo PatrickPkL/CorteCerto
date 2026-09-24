@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – supabase.js
+   Corte Comigo – supabase.js
    Cliente Supabase para leitura/consulta externa (SaaS).
    O core da aplicação continua usando o PostgreSQL próprio via
    pool.js; este módulo é opcional e só ativa quando

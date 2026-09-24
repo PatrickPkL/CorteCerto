@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 009_precos_planos_limpeza.js
+   Corte Comigo – 009_precos_planos_limpeza.js
    RF-032 (preços v2) + limpeza de dados de demonstração:
 
    1. Preços mensais dos planos:

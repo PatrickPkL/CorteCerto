@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/suporte.js
+   Corte Comigo – admin/js/suporte.js
    Tickets de atendimento (RF extra mantido da v1).
    ============================================================ */
 

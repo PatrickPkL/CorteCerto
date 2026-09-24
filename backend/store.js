@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – store.js ("banco")
+   Corte Comigo – store.js ("banco")
    Persistência da aplicação em arquivo JSON (database/db.json).
    Implementa o contrato de localStorage exigido por
    db.js / auth.js / api.js quando rodam no Node.

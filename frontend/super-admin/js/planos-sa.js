@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/planos-sa.js
+   Corte Comigo – super-admin/js/planos-sa.js
    CRUD completo de planos + modo grátis global.
    Requer super-auth.js carregado antes.
    ============================================================ */

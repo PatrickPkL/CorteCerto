@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/chatbot.js
+   Corte Comigo – public/js/chatbot.js
    Widget "Fale com a gente" — disponível em TODAS as páginas
    do site. O bot se apresenta como assistente do SITE Corte
    Certo (não da barbearia). Se a página já é de um salão
@@ -244,7 +244,7 @@
         '<div class="cc-avatar">CC</div>' +
         '<div class="cc-titulo">' +
           '<b id="cc-chat-titulo">Fale com a gente</b>' +
-          '<span class="cc-sub" id="cc-chat-loja">Assistente virtual do site Corte Certo</span>' +
+          '<span class="cc-sub" id="cc-chat-loja">Assistente virtual do site Corte Comigo</span>' +
           '<select id="cc-chat-salao" title="Escolha o salão"></select>' +
         '</div>' +
       '</div>' +
@@ -305,7 +305,7 @@
         if (!novo || novo === lojaId) return;
         lojaId = novo;
         lojaNome = nomeDoLoja(lojaId);
-        lojaEl.textContent = 'Assistente virtual do site Corte Certo · ' + lojaNome;
+        lojaEl.textContent = 'Assistente virtual do site Corte Comigo · ' + lojaNome;
         trocarDeSalao();
       });
     }
@@ -323,7 +323,7 @@
     }
 
     function boasVindas() {
-      bolha('bot', '(IA) Olá! Eu sou o assistente virtual do site Corte Certo. ' +
+      bolha('bot', '(IA) Olá! Eu sou o assistente virtual do site Corte Comigo. ' +
         'Posso te ajudar com as informações deste salão: serviços e preços, horários, endereço, contato e agendamento.\n' +
         'Se precisar falar com uma pessoa real, é só me pedir — nossa equipe responde em até 32 horas.');
       mostrarSugestoes(SUGESTOES_INICIAIS);
@@ -339,7 +339,7 @@
       } else {
         const r = document.createElement('span');
         r.className = 'cc-rotulo';
-        r.textContent = role === 'atendente' ? 'Atendente humano (Corte Certo)' : 'Assistente virtual (IA)';
+        r.textContent = role === 'atendente' ? 'Atendente humano (Corte Comigo)' : 'Assistente virtual (IA)';
         b.appendChild(r);
         const t = document.createElement('span');
         t.innerHTML = esc(htmlOuTexto).replace(/\n/g, '<br>');
@@ -403,7 +403,7 @@
       } else {
         identEl.hidden = true;
       }
-      lojaEl.textContent = 'Assistente virtual do site Corte Certo' + (lojaFixada || lojaId ? ' · ' + lojaNome : '');
+      lojaEl.textContent = 'Assistente virtual do site Corte Comigo' + (lojaFixada || lojaId ? ' · ' + lojaNome : '');
       if (!threadId && !msgsEl.children.length) {
         carregarHistoricoInicial();
       }

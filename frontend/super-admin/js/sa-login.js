@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/sa-login.js
+   Corte Comigo – super-admin/js/sa-login.js
    Login do painel super-admin. Em arquivo externo para o CSP
    não precisar de 'unsafe-inline' em script-src.
    ============================================================ */

@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 019_lembrete_dia_email.js
+   Corte Comigo – 019_lembrete_dia_email.js
    Marca de envio do lembrete por e-mail (Gmail) NO DIA do agendamento.
 
    Complementa 018_lembrete_email.js (véspera). O lembrete é enviado

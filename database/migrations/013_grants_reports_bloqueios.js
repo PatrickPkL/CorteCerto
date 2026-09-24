@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 013_grants_reports_bloqueios.js
+   Corte Comigo – 013_grants_reports_bloqueios.js
    Backfill: as migrations 005/006 concederam privilégios com
    "ON ALL TABLES IN SCHEMA public", que não cobre tabelas
    criadas posteriormente. Concede explicitamente os DMLs em

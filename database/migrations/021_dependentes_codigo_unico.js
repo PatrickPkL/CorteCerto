@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 021_dependentes_codigo_unico.js
+   Corte Comigo – 021_dependentes_codigo_unico.js
    Contas "Dependente/Funcionário":
 
    - usr_role += 'dependente'  : 3º papel (Cliente / Empresa-Beiro

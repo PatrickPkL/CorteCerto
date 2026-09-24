@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 017_planos_beneficios_iguais.js
+   Corte Comigo – 017_planos_beneficios_iguais.js
    Benefícios unificados (v4):
 
    Todos os planos pagos passam a ter EXATAMENTE os mesmos

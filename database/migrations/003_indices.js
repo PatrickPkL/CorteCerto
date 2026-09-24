@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 003_indices.js
+   Corte Comigo – 003_indices.js
    Índices de desempenho + full-text search (português) + tags.
    ============================================================ */
 

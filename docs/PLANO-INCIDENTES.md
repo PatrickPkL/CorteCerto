@@ -1,8 +1,8 @@
-# Plano de Resposta a Incidentes — Corte Certo
+# Plano de Resposta a Incidentes — Corte Comigo
 
 ## 1. Definição de Incidente
 
-Um incidente de segurança é qualquer evento que comprometa a confidencialidade, integridade ou disponibilidade de dados pessoais tratados pelo Corte Certo, incluindo:
+Um incidente de segurança é qualquer evento que comprometa a confidencialidade, integridade ou disponibilidade de dados pessoais tratados pelo Corte Comigo, incluindo:
 
 - Acesso não autorizado a dados pessoais
 - Vazamento de dados (e-mail, telefone, dados de pagamento)
@@ -23,9 +23,9 @@ Um incidente de segurança é qualquer evento que comprometa a confidencialidade
 
 | Papel | Responsável | Contato |
 |-------|-------------|---------|
-| **DPO** | Responsável designado | dpo@cortecerto.com |
+| **DPO** | Responsável designado | dpo@cortecomigo.com |
 | **Técnico** | Desenvolvedor principal | Canal interno |
-| **Comunicação** | DPO | dpo@cortecerto.com |
+| **Comunicação** | DPO | dpo@cortecomigo.com |
 
 ## 4. Procedimento de Resposta
 
@@ -68,8 +68,8 @@ Notificação deve conter:
 ```
 NOTIFICAÇÃO DE INCIDENTE DE SEGURANÇA — ANPD
 
-1. Controlador: [Nome da empresa / Corte Certo]
-2. DPO Responsável: [Nome] — dpo@cortecerto.com
+1. Controlador: [Nome da empresa / Corte Comigo]
+2. DPO Responsável: [Nome] — dpo@cortecomigo.com
 3. Data do incidente: [DD/MM/AAAA]
 4. Data da notificação: [DD/MM/AAAA]
 5. Natureza do incidente: [Descrição breve]

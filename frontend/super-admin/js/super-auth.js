@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/super-auth.js
+   Corte Comigo – super-admin/js/super-auth.js
    Gerenciamento de autenticação do super-admin.
    ============================================================ */
 

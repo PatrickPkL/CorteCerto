@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 023_supabase_sessao.js
+   Corte Comigo – 023_supabase_sessao.js
    Em bancos gerenciados (Supabase) o usuário dono (postgres) NÃO é
    superuser, então "SET LOCAL ROLE cortecerto_admin" falha com
    "permission denied to set role". Damos membership nos roles

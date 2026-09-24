@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/denuncias-sa.js
+   Corte Comigo – super-admin/js/denuncias-sa.js
    Denúncias: lista todas as denúncias recebidas, filtra por
    status e tipo, e permite resolver/rejeitar cada uma.
    Requer super-auth.js carregado antes.

@@ -1,8 +1,8 @@
-# Inventário de Dados Pessoais — Corte Certo
+# Inventário de Dados Pessoais — Corte Comigo
 
 ## 1. Visão Geral
 
-Este inventário mapeia todos os dados pessoais tratados pelo Corte Certo, incluindo localização de armazenamento, finalidade, prazo de retenção e acesso.
+Este inventário mapeia todos os dados pessoais tratados pelo Corte Comigo, incluindo localização de armazenamento, finalidade, prazo de retenção e acesso.
 
 ## 2. Dados por Categoria
 

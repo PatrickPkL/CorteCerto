@@ -1,8 +1,8 @@
 {
-  "name": "corte-certo",
+  "name": "corte-comigo",
   "version": "1.0.0",
   "private": true,
-  "description": "Corte Certo — agendamento para salões e barbearias (demo)",
+  "description": "Corte Comigo — agendamento para salões e barbearias (demo)",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",

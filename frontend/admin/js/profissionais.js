@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/profissionais.js
+   Corte Comigo – admin/js/profissionais.js
    Equipe com horários próprios (DT-09), vínculo de serviços,
    limite por plano (RF-026/DT-12) e soft-delete (UC-09.4).
    ============================================================ */

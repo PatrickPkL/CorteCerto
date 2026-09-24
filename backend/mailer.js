@@ -2,7 +2,7 @@
 
 var GMAIL_USER = process.env.GMAIL_USER || "";
 var GMAIL_PASS = process.env.GMAIL_PASS || "";
-var FROM_NAME = process.env.EMAIL_FROM || "Corte Certo";
+var FROM_NAME = process.env.EMAIL_FROM || "Corte Comigo";
 var APP_URL = process.env.APP_URL || "http://localhost:3000";
 var DEMO_MODE = !GMAIL_USER || !GMAIL_PASS;
 
@@ -201,13 +201,13 @@ function rodapeHTML() {
 function containerHTML(conteudo) {
   return '<div style="max-width:480px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;margin-top:20px;margin-bottom:20px;">' +
     '<div style="background-color:#b8863b;padding:30px 20px;text-align:center;">' +
-      '<h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700;">Corte Certo</h1>' +
+      '<h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700;">Corte Comigo</h1>' +
     "</div>" +
     '<div style="padding:40px 20px;">' +
       conteudo +
     "</div>" +
     '<div style="padding:20px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">' +
-      '<p style="color:#999999;font-size:12px;margin:0;">Corte Certo &copy; ' + new Date().getFullYear() + ' — Todos os direitos reservados.</p>' +
+      '<p style="color:#999999;font-size:12px;margin:0;">Corte Comigo &copy; ' + new Date().getFullYear() + ' — Todos os direitos reservados.</p>' +
     "</div>" +
     "</div>";
 }
@@ -221,16 +221,16 @@ function enviarLinkMagico(email, token, nome) {
 
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá' + (nome ? ", " + nome : "") + "!</p>" +
-    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Clique no botão abaixo para acessar sua conta no Corte Certo. Não é necessário senha.</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Clique no botão abaixo para acessar sua conta no Corte Comigo. Não é necessário senha.</p>' +
     '<div style="text-align:center;">' +
-      botaoHTML(link, "Entrar no Corte Certo") +
+      botaoHTML(link, "Entrar no Corte Comigo") +
     "</div>" +
     '<p style="color:#999999;font-size:12px;margin:24px 0 0 0;text-align:center;">Este link expira em 15 minutos.</p>';
 
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
-    subject: "Confirme seu e-mail — Corte Certo",
+    subject: "Confirme seu e-mail — Corte Comigo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "link-magico");
 }
@@ -238,7 +238,7 @@ function enviarLinkMagico(email, token, nome) {
 function enviarCodigoVerificacao(email, codigo) {
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá!</p>' +
-    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Use o código abaixo para concluir seu cadastro no Corte Certo:</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Use o código abaixo para concluir seu cadastro no Corte Comigo:</p>' +
     '<div style="text-align:center;background-color:#f9f9f9;border-radius:8px;padding:24px;margin:16px 0;">' +
       '<span style="display:inline-block;color:#b8863b;font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace;">' + String(codigo) + "</span>" +
     "</div>" +
@@ -247,7 +247,7 @@ function enviarCodigoVerificacao(email, codigo) {
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
-    subject: "Seu código de verificação — Corte Certo",
+    subject: "Seu código de verificação — Corte Comigo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "codigo-verificacao");
 }
@@ -261,7 +261,7 @@ function enviarRecuperacao(email, token, nome) {
 
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá' + (nome ? ", " + nome : "") + "!</p>" +
-    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Recebemos um pedido para recuperar o acesso à sua conta no Corte Certo.</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Recebemos um pedido para recuperar o acesso à sua conta no Corte Comigo.</p>' +
     '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Clique no botão abaixo para entrar na sua conta. Não é necessária senha.</p>' +
     '<div style="text-align:center;">' +
       botaoHTML(link, "Recuperar acesso") +
@@ -271,7 +271,7 @@ function enviarRecuperacao(email, token, nome) {
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
-    subject: "Recupere seu acesso — Corte Certo",
+    subject: "Recupere seu acesso — Corte Comigo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "recuperar-acesso");
 }
@@ -290,7 +290,7 @@ function enviarConfirmacaoAgendamento(email, dados) {
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
-    subject: "Agendamento confirmado — " + (dados.salaoNome || "Corte Certo"),
+    subject: "Agendamento confirmado — " + (dados.salaoNome || "Corte Comigo"),
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "confirmacao-agendamento");
 }
@@ -317,7 +317,7 @@ function enviarNovoAgendamento(email, dados) {
 function enviarCodigoExclusao(email, codigo) {
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá!</p>' +
-    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Recebemos um pedido para excluir a sua conta no Corte Certo. Para concluir, digite o código abaixo:</p>' +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Recebemos um pedido para excluir a sua conta no Corte Comigo. Para concluir, digite o código abaixo:</p>' +
     '<div style="text-align:center;background-color:#f9f9f9;border-radius:8px;padding:24px;margin:16px 0;">' +
       '<span style="display:inline-block;color:#b8863b;font-size:40px;font-weight:800;letter-spacing:10px;font-family:monospace;">' + String(codigo) + "</span>" +
     "</div>" +
@@ -326,7 +326,7 @@ function enviarCodigoExclusao(email, codigo) {
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: email,
-    subject: "Código para excluir sua conta — Corte Certo",
+    subject: "Código para excluir sua conta — Corte Comigo",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "codigo-exclusao");
 }
@@ -338,7 +338,7 @@ function enviarBoasVindas(dados) {
     : null;
 
   var conteudo =
-    '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Bem-vindo ao Corte Certo, ' + (dados.nome || "") + "!</p>" +
+    '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Bem-vindo ao Corte Comigo, ' + (dados.nome || "") + "!</p>" +
     '<p style="color:#555555;font-size:14px;margin:0 0 8px 0;">Sua conta no salão <strong>' + (dados.nomeSalao || "") + "</strong> foi criada." +
     (dados.trialDias ? " Você tem <strong>" + dados.trialDias + " dias</strong> de teste grátis." : "") +
     "</p>" +
@@ -361,7 +361,7 @@ function enviarBoasVindas(dados) {
   return enviarEmailComTimeout({
     from: FROM_NAME + " <" + GMAIL_USER + ">",
     to: dados.email,
-    subject: "Bem-vindo ao Corte Certo, " + (dados.nome || "") + "!",
+    subject: "Bem-vindo ao Corte Comigo, " + (dados.nome || "") + "!",
     html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
   }, "boas-vindas");
 }

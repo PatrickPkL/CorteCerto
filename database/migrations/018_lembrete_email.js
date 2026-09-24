@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 018_lembrete_email.js
+   Corte Comigo – 018_lembrete_email.js
    Marca de envio do lembrete por e-mail (Gmail) do agendamento.
 
    Guarda QUANDO o lembrete de véspera foi enviado ao cliente para

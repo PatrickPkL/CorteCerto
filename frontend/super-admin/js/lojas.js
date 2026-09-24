@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/lojas.js
+   Corte Comigo – super-admin/js/lojas.js
    Listagem de lojas: busca, filtros por status/plano e acesso
    ao detalhe de cada loja.
    Requer super-auth.js carregado antes.

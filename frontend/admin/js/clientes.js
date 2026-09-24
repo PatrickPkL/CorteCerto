@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/clientes.js
+   Corte Comigo – admin/js/clientes.js
    CRM: lista de clientes (RF-044), ficha com notas e histórico
    (RF-045/047). O cadastro manual foi removido: os clientes são
    criados automaticamente pelos agendamentos (RBAC).

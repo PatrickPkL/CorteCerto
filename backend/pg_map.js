@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – pg_map.js
+   Corte Comigo – pg_map.js
    Mapeamento entre o formato em memória da aplicação (db.js:
    camelCase, flags 1/0, timestamps locais) e as tabelas do
    PostgreSQL (snake_case, tipos SQL, cifragem de dados sensíveis).

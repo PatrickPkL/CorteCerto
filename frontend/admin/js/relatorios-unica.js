@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo - admin/js/relatorios-unica.js
+   Corte Comigo - admin/js/relatorios-unica.js
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {

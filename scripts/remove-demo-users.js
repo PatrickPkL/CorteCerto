@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – scripts/remove-demo-users.js
+   Corte Comigo – scripts/remove-demo-users.js
    DELETE CIRÚRGICO das contas demo do seed (Marcos/João).
 
    Diferente de re-seed, apaga SOMENTE os 2 usuários determinísticos

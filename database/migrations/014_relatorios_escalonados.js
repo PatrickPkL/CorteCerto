@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 014_relatorios_escalonados.js
+   Corte Comigo – 014_relatorios_escalonados.js
    Relatórios escalonados por plano (RF-070 v3.1):
 
    - plans.nivel_relatorio : 'basico' | 'intermediario' | 'completo'

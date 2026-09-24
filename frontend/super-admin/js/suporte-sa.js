@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/suporte-sa.js
+   Corte Comigo – super-admin/js/suporte-sa.js
    Suporte: lista todos os tickets, filtra por status e responde.
    Requer super-auth.js carregado antes.
    ============================================================ */

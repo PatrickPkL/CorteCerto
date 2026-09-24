@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – shared.js
+   Corte Comigo – shared.js
    Toast, Modais, Tema claro/escuro, Sessão (Auth), navegação
    pública, sino de notificações e formatadores compartilhados.
    Requer db.js, auth.js e local-api.js carregados antes.

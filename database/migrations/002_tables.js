@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – 002_tables.js
+   Corte Comigo – 002_tables.js
    Cria as 22 tabelas do domínio.
    Dados sensíveis (users.email/phone) são criptografados em
    repouso na aplicação (AES-256-GCM). Para manter unicidade e

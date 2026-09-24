@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/loja-detalhe.js
+   Corte Comigo – super-admin/js/loja-detalhe.js
    Detalhe de loja individual: info, serviços, profissionais,
    agendamentos, plano e exclusão.
    Requer super-auth.js carregado antes.

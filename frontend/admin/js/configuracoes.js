@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/configuracoes.js
+   Corte Comigo – admin/js/configuracoes.js
    Dados da loja (RF-016/017), logo/capa e galeria com reencode
    (RF-062..065), grade de horários com almoço (DT-09) e
    exclusão de conta em cascata (RF-010).
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
       var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = 'cortecerto-dados-loja-' + new Date().toISOString().slice(0,10) + '.json';
+      a.href = url; a.download = 'cortecomigo-dados-loja-' + new Date().toISOString().slice(0,10) + '.json';
       a.click();
       URL.revokeObjectURL(url);
     };

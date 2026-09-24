@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – auth.js  (PRD v2 · Seção 3.1 / RNF-06 / RNF-10)
+   Corte Comigo – auth.js  (PRD v2 · Seção 3.1 / RNF-06 / RNF-10)
    Autenticação SEM SENHA: e-mail + código de 6 dígitos (RF-002).
    O código é enviado por e-mail e, sem Gmail configurado, exibido
    na UI (modo demonstração — RNF-19).

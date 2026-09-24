@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – crypt.js
+   Corte Comigo – crypt.js
    Criptografia em repouso de dados sensíveis (phone/email).
    AES-256-GCM com chave derivada (SHA-256) de DB_ENCRYPT_KEY.
 

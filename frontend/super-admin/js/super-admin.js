@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – super-admin/js/super-admin.js
+   Corte Comigo – super-admin/js/super-admin.js
    Dashboard: estatísticas da plataforma.
    Requer super-auth.js carregado antes.
    ============================================================ */

@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – payments.js
+   Corte Comigo – payments.js
    Cobrança dos planos via AbacatePay.
 
    Métodos de pagamento:
@@ -125,7 +125,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
         data: {
           amount: pag.amount_cents,
           expiresIn: EXPIRA_EM_SEG,
-          description: 'Corte Certo — Plano ' + plano.name + ' (' +
+          description: 'Corte Comigo — Plano ' + plano.name + ' (' +
             ((pag.billing_period || 30) === 365 ? 'anual' : '30 dias') + ')',
           externalId: 'cc_pay_' + pag.id,
           metadata: { payment_db_id: String(pag.id), barbershop_id: String(pag.barbershop_id), plan_id: String(pag.plan_id) }
@@ -212,7 +212,7 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       pag.dev_mode = d.devMode === true; /* sandbox → permite simular pagamento */
     } else {
       /* modo simulado — código PIX inválido apenas ilustrativo */
-      pag.br_code = '00020126BR.GOV.BCB.PIX01CORTECERTO-DEMO520400005303986' +
+      pag.br_code = '00020126BR.GOV.BCB.PIX01CORTECOMIGO-DEMO520400005303986' +
         '5802BR5904DEMO6009SAO PAULO62070503***' + String(pag.id).padStart(3, '0') + '6304DEMO';
     }
 

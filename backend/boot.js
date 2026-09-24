@@ -1,6 +1,6 @@
 'use strict';
 /* ============================================================
-   Corte Certo – boot.js
+   Corte Comigo – boot.js
    Bootstrap do backend em Node: simula o ambiente de browser
    (window/localStorage) e carrega as camadas na ordem certa.
    Exige await DB.init() (carga do PostgreSQL) antes de servir.

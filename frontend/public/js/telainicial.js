@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – public/js/telainicial.js
+   Corte Comigo – public/js/telainicial.js
    Coreografia da splash: logo surge (fade-in), pausa, a tela
    preta some (fade-out) e o nó é removido do DOM revelando a
    página. Total ≈ 2,8s em toda visita.

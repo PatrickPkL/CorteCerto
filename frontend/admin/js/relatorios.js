@@ -1,5 +1,5 @@
 /* ============================================================
-   Corte Certo – admin/js/relatorios.js
+   Corte Comigo – admin/js/relatorios.js
    Relatórios:
    · Modo PLATAFORMA (super-admin logado): números de todas as
      lojas, assinaturas por plano e séries mensais do site.
