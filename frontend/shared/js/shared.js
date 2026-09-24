@@ -398,11 +398,6 @@ function renderNavAuth() {
   slot.innerHTML = '';
 
   if (u) {
-    const ola = document.createElement('span');
-    ola.className = 'nav-ola';
-    ola.textContent = 'Olá, ' + u.name.split(' ')[0];
-    slot.appendChild(ola);
-
     const sair = document.createElement('a');
     sair.href = '#';
     sair.textContent = 'Sair';

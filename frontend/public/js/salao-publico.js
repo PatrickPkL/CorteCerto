@@ -222,11 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const boxForm = document.getElementById('review-form-box');
     if (!boxForm) return;
     const u = Auth.usuarioAtual();
-    if (!u || u.role !== 'cliente') {
+    if (!u) {
       boxForm.innerHTML = '<p class="review-convite">' +
-        (u && u.role !== 'cliente'
-          ? 'Comentários de avaliação são deixados por clientes do salão.'
-          : 'Já visitou este salão? <a href="/login?next=' + encodeURIComponent('/salao?id=' + loja.id) + '">Entre na sua conta</a> e deixe sua avaliação.') +
+        'Já visitou este salão? <a href="/login?next=' + encodeURIComponent('/salao?id=' + loja.id) + '">Entre na sua conta</a> e deixe sua avaliação.' +
         '</p>';
       return;
     }
@@ -292,6 +290,33 @@ document.addEventListener('DOMContentLoaded', () => {
       toggle.setAttribute('aria-expanded', String(abrir));
       toggle.textContent = abrir ? 'Ocultar avaliações' : rotuloToggle();
     });
+  }
+
+  /* ---------- favoritos (UC-15): botão no perfil do salão ---------- */
+  const btnFavoritar = document.getElementById('btn-favoritar');
+  if (btnFavoritar) {
+    function atualizarFavorito() {
+      if (!Auth.usuarioAtual()) { btnFavoritar.textContent = '☆ Favoritar'; return; }
+      let favorito = false;
+      try {
+        favorito = API.meusFavoritos().some(l => l && String(l.id) === String(loja.id));
+      } catch (e) { /* noop */ }
+      btnFavoritar.textContent = favorito ? '★ Favorito' : '☆ Favoritar';
+    }
+    btnFavoritar.addEventListener('click', () => {
+      if (!Auth.usuarioAtual()) {
+        window.location.href = '/login?next=' + encodeURIComponent('/salao?id=' + loja.id);
+        return;
+      }
+      try {
+        const r = API.alternarFavorito(loja.id);
+        showToast(r.favorito ? 'Adicionado aos favoritos! Ver em Meu perfil → Favoritos.' : 'Removido dos favoritos.');
+        atualizarFavorito();
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      }
+    });
+    atualizarFavorito();
   }
 
   /* ==========================================================
