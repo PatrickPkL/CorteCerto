@@ -6,13 +6,15 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var btnSair = document.getElementById('btn-sair');
   var tglGratis = document.getElementById('tgl-site-gratis');
   var lblGratis = document.getElementById('lbl-site-gratis');
   var avisoGratis = document.getElementById('aviso-site-gratis');
   var tbodyPlanos = document.getElementById('tbody-planos');
+  var wrapPlanos = document.getElementById('wrap-planos');
+  var btnDescobrir = document.getElementById('btn-descobrir-planos');
   var modal = document.getElementById('sa-modal-plano');
   var formPlano = document.getElementById('form-plano');
   var modalTitulo = document.getElementById('sa-modal-titulo');
@@ -20,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var planoEditando = null;
   var _lista = [];
+  var planosExpandidos = false;
 
   if (btnSair) {
     btnSair.addEventListener('click', function (e) {
@@ -34,6 +37,20 @@ document.addEventListener('DOMContentLoaded', function () {
       return true;
     }
     return false;
+  }
+
+  /* ---------- toggle expandir/recolher planos ---------- */
+  function togglePlanos() {
+    planosExpandidos = !planosExpandidos;
+    if (wrapPlanos) wrapPlanos.hidden = !planosExpandidos;
+    if (btnDescobrir) btnDescobrir.textContent = planosExpandidos ? 'Recolher planos' : 'Descobrir planos';
+    if (planosExpandidos) {
+      carregarPlanos();
+    }
+  }
+
+  if (btnDescobrir) {
+    btnDescobrir.addEventListener('click', togglePlanos);
   }
 
   function atualizarRotulos() {
@@ -94,6 +111,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- lista de planos ---------- */
   function carregarPlanos() {
+    if (!planosExpandidos) return;
+    if (tbodyPlanos) {
+      tbodyPlanos.innerHTML = '<tr><td colspan="7" class="sa-loading">Carregando...</td></tr>';
+    }
     fetch('/api/super-admin/planos', { headers: saAuth.headers() })
       .then(function (res) {
         if (tratarNaoAutorizado(res)) return;
@@ -332,5 +353,4 @@ document.addEventListener('DOMContentLoaded', function () {
 
   atualizarRotulos();
   carregarConfig();
-  carregarPlanos();
 });

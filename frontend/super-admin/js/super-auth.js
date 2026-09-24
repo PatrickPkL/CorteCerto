@@ -11,12 +11,18 @@ var saAuth = {
   check: function () {
     if (!this.getToken()) {
       window.location.href = 'login.html';
+      return false;
     }
+    return true;
   },
 
   headers: function () {
+    var token = this.getToken();
+    if (token && !token.startsWith('Bearer ')) {
+      token = 'Bearer ' + token;
+    }
     return {
-      'authorization': this.getToken(),
+      'Authorization': token,
       'content-type': 'application/json'
     };
   },

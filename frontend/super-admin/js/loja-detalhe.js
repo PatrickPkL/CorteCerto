@@ -7,7 +7,7 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var params = new URLSearchParams(window.location.search);
   var lojaId = params.get('id');

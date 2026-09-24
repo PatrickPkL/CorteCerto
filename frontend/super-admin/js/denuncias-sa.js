@@ -8,7 +8,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   'use strict';
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var tbody = document.getElementById('tbody-denuncias');
   var totalPendentes = document.getElementById('sa-total-pendentes');

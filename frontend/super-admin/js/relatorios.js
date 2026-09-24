@@ -7,7 +7,7 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var elPeriodo = document.getElementById('sa-periodo');
   var elReceita = document.getElementById('stat-receita');

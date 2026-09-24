@@ -6,7 +6,7 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var tbody = document.getElementById('tbody-tickets');
   var totalAbertos = document.getElementById('sa-total-abertos');

@@ -6,7 +6,7 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var elTotalLojas = document.getElementById('stat-lojas');
   var elTotalUsers = document.getElementById('stat-users');

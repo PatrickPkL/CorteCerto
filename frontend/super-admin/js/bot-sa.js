@@ -7,7 +7,7 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  saAuth.check();
+  if (!saAuth.check()) return;
 
   var el = {
     sw: document.getElementById('bot-switch'),
