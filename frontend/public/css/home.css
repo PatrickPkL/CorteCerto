@@ -72,13 +72,13 @@
 /* ---------------- hero da página revelada ---------------- */
 
 .hero-home {
-  min-height: calc(100vh - 200px);
+  min-height: calc(100vh - 320px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 48px 20px 80px;
+  padding: 48px 20px 64px;
 }
 
 .hero-logo {
@@ -113,4 +113,81 @@
 .btn-lg {
   padding: 14px 38px;
   font-size: 16.5px;
+}
+
+/* ---------------- benefícios e planos (sempre visíveis) ---------------- */
+
+.beneficios-home,
+.planos-home {
+  text-align: center;
+  padding: 8px 20px 72px;
+  scroll-margin-top: 90px;
+}
+
+.beneficios-home h2,
+.planos-home h2 {
+  font-size: clamp(24px, 4vw, 34px);
+  margin: 10px 0 26px;
+  letter-spacing: -0.5px;
+}
+
+.beneficios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.beneficio-card h3 { margin: 0 0 6px; font-size: 17px; }
+.beneficio-card p { margin: 0; color: var(--text-muted); font-size: 14px; }
+
+.planos-sub {
+  color: var(--text-muted);
+  font-size: 15px;
+  max-width: 580px;
+  margin: 0 auto 18px;
+}
+
+.planos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+  max-width: 1020px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+/* card de plano público (os estilos internos vêm de components.css) */
+.plan-card {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plan-card:hover { box-shadow: var(--shadow-md); }
+
+.plan-card-free { border-color: var(--brass); }
+
+.plan-card a.btn,
+.plan-card button.btn { margin-top: auto; }
+
+.planos-termos {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 660px;
+  margin: 22px auto 0;
+}
+
+.planos-vazio {
+  color: var(--text-muted);
+  font-size: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
 }

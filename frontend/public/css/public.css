@@ -75,6 +75,62 @@
 }
 .rating { color: var(--brass); font-weight: 600; }
 
+/* stats do salão no card do catálogo (discretas) */
+.salon-stats {
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin: -6px 0 12px;
+}
+
+/* ---------------- avaliações discretas (perfil público) ---------------- */
+.reviews-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.reviews-toggle:hover { border-color: var(--brass); color: var(--text); }
+.reviews-toggle[aria-expanded="true"] { color: var(--text); }
+.reviews-toggle .rating { font-size: 12.5px; }
+
+.reviews-panel { margin-top: 14px; }
+.reviews-panel[hidden] { display: none; }
+
+.review-form-box {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.review-form-box .review-convite {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  margin: 0;
+}
+.review-estrelas { display: flex; align-items: center; gap: 4px; }
+.review-estrelas .estrela {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-muted);
+  padding: 0;
+  transition: color 0.15s ease;
+}
+.review-estrelas .estrela.ativa { color: var(--brass); }
+.review-valor { font-size: 13px; color: var(--text-muted); margin-left: 8px; }
+.review-form .field { margin-top: 10px; }
+.review-char-count { font-size: 11.5px; color: var(--text-muted); text-align: right; margin-top: 4px; }
+
 .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .tag {
   font-size: 11.5px;

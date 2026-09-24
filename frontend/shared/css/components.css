@@ -520,7 +520,7 @@ input:focus, select:focus, textarea:focus {
   color: var(--text);
 }
 .plan-feats li::before {
-  content: '?';
+  content: '\2713';
   position: absolute;
   left: 2px;
   color: var(--brass);

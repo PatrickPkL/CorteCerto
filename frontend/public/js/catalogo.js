@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const sugestoesBox = document.getElementById('sugestoes');
   if (!grid) return;
 
+  function intAbreviado(n) {
+    n = Number(n || 0);
+    if (n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + ' mil';
+    return String(n);
+  }
+
   function cardLoja(l) {
     const capa = l.logo_url || l.cover_url; // foto de perfil manda no card
     const capaStyle = capa ? ' style="background:#000 url(&quot;' + esc(capa) + '&quot;) center/cover no-repeat;"' : '';
@@ -22,6 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ? '<div class="salon-match">Profissional: <strong>' + esc(l.matched_professional.name) + '</strong></div>'
         : '');
     const rating = Number(l.rating_avg || 0).toFixed(1);
+    const stats = [
+      l.views ? intAbreviado(l.views) + ' visualizações' : '',
+      l.total_agendamentos ? intAbreviado(l.total_agendamentos) + ' agendamentos' : ''
+    ].filter(Boolean).join(' · ');
 
     return '<a href="/salao?id=' + l.id + '" class="salon-card">' +
       '<div class="salon-card-cover"' + capaStyle + '></div>' +
@@ -30,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '<div class="salon-meta"><span class="rating">★ ' + rating + '</span>' +
           (l.rating_count ? ' (' + l.rating_count + ')' : '') +
           ' · ' + esc((l.city || 'Cidade não informada') + (l.uf ? ', ' + l.uf : '')) + '</div>' +
+        (stats ? '<div class="salon-stats">' + esc(stats) + '</div>' : '') +
         match +
         '<div class="tag-list">' + tags + '</div>' +
         '<span class="btn btn-outline">Ver barbearia</span>' +

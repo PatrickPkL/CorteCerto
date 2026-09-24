@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
   try { loja = API.getLoja(lojaId); }
   catch (e) { window.location.href = '/catalogo'; return; }
 
+  /* contagem de visualização do perfil (exibida discretamente nos
+     cards do catálogo) — best-effort, nunca quebra a página */
+  try { API.registrarVisualizacao(lojaId); } catch (e) { /* noop */ }
+
   const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -156,22 +160,35 @@ document.addEventListener('DOMContentLoaded', () => {
     '<div class="empty-state"><h3>Nenhum serviço cadastrado</h3><p>Este salão ainda não cadastrou serviços.</p></div>';
   }
 
-  /* ---------- avaliações (RF-055) ---------- */
-  function renderReviews() {
+  /* ---------- avaliações (RF-055) — discretas ----------
+     No perfil, antes de interagir, só aparece o Nº de comentários
+     (pequeno e sutil). Ao clicar, abre o painel com as avaliações
+     (1 a 5 estrelas, comentário ≤ 100 caracteres) e o formulário
+     para clientes logados. */
+  const contador = document.getElementById('reviews-contador');
+  const toggle = document.getElementById('reviews-toggle');
+  const panels = document.getElementById('reviews-panel');
+
+  let reviewsGerais = [];
+  function refreshReviews() {
+    try { reviewsGerais = API.reviewsDaLoja(loja.id); } catch (e) { reviewsGerais = []; }
+    const total = reviewsGerais.length;
+    if (contador) {
+      contador.textContent = total + (total === 1 ? ' comentário' : ' comentários');
+    }
+  }
+
+  function renderLista() {
     const box = document.getElementById('lista-reviews');
     const resumo = document.getElementById('reviews-resumo');
     if (!box) return;
-    let reviews = [];
-    try { reviews = API.reviewsDaLoja(loja.id); } catch (e) { /* noop */ }
-
     if (resumo) {
-      resumo.innerHTML = reviews.length
+      resumo.innerHTML = reviewsGerais.length
         ? '<span class="rating">★ ' + Number(loja.rating_avg || 0).toFixed(1) + '</span> · ' +
-          reviews.length + ' avaliação(ões)'
+          reviewsGerais.length + ' avaliação(ões)'
         : '<span style="color:var(--text-muted)">Ainda sem avaliações — seja o primeiro!</span>';
     }
-
-    box.innerHTML = reviews.slice(0, 8).map(r => {
+    box.innerHTML = reviewsGerais.slice(0, 8).map(r => {
       const estrelas = '★'.repeat(Math.max(1, Math.min(5, Number(r.rating) || 0))) +
         '☆'.repeat(5 - Math.max(1, Math.min(5, Number(r.rating) || 0)));
       return '<div class="review-item">' +
@@ -182,6 +199,81 @@ document.addEventListener('DOMContentLoaded', () => {
       '</div>';
     }).join('') ||
     '<p style="color:var(--text-muted)">Nenhuma avaliação por aqui.</p>';
+  }
+
+  function renderFormulario() {
+    const boxForm = document.getElementById('review-form-box');
+    if (!boxForm) return;
+    const u = Auth.usuarioAtual();
+    if (!u || u.role !== 'cliente') {
+      boxForm.innerHTML = '<p class="review-convite">' +
+        (u && u.role !== 'cliente'
+          ? 'Comentários de avaliação são deixados por clientes do salão.'
+          : 'Já visitou este salão? <a href="/login?next=' + encodeURIComponent('/salao?id=' + loja.id) + '">Entre na sua conta</a> e deixe sua avaliação.') +
+        '</p>';
+      return;
+    }
+    boxForm.innerHTML =
+      '<h4 style="font-size:15px;margin:0 0 10px;">Deixe sua avaliação</h4>' +
+      '<form class="review-form" id="review-form">' +
+        '<div class="review-estrelas" id="review-estrelas">' +
+          [1, 2, 3, 4, 5].map(n =>
+            '<button type="button" class="estrela" data-nota="' + n + '" aria-label="' + n + ' estrela(s)">★</button>').join('') +
+          '<span class="review-valor" id="review-valor"></span>' +
+        '</div>' +
+        '<div class="field">' +
+          '<textarea id="review-comentario" rows="2" maxlength="100" style="width:100%;resize:vertical;" placeholder="Como foi sua experiência? (máx. 100 caracteres)"></textarea>' +
+          '<div class="review-char-count" id="review-char-count">0/100</div>' +
+        '</div>' +
+        '<button type="submit" class="btn btn-primary">Enviar avaliação</button>' +
+      '</form>';
+
+    const estrelasEl = boxForm.querySelector('#review-estrelas');
+    const valorEl = boxForm.querySelector('#review-valor');
+    const texto = boxForm.querySelector('#review-comentario');
+    const contadorChars = boxForm.querySelector('#review-char-count');
+    let nota = 0;
+
+    estrelasEl.querySelectorAll('.estrela').forEach(b => {
+      b.addEventListener('click', () => {
+        nota = Number(b.dataset.nota);
+        estrelasEl.querySelectorAll('.estrela').forEach(x =>
+          x.classList.toggle('ativa', Number(x.dataset.nota) <= nota));
+        valorEl.textContent = nota + ' de 5';
+      });
+    });
+    texto.addEventListener('input', () => {
+      contadorChars.textContent = texto.value.length + '/100';
+    });
+    boxForm.querySelector('#review-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!nota) { showToast('Escolha uma nota de 1 a 5 estrelas.', 'error'); return; }
+      const comentario = (texto.value || '').trim();
+      try {
+        API.criarReview(loja.id, { rating: nota, comment: comentario });
+        showToast('Avaliação enviada! Obrigado.');
+        refreshReviews();
+        renderLista();
+        boxForm.innerHTML = '';
+      } catch (err2) {
+        showToast(msgErro(err2), 'error');
+      }
+    });
+  }
+
+  refreshReviews();
+  if (toggle && !toggle.dataset.ccOn) {
+    toggle.dataset.ccOn = '1';
+    toggle.addEventListener('click', () => {
+      const abrir = panels.hidden;
+      if (abrir) {
+        refreshReviews();
+        renderLista();
+        renderFormulario();
+      }
+      panels.hidden = !abrir;
+      toggle.setAttribute('aria-expanded', String(abrir));
+    });
   }
 
   /* ==========================================================
@@ -541,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  renderReviews();
+  refreshReviews();
 
   const btnCompartilhar = document.getElementById('btn-compartilhar');
   if (btnCompartilhar) {

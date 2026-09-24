@@ -123,6 +123,7 @@ const MAP = [
       slot_interval_min: (b.slotIntervalMin || 15),
       horarios_configurados: b.horarios_configurados ? 1 : 0,
       codigo_unico: b.codigo_unico || null,
+      views: b.views || 0,
       created_at: toPgDate(b.created_at) || new Date(), updated_at: toPgDate(b.updated_at) || new Date()
     }),
     toMem: (r) => ({
@@ -135,6 +136,7 @@ const MAP = [
       slotIntervalMin: Number(r.slot_interval_min || 15),
       horarios_configurados: r.horarios_configurados ? 1 : 0,
       codigo_unico: r.codigo_unico || null,
+      views: Number(r.views || 0),
       created_at: toMemDate(r.created_at, 'local'), updated_at: toMemDate(r.updated_at, 'local')
     })
   },
@@ -454,7 +456,7 @@ const CASTS = {
   users: { role: 'usr_role', prefs: 'jsonb', consentimentos: 'jsonb[]', barbershop_id: 'uuid', created_at: 'timestamptz', updated_at: 'timestamptz' },
   sessions: { user_id: 'uuid', expires_at: 'timestamptz', created_at: 'timestamptz' },
   sms_codes: { expires_at: 'timestamptz', next_allowed_at: 'timestamptz', created_at: 'timestamptz', payload: 'jsonb' },
-  barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', slot_interval_min: 'int', created_at: 'timestamptz', updated_at: 'timestamptz' },
+  barbershops: { owner_user_id: 'uuid', uf: null, lat: 'numeric', lng: 'numeric', tags: 'text[]', rating_base: 'numeric', slot_interval_min: 'int', views: 'int', created_at: 'timestamptz', updated_at: 'timestamptz' },
   services: { barbershop_id: 'uuid', price: 'numeric', duration_min: 'int', sort_order: 'int', updated_at: 'timestamptz', created_at: 'timestamptz' },
   professionals: { barbershop_id: 'uuid', user_id: 'uuid', is_active: 'boolean', created_at: 'timestamptz', updated_at: 'timestamptz' },
   professional_services: { professional_id: 'uuid', service_id: 'uuid', price_override: 'numeric' },

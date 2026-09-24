@@ -281,8 +281,31 @@ window.API = (function () {
     return { items, total, page, limit: limite };
   }
 
-  function lojaPublica(l) {
+function statsDeAgendamentos(shopId) {
+    const db = DB._d();
+    const todos = (db.appointments || []).filter(a => a.barbershop_id == shopId);
+    const total = todos.length;
+    const dias = new Set();
+    todos.forEach(a => dias.add(String(a.starts_at || a.created_at || '').slice(0, 10)));
+    const diasCom = dias.size;
+    return {
+      total_agendamentos: total,
+      media_agendamentos_dia: diasCom ? Math.round((total / diasCom) * 10) / 10 : 0
+    };
+  }
+
+  function registrarVisualizacao(shopId) {
+    const db = DB._d();
+    const l = db.barbershops.find(b => b.id == shopId);
+    if (!l) err(404, 'Salão não encontrado.');
+    l.views = (l.views || 0) + 1;
+    DB.salvar();
+    return { views: l.views };
+  }
+
+function lojaPublica(l) {
     const r = ratingDeLoja(l.id);
+    const stats = statsDeAgendamentos(l.id);
     return {
       id: l.id, name: l.name, slug: l.slug, description: l.description || '',
       address: l.address || '', city: l.city || '', uf: l.uf || '',
@@ -291,6 +314,9 @@ window.API = (function () {
       tags: l.tags || [],
       lat: l.lat ?? null, lng: l.lng ?? null,
       rating_avg: r.media, rating_count: r.count,
+      views: l.views || 0,
+      total_agendamentos: stats.total_agendamentos,
+      media_agendamentos_dia: stats.media_agendamentos_dia,
       created_at: l.created_at
     };
   }
@@ -3286,6 +3312,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     }
     const loja = DB._d().barbershops.find(b => b.id == shopId);
     if (!loja) err(404, 'Salão não encontrado.');
+    const comment = String(dados.comment || '').trim();
+    if (comment.length > 100) err(400, 'Comentário deve ter no máximo 100 caracteres.');
     const r = {
       id: DB.proximoId(),
       barbershop_id: loja.id,
@@ -3293,7 +3321,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       user_id: user.id,
       client_name: user.name,
       rating: nota,
-      comment: String(dados.comment || '').trim(),
+      comment: comment,
       created_at: agoraLocal()
     };
     DB._d().reviews.push(r);
@@ -4184,7 +4212,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
     // lojas
     listarLojasPublicas, getLoja, minhaLoja, atualizarLoja, excluirLoja,
-    lojasProximas, ratingDeLoja, lojaPublica,
+    lojasProximas, ratingDeLoja, lojaPublica, registrarVisualizacao,
 
     // serviços
     servicosDaLoja, criarServico, atualizarServico, excluirServico, servicosPublicos,
