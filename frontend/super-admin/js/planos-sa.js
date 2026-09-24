@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var tglGratis = document.getElementById('tgl-site-gratis');
   var lblGratis = document.getElementById('lbl-site-gratis');
   var avisoGratis = document.getElementById('aviso-site-gratis');
+  var tglTrial = document.getElementById('tgl-trial');
+  var lblTrial = document.getElementById('lbl-trial');
+  var avisoTrial = document.getElementById('aviso-trial');
   var tbodyPlanos = document.getElementById('tbody-planos');
   var wrapPlanos = document.getElementById('wrap-planos');
   var btnDescobrir = document.getElementById('btn-descobrir-planos');
@@ -57,6 +60,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var ativo = !!(tglGratis && tglGratis.checked);
     if (lblGratis) lblGratis.textContent = ativo ? 'Ligado' : 'Desligado';
     if (avisoGratis) avisoGratis.hidden = !ativo;
+
+    var trialAtivo = !(tglTrial && tglTrial.checked === false);
+    if (lblTrial) lblTrial.textContent = trialAtivo ? 'Ligado' : 'Desligado';
+    if (avisoTrial) avisoTrial.hidden = trialAtivo;
   }
 
   /* ---------- configuração global ---------- */
@@ -71,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (env.error) { showToast(env.error, 'error'); return; }
         var cfg = env.data || {};
         if (tglGratis) tglGratis.checked = !!cfg.site_gratis;
+        if (tglTrial) tglTrial.checked = cfg.trial_10dias !== false;
         atualizarRotulos();
       })
       .catch(function () { showToast('Erro ao carregar configuração.', 'error'); });
@@ -107,6 +115,39 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (tglGratis) {
     tglGratis.addEventListener('change', function () { salvarConfig(!!tglGratis.checked); });
+  }
+
+  function salvarTrial(ativo) {
+    fetch('/api/super-admin/config', {
+      method: 'PUT',
+      headers: saAuth.headers(),
+      body: JSON.stringify({ trial_10dias: ativo })
+    })
+      .then(function (res) {
+        if (tratarNaoAutorizado(res)) return;
+        return res.json();
+      })
+      .then(function (env) {
+        if (!env) return;
+        if (env.error) {
+          showToast(env.error, 'error');
+          if (tglTrial) tglTrial.checked = !ativo;
+          atualizarRotulos();
+          return;
+        }
+        showToast(ativo ? 'Promoção de 10 dias grátis ATIVADA para novas contas.'
+                        : 'Promoção de 10 dias grátis desativada.', ativo ? 'success' : 'info');
+        atualizarRotulos();
+      })
+      .catch(function () {
+        showToast('Erro ao salvar configuração.', 'error');
+        if (tglTrial) tglTrial.checked = !ativo;
+        atualizarRotulos();
+      });
+  }
+
+  if (tglTrial) {
+    tglTrial.addEventListener('change', function () { salvarTrial(!!tglTrial.checked); });
   }
 
   /* ---------- lista de planos ---------- */

@@ -488,12 +488,18 @@ window.Auth = (function () {
       };
       db.users.push(usuario);
       if (usuario.role === 'dono') barbearia = provisionarSalao(usuario, p.salon_name);
-      /* email de onboarding para novo dono */
+      /* email de onboarding para novo dono (10 dias grátis só quando a
+         promoção está ligada pelo super-admin) */
       if (usuario.role === 'dono' && usuario.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usuario.email)) {
+        let trialDias = 0;
+        try {
+          const stTrial = (DB._d().platform_settings || []).find(s => s.chave === 'trial_10dias');
+          if (!stTrial || !stTrial.valor || stTrial.valor.ativo !== false) trialDias = 10;
+        } catch (e) { /* padrão: sem promessa de trial no e-mail */ }
         Mailer.enviarBoasVindas({
           email: usuario.email, nome: usuario.name,
           nomeSalao: p.salon_name || (barbearia && barbearia.name) || 'Seu salão',
-          trialDias: 10,
+          trialDias,
           shopId: barbearia && barbearia.id
         }).catch(function(e) { console.error('[onboarding] falha:', e); });
       }

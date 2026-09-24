@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let liberado = false;
     try { liberado = !!API.acessoLiberado(loja.id); } catch (e) { liberado = false; }
 
-    const podeTrial = !sub.trial_usado && !sub.on_trial;
+    const podeTrial = sub.trial_disponivel !== false && !sub.trial_usado && !sub.on_trial;
 
     if (sub.on_trial) {
       const valorPlano = sub.plan ? DB.fmtBRL(sub.plan.price_monthly) + '/mês' : '—';
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('lista-planos');
     if (!box) return;
 
-    const podeTrial = !subAtual.trial_usado && !subAtual.on_trial;
+    const podeTrial = subAtual.trial_disponivel !== false && !subAtual.trial_usado && !subAtual.on_trial;
     const anual = periodoGlobal === 'anual';
     box.innerHTML = planos.map(p => {
       const atual = subAtual.plano_efetivo && subAtual.plano_efetivo.id === p.id;

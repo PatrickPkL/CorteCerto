@@ -183,6 +183,33 @@ window.API = (function () {
     return { site_gratis: !!ativo };
   }
 
+  /* ---------- Trial "10 dias grátis" para novas contas (config global) ----------
+     O super-admin liga/desliga a promoção. DESLIGADA: nenhuma assinatura nova
+     entra em trial (a função deixa de existir); trials já em andamento seguem
+     até o fim. LIGADA (padrão quando a chave não existe): novas contas podem
+     iniciar os 10 dias grátis ao escolher um plano. */
+  function modoTrialAtivo() {
+    try {
+      const st = (_db().platform_settings || []).find(s => s.chave === 'trial_10dias');
+      if (!st || !st.valor) return true;
+      return st.valor.ativo !== false;
+    } catch (e) { return true; }
+  }
+
+  function definirModoTrial(ativo) {
+    const db = _db();
+    db.platform_settings = db.platform_settings || [];
+    let st = db.platform_settings.find(s => s.chave === 'trial_10dias');
+    if (!st) {
+      st = { chave: 'trial_10dias', valor: {}, updated_at: agoraISO() };
+      db.platform_settings.push(st);
+    }
+    st.valor = { ativo: !!ativo };
+    st.updated_at = agoraISO();
+    DB.salvar();
+    return { trial_10dias: !!ativo };
+  }
+
   function planoGratuitoPlataforma() {
     return {
       id: '__plataforma_gratis__', name: 'Grátis (plataforma)', is_free: true,
@@ -766,12 +793,17 @@ window.API = (function () {
   }
 
   function saObterConfig() {
-    return { site_gratis: modoGratuito() };
+    return { site_gratis: modoGratuito(), trial_10dias: modoTrialAtivo() };
   }
 
   function saDefinirSiteGratis(ativo) {
     if (ativo && typeof ativo === 'object') ativo = ativo.ativo;
     return definirModoGratuito(!!ativo);
+  }
+
+  function saDefinirTrial(ativo) {
+    if (ativo && typeof ativo === 'object') ativo = ativo.ativo;
+    return definirModoTrial(!!ativo);
   }
 
   function saExcluirLoja(shopId) {
@@ -3510,6 +3542,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       current_period_end: sub ? sub.current_period_end : null,
       trial_usado: !!(sub && sub.trial_usado),
       on_trial: !!(sub && sub.status === 'trial' && sub.trial_ends_at >= hoje),
+      trial_disponivel: modoTrialAtivo(),
       days_left_in_trial: (sub && sub.trial_ends_at)
         ? Math.max(0, Math.round((DB.parseISO(sub.trial_ends_at) - DB.parseISO(hoje)) / 86400000))
         : 0
@@ -3532,6 +3565,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
    */
   function assinarComTrial(planId) {
     const { shop } = exigirDono();
+    if (!modoTrialAtivo()) {
+      err(403, 'A promoção de 10 dias grátis está desativada. Assine diretamente um plano para liberar o acesso.');
+    }
     const db = DB._d();
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err(404, 'Plano não encontrado.');
@@ -4243,6 +4279,6 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     saTickets, saResponderTicket,
     saListarDenuncias, saResolverDenuncia,
     saListarPlanos, saAtualizarPrecosPlano, saCriarPlano, saEditarPlano, saExcluirPlano,
-    saObterConfig, saDefinirSiteGratis
+    saObterConfig, saDefinirSiteGratis, saDefinirTrial
   };
 })();

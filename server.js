@@ -230,7 +230,8 @@ const _RPC_BLOQUEADOS = new Set([
   'saTickets', 'saResponderTicket',
   'saListarDenuncias', 'saResolverDenuncia',
   'saListarPlanos', 'saAtualizarPrecosPlano', 'saCriarPlano', 'saEditarPlano', 'saExcluirPlano',
-  'saObterConfig', 'saDefinirSiteGratis'
+  'saObterConfig', 'saDefinirSiteGratis', 'saDefinirTrial',
+  'definirModoTrial'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
@@ -545,10 +546,12 @@ function handleSuperAdmin(req, res, pathname, url) {
     return;
   }
 
-  /* PUT /api/super-admin/config — liga/desliga o modo grátis do site */
+  /* PUT /api/super-admin/config — liga/desliga modo grátis do site e trial */
   if (rota === 'config' && !idParam && req.method === 'PUT') {
     return readBody().then(dados => {
-      const r = API.saDefinirSiteGratis(dados.site_gratis);
+      if (typeof dados.site_gratis !== 'undefined') API.saDefinirSiteGratis(dados.site_gratis);
+      if (typeof dados.trial_10dias !== 'undefined') API.saDefinirTrial(dados.trial_10dias);
+      const r = API.saObterConfig();
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
