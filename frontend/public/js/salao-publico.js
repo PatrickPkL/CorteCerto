@@ -177,6 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return '★'.repeat(n) + '☆'.repeat(5 - n);
   }
 
+  function rotuloToggle() {
+    const total = reviewsGerais.length;
+    return total
+      ? 'Ver ' + total + (total === 1 ? ' avaliação' : ' avaliações') + ' e comentar'
+      : 'Ver avaliações e comentar';
+  }
+
   function atualizarResumo() {
     const total = reviewsGerais.length;
     const media = total
@@ -185,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (reviewsStars) reviewsStars.textContent = estrelasCheias(media);
     if (reviewsNota) reviewsNota.textContent = total ? media.toFixed(1) : '—';
     if (reviewsCount) reviewsCount.textContent = total + (total === 1 ? ' comentário' : ' comentários');
+    if (toggle && panels && panels.hidden) toggle.textContent = rotuloToggle();
   }
 
   function carregarReviews() {
@@ -282,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       panels.hidden = !abrir;
       toggle.setAttribute('aria-expanded', String(abrir));
-      toggle.textContent = abrir ? 'Ocultar avaliações' : 'Ver avaliações e comentar';
+      toggle.textContent = abrir ? 'Ocultar avaliações' : rotuloToggle();
     });
   }
 
